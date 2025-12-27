@@ -74,6 +74,10 @@ uv run ruff format src tests     # Format
 uv run lodestar --help           # Test CLI entrypoint
 uv run lodestar status --json    # Test JSON output
 uv run pytest -k "test_name"     # Run specific test
+
+# Documentation
+uv run mkdocs serve              # Local docs preview at localhost:8000
+uv run mkdocs build              # Build static docs to site/
 ```
 
 ## Key References
@@ -120,28 +124,62 @@ lodestar export snapshot         # Export full state
 
 All commands support `--json`, `--schema`, and `--explain` flags.
 
-## Dogfooding: This Repo Uses Lodestar
+## Dogfooding: This Repo Uses Lodestar (MANDATORY)
 
-This project uses **lodestar itself** for task management. Tasks are defined in `.lodestar/spec.yaml`.
+This project uses **lodestar itself** for task management. **You MUST use lodestar commands** to create, fetch, and manage tasks—do not edit `.lodestar/spec.yaml` directly.
 
-### Task Creation
+### Finding Tasks to Work On
+
+Always use lodestar to discover what to work on:
+
 ```bash
-# Create a task
-lodestar task create --title "My task" --priority 1 --label "feature"
+lodestar status                  # Project overview + task counts
+lodestar task next               # Find claimable tasks (use this!)
+lodestar task list               # List all tasks
+lodestar task show <id>          # Show task details
+```
+
+### Creating New Tasks
+
+Use `lodestar task create` to add tasks—never edit spec.yaml directly:
+
+```bash
+# Create a task with required fields
+lodestar task create \
+  --id "F099" \
+  --title "Implement new feature" \
+  --description "What needs to be done" \
+  --priority 2 \
+  --label feature
 
 # With dependencies
-lodestar task create --title "Step 2" --depends-on "STEP-001"
+lodestar task create \
+  --title "Step 2" \
+  --depends-on "STEP-001" \
+  --priority 1
 ```
 
-### Agent Workflow
+### Working on Tasks
+
 ```bash
-lodestar status                  # Project overview
-lodestar agent join              # Register as agent
+lodestar agent join              # Register as agent (do this first)
 lodestar task next               # Find available work
-lodestar task claim <id>         # Claim a task
-lodestar task done <id>          # Mark task complete
-lodestar task verify <id>        # Verify task
+lodestar task claim <id>         # Claim before starting work
+lodestar task renew <id>         # Extend lease if needed
+lodestar task release <id>       # Release if blocked
 ```
+
+### Completing Tasks
+
+```bash
+lodestar task done <id>          # Mark task complete
+lodestar task verify <id>        # Verify task works
+```
+
+### Prohibited
+
+- **Do NOT edit `.lodestar/spec.yaml` directly** — use `lodestar task create/update`
+- **Do NOT work on tasks without claiming them** — use `lodestar task claim`
 
 ## Testing Strategy
 
@@ -149,3 +187,37 @@ lodestar task verify <id>        # Verify task
 - **Integration tests**: Concurrent claims, spec locking
 - **Golden tests**: CLI `--json` output snapshots
 - Test CLI end-to-end: `uv run lodestar <cmd>` with assertions on output
+
+## Documentation
+
+This project uses **mkdocs** with Material theme. Docs live in `docs/`.
+
+### When to Update Docs
+
+Update documentation whenever you:
+- Add, modify, or remove CLI commands
+- Change command flags or output formats
+- Modify core concepts (spec/runtime, leases, scheduling)
+- Add new features or workflows
+- Fix bugs that affect documented behavior
+
+### Doc Structure
+
+```
+docs/
+├── index.md              # Landing page
+├── getting-started.md    # Installation, quickstart
+├── concepts/             # Architecture docs
+├── cli/                  # Command reference
+├── guides/               # How-to guides
+└── reference/            # API/schema reference
+```
+
+### Documentation Standards
+
+- Keep CLI examples current with actual output
+- Include `--json` examples for programmatic usage
+- Cover both human and AI agent workflows
+- Cross-reference related sections
+- Test code examples before committing
+- Run `uv run mkdocs build` before committing changes
