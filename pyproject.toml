@@ -1,0 +1,80 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lodestar-cli"
+version = "0.1.0"
+description = "Agent-native repo orchestration for multi-agent coordination in Git repositories"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "Lodestar Team" }]
+keywords = ["cli", "agents", "coordination", "git", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "portalocker>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+lodestar = "lodestar.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/lodestar-cli/lodestar"
+Documentation = "https://github.com/lodestar-cli/lodestar#readme"
+Repository = "https://github.com/lodestar-cli/lodestar.git"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lodestar"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "ARG"]
+ignore = [
+    "E501",    # Line too long (handled by formatter)
+    "B008",    # Function call in default argument (Typer pattern)
+    "B904",    # Raise from in except (not always needed for typer.Exit)
+    "ARG001",  # Unused function argument (CLI options are intentional)
+    "ARG002",  # Unused method argument (database params may be for future use)
+    "UP046",   # Generic class style (Pydantic compatibility)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true

@@ -1,0 +1,804 @@
+{
+  "projectName": "lodestar",
+  "version": "0.1.0",
+  "features": [
+    {
+      "id": "F001",
+      "category": "cli",
+      "priority": 1,
+      "description": "Initialize Typer CLI app with entry point",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "lodestar command runs without error",
+        "lodestar --help displays available commands",
+        "--version flag works"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:51:47.651689",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "CLI runs with --version and --help",
+        "84 tests pass"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": "2025-12-27T10:35:45.999202",
+      "notes": "M0 skeleton. Use Typer for CLI framework. Entry point is lodestar. Create src/lodestar/cli/ structure with app.py."
+    },
+    {
+      "id": "F002",
+      "category": "cli",
+      "priority": 1,
+      "description": "Implement lodestar init command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Creates .lodestar/spec.yaml with default structure",
+        "Creates .lodestar/.gitignore for runtime files",
+        "Creates root AGENTS.md with agent instructions",
+        "Command is idempotent - safe to run multiple times",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:51:49.640321",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar init creates .lodestar/spec.yaml",
+        ".gitignore",
+        "AGENTS.md"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M0 skeleton. Creates two-plane structure. spec.yaml has project name and empty tasks dict. AGENTS.md provides quick-start for agents."
+    },
+    {
+      "id": "F003",
+      "category": "cli",
+      "priority": 1,
+      "description": "Implement lodestar doctor command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Validates .lodestar directory exists",
+        "Validates spec.yaml is valid YAML and schema-conformant",
+        "Validates runtime.sqlite is accessible",
+        "Reports issues with suggested fixes",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:51:51.754059",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar doctor checks repo",
+        "spec",
+        "dag",
+        "runtime",
+        "gitignore"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M0 skeleton. Health check command. Should detect common problems like missing files or corrupted database."
+    },
+    {
+      "id": "F004",
+      "category": "cli",
+      "priority": 1,
+      "description": "Implement lodestar status command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Shows repo initialized status",
+        "Shows agent registration status",
+        "Shows task counts by status (ready/blocked/claimed/done/verified)",
+        "Shows active agent count",
+        "Suggests next actions (3-5 commands)",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:51:53.751872",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar status shows project",
+        "tasks",
+        "agents",
+        "next actions"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M0 skeleton. Progressive discovery entry point. When run with no args lodestar should behave like status."
+    },
+    {
+      "id": "F005",
+      "category": "spec",
+      "priority": 1,
+      "description": "Implement spec plane with YAML schema",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "spec.yaml loads and validates against Pydantic schema",
+        "Project section with name and default_branch",
+        "Tasks dictionary with all required fields",
+        "Atomic file writes with portalocker",
+        "DAG cycle detection on save"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:06.104640",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "Spec loads/saves YAML with atomic writes and file locking"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M0 skeleton. Core spec plane. Use Pydantic v2 for models. spec.yaml is committed to git. Validate depends_on references exist."
+    },
+    {
+      "id": "F006",
+      "category": "runtime",
+      "priority": 1,
+      "description": "Implement runtime plane with SQLite WAL",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "runtime.sqlite created with WAL mode",
+        "agents table with schema from PRD",
+        "leases table with schema from PRD",
+        "messages table with schema from PRD",
+        "Database migrations framework",
+        "Gitignored automatically"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:08.081884",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "SQLite runtime with WAL mode",
+        "agents/leases/messages tables"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M0 skeleton. Core runtime plane. Use SQLite WAL for concurrent access. Tables: agents/leases/messages/events(optional)."
+    },
+    {
+      "id": "F007",
+      "category": "models",
+      "priority": 1,
+      "description": "Implement Pydantic models with JSON Schema export",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "All spec models defined with Pydantic v2",
+        "All runtime models defined with Pydantic v2",
+        "JSON Schema export via --schema flag",
+        "Consistent JSON envelope structure (ok/data/next/warnings)"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:10.116949",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "Pydantic v2 models with model_dump and JSON serialization"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M0 skeleton. Models in src/lodestar/models/. Every command must support --schema to export its output schema."
+    },
+    {
+      "id": "F008",
+      "category": "cli",
+      "priority": 1,
+      "description": "Implement --json and --explain flags for all commands",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "All commands support --json flag",
+        "--json output uses consistent envelope structure",
+        "No ANSI codes in --json output",
+        "All commands support --explain flag",
+        "--explain returns agent-friendly command description"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:12.131834",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "All commands support --json and --explain flags"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M0 skeleton. Core CLI infrastructure. Use Rich for human output but disable for --json. --explain helps agents understand what commands do."
+    },
+    {
+      "id": "F009",
+      "category": "agent",
+      "priority": 1,
+      "description": "Implement lodestar agent join command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Registers new agent with unique agent_id",
+        "Resumes existing agent if already registered",
+        "Returns agent_id in JSON response",
+        "Returns suggested next actions",
+        "Stores session_meta (tool name and model)",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:22.731070",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar agent join registers agent and returns agent_id"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M1 agent identity. Canonical entrypoint for agents. agent_id should be stable UUID. Store in runtime.sqlite agents table."
+    },
+    {
+      "id": "F010",
+      "category": "agent",
+      "priority": 2,
+      "description": "Implement lodestar agent list command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Lists all registered agents",
+        "Shows agent_id and display_name and last_seen_at",
+        "Filters by active/inactive status",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:24.786679",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar agent list shows all registered agents"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M1 agent identity. Show agents from runtime.sqlite. Active = last_seen_at within configurable window."
+    },
+    {
+      "id": "F011",
+      "category": "agent",
+      "priority": 2,
+      "description": "Implement lodestar agent heartbeat command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Updates last_seen_at for current agent",
+        "Returns time until next heartbeat needed",
+        "Can be called periodically by agent",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:26.935052",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar agent heartbeat updates last_seen_at"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M1 agent identity. Updates agents.last_seen_at. Allows agents to signal they are still active."
+    },
+    {
+      "id": "F012",
+      "category": "agent",
+      "priority": 2,
+      "description": "Implement lodestar agent brief command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Generates brief for specified task",
+        "Includes goal and acceptance criteria",
+        "Includes allowed paths/locks",
+        "Includes check commands",
+        "Supports --format flag (copilot/claude/generic)",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:28.996871",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar agent brief returns task brief for sub-agents"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M1 agent identity. Used by orchestrator to spawn sub-agents. Brief should be self-contained context for task execution."
+    },
+    {
+      "id": "F013",
+      "category": "task",
+      "priority": 1,
+      "description": "Implement lodestar task list command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Lists all tasks from spec.yaml",
+        "Shows task_id and title and status",
+        "Filters by status and labels",
+        "Shows dependency status",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:40.424542",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task list shows all tasks with filtering"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. Read from spec.yaml. Show which tasks are blocked vs ready. Cross-reference with runtime for claim status."
+    },
+    {
+      "id": "F014",
+      "category": "task",
+      "priority": 1,
+      "description": "Implement lodestar task show command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Shows full task details by ID",
+        "Shows all fields from spec",
+        "Shows current claim status from runtime",
+        "Shows dependency tree",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:42.519368",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task show displays full task details"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. Merge spec and runtime data. Show which deps are satisfied vs pending."
+    },
+    {
+      "id": "F015",
+      "category": "task",
+      "priority": 1,
+      "description": "Implement lodestar task create command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Creates new task in spec.yaml",
+        "Validates required fields",
+        "Validates depends_on references exist",
+        "Validates no DAG cycles created",
+        "Assigns unique task_id if not provided",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:44.605107",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task create adds tasks to spec.yaml"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. Atomic write with portalocker. DAG validation is critical. Task IDs can be arbitrary strings or auto-generated."
+    },
+    {
+      "id": "F016",
+      "category": "task",
+      "priority": 2,
+      "description": "Implement lodestar task update command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Updates existing task fields",
+        "Validates field values",
+        "Validates no DAG cycles if depends_on changes",
+        "Atomic spec.yaml write",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:56:20.119816",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task update modifies title",
+        "description",
+        "priority",
+        "status",
+        "labels"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. Update any field except task_id. Re-validate DAG on dependency changes."
+    },
+    {
+      "id": "F017",
+      "category": "task",
+      "priority": 1,
+      "description": "Implement lodestar task next command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Returns only claimable tasks",
+        "Claimable = status ready AND all depends_on verified",
+        "Sorted by priority (lower number = higher priority)",
+        "Excludes tasks with active claims",
+        "Returns suggested claim command",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:46.707826",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task next returns claimable tasks by priority"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. Core scheduling command. Must filter out expired leases. Include priority sorting."
+    },
+    {
+      "id": "F018",
+      "category": "task",
+      "priority": 2,
+      "description": "Implement lodestar task graph command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Exports task DAG as JSON",
+        "Optional DOT format output",
+        "Shows dependency relationships",
+        "Shows task statuses",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:56.851402",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task graph exports DAG as JSON or DOT format"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. DAG visualization. Useful for external schedulers or debugging. Consider graphviz DOT format as --format dot."
+    },
+    {
+      "id": "F019",
+      "category": "spec",
+      "priority": 1,
+      "description": "Implement DAG validation for task dependencies",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Detects cycles in depends_on graph",
+        "Validates all depends_on references exist",
+        "Runs on spec load and save",
+        "Returns clear error messages for violations",
+        "Prevents invalid spec from being saved"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:52:58.943222",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "DAG validation detects cycles and missing dependencies"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. Core spec validation. Use topological sort or DFS for cycle detection. Critical for task scheduling correctness."
+    },
+    {
+      "id": "F020",
+      "category": "task",
+      "priority": 2,
+      "description": "Implement lodestar task done command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Marks task status as done",
+        "Requires active claim by current agent",
+        "Releases the lease",
+        "Updates spec.yaml atomically",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:01.029205",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task done marks task status as done"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. Transition from claimed to done. Agent must hold the lease. Consider validation of acceptance criteria."
+    },
+    {
+      "id": "F021",
+      "category": "task",
+      "priority": 2,
+      "description": "Implement lodestar task verify command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Marks task status as verified",
+        "Verifies task was in done status",
+        "Updates spec.yaml atomically",
+        "Unlocks dependent tasks",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:03.146329",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task verify marks as verified",
+        "unblocks dependents"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M2 tasks. Final task state. Verified tasks satisfy dependencies. May be done by different agent than implementer."
+    },
+    {
+      "id": "F022",
+      "category": "lease",
+      "priority": 1,
+      "description": "Implement lodestar task claim command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Creates lease for task with TTL",
+        "Only succeeds if task is claimable",
+        "Only succeeds if no active lease exists",
+        "Atomic transaction prevents race conditions",
+        "Default TTL is 15 minutes",
+        "Supports --ttl flag for custom TTL",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:14.958189",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task claim creates lease with TTL"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M3 leases. Core claim logic. Use SQLite transaction for atomicity. Check task status=ready AND deps satisfied AND no active lease."
+    },
+    {
+      "id": "F023",
+      "category": "lease",
+      "priority": 1,
+      "description": "Implement lodestar task renew command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Extends lease expires_at",
+        "Only current lease holder can renew",
+        "Returns new expiration time",
+        "Supports --ttl flag for renewal duration",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:17.079035",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task renew extends lease expiration"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M3 leases. Keep lease alive while working. Default renewal extends by same TTL as original claim."
+    },
+    {
+      "id": "F024",
+      "category": "lease",
+      "priority": 1,
+      "description": "Implement lodestar task release command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Releases lease without completing task",
+        "Only current lease holder can release",
+        "Task becomes claimable again",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:19.245274",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar task release ends lease early"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M3 leases. Abandon work without marking done. Useful when agent cannot complete the task."
+    },
+    {
+      "id": "F025",
+      "category": "lease",
+      "priority": 1,
+      "description": "Implement automatic lease expiry handling",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Expired leases filtered out at read time",
+        "No background daemon required",
+        "task next excludes expired claims",
+        "Expired tasks become claimable",
+        "Consistent expiry logic across all commands"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:21.481623",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "Expired leases filtered out in get_active_lease queries"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M3 leases. Core expiry behavior. All queries that check for active leases must filter by expires_at > now. No daemon needed."
+    },
+    {
+      "id": "F026",
+      "category": "lease",
+      "priority": 1,
+      "description": "Implement concurrent claim atomicity",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Two simultaneous claims result in exactly one success",
+        "SQLite transaction isolation",
+        "No race conditions in claim logic",
+        "Concurrency test passes with multiple processes"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:23.678073",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "create_lease is atomic via SQLite transaction"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M3 leases. Critical correctness requirement. Use SQLite BEGIN IMMEDIATE or EXCLUSIVE transaction. Test with multiprocessing."
+    },
+    {
+      "id": "F027",
+      "category": "messaging",
+      "priority": 2,
+      "description": "Implement lodestar msg send command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Sends message to agent or task thread",
+        "Supports --to agent:A1 format",
+        "Supports --to task:T123 format",
+        "Stores in runtime.sqlite messages table",
+        "Returns message_id",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:33.093984",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar msg send works for agent and task recipients"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M4 messaging. Store from_agent_id and to_type and to_id. Text in --text flag. Optional meta as JSON."
+    },
+    {
+      "id": "F028",
+      "category": "messaging",
+      "priority": 2,
+      "description": "Implement lodestar msg inbox command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Lists messages sent to current agent",
+        "Supports --since cursor for pagination",
+        "Returns messages in chronological order",
+        "Returns cursor for next page",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:35.148195",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar msg inbox shows messages with cursor pagination"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M4 messaging. Filter by to_type=agent and to_id=current_agent_id. Cursor can be message_id or timestamp."
+    },
+    {
+      "id": "F029",
+      "category": "messaging",
+      "priority": 2,
+      "description": "Implement lodestar msg thread command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Lists messages for a task thread",
+        "Supports --since cursor for pagination",
+        "Returns messages in chronological order",
+        "Returns cursor for next page",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:53:37.181493",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar msg thread shows task message threads"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M4 messaging. Filter by to_type=task and to_id=task_id. Thread allows agents to discuss a specific task."
+    },
+    {
+      "id": "F030",
+      "category": "mcp",
+      "priority": 3,
+      "description": "Implement lodestar mcp serve command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Starts MCP server on stdio or socket",
+        "Exposes all CLI operations as MCP tools",
+        "Tools mirror CLI command structure",
+        "Local-only authentication",
+        "Supports --json output"
+      ],
+      "estimatedEffort": null,
+      "status": "not-started",
+      "passes": false,
+      "verifiedAt": null,
+      "verifiedBy": null,
+      "evidenceLinks": [],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "M5 optional. MCP server for agents that prefer tool calls. Use mcp SDK. Each CLI command becomes an MCP tool."
+    },
+    {
+      "id": "F031",
+      "category": "cli",
+      "priority": 2,
+      "description": "Implement lodestar export snapshot command",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Exports combined spec and runtime state",
+        "Includes all tasks with claim status",
+        "Includes all active agents",
+        "Includes message counts",
+        "JSON format output",
+        "Useful for CI and external tools"
+      ],
+      "estimatedEffort": null,
+      "status": "verified",
+      "passes": true,
+      "verifiedAt": "2025-12-27T10:56:22.036725",
+      "verifiedBy": "coding-agent",
+      "evidenceLinks": [
+        "lodestar export snapshot outputs full spec and runtime state as JSON"
+      ],
+      "blockedBy": null,
+      "lastWorkedOn": null,
+      "notes": "For CI systems and external dashboards. Combine spec.yaml data with runtime.sqlite data into single snapshot."
+    }
+  ],
+  "metadata": {
+    "createdAt": "2025-12-27T10:17:16.186515",
+    "lastUpdated": "2025-12-27T10:56:22.036736",
+    "totalFeatures": 31,
+    "passingFeatures": 30
+  }
+}

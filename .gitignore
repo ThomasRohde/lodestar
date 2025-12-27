@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# uv
+.uv/
+uv.lock
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+.pyright/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Lodestar runtime (ephemeral plane - never commit)
+.lodestar/runtime.sqlite
+.lodestar/runtime.sqlite-wal
+.lodestar/runtime.sqlite-shm
+.lodestar/runtime.jsonl
+
+# Klondike (bootstrapping tool - session state is local)
+.klondike/agent-progress.json
+.klondike/config.yaml
+agent-progress.md
+
+# Ruff
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.local
+*.pem
