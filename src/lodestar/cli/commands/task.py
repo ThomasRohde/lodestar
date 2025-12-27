@@ -231,12 +231,16 @@ def task_show(
             console.print(f"[error]Task {task_id} not found[/error]")
         raise typer.Exit(1)
 
-    # Check for active lease
+    # Check for active lease and communication context
     lease = None
+    message_count = 0
+    message_agents = []
     runtime_path = get_runtime_db_path(root)
     if runtime_path.exists():
         db = RuntimeDatabase(runtime_path)
         lease = db.get_active_lease(task_id)
+        message_count = db.get_task_message_count(task_id)
+        message_agents = db.get_task_message_agents(task_id)
 
     result = task.model_dump()
     result["status"] = task.status.value
@@ -247,6 +251,12 @@ def task_show(
             "agent_id": lease.agent_id,
             "expires_at": lease.expires_at.isoformat(),
         }
+
+    # Add communication context
+    result["communication"] = {
+        "message_count": message_count,
+        "participating_agents": message_agents,
+    }
 
     # Determine claimability
     verified = spec.get_verified_tasks()
@@ -287,6 +297,16 @@ def task_show(
             console.print(
                 f"[success]Claimable[/success] - run [command]lodestar task claim {task.id}[/command]"
             )
+
+        # Show communication context if there are messages or participating agents
+        if message_count > 0 or message_agents:
+            console.print()
+            console.print("[info]Communication:[/info]")
+            if message_count > 0:
+                console.print(f"  Messages in thread: {message_count}")
+                console.print(f"  View with: [command]lodestar msg thread {task.id}[/command]")
+            if message_agents:
+                console.print(f"  Participating agents: {', '.join(message_agents)}")
 
         console.print()
 

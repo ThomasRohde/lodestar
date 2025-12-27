@@ -385,30 +385,53 @@ class RuntimeDatabase:
             return message
 
     def get_inbox(
-        self, agent_id: str, since: datetime | None = None, limit: int = 50
+        self,
+        agent_id: str,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        from_agent_id: str | None = None,
+        limit: int = 50,
     ) -> list[Message]:
-        """Get messages for an agent."""
+        """Get messages for an agent.
+
+        Args:
+            agent_id: The agent whose inbox to retrieve
+            since: Filter messages created after this time
+            until: Filter messages created before this time
+            from_agent_id: Filter by sender agent ID
+            limit: Maximum number of messages to return
+
+        Returns:
+            List of messages matching the criteria
+        """
         import json
 
+        # Build query dynamically based on filters
+        conditions = ["to_type = 'agent'", "to_id = ?"]
+        params = [agent_id]
+
+        if since:
+            conditions.append("created_at > ?")
+            params.append(since.isoformat())
+
+        if until:
+            conditions.append("created_at < ?")
+            params.append(until.isoformat())
+
+        if from_agent_id:
+            conditions.append("from_agent_id = ?")
+            params.append(from_agent_id)
+
+        where_clause = " AND ".join(conditions)
+        query = f"""
+            SELECT * FROM messages
+            WHERE {where_clause}
+            ORDER BY created_at DESC LIMIT ?
+        """
+        params.append(limit)
+
         with self._connect() as conn:
-            if since:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM messages
-                    WHERE to_type = 'agent' AND to_id = ? AND created_at > ?
-                    ORDER BY created_at DESC LIMIT ?
-                    """,
-                    (agent_id, since.isoformat(), limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM messages
-                    WHERE to_type = 'agent' AND to_id = ?
-                    ORDER BY created_at DESC LIMIT ?
-                    """,
-                    (agent_id, limit),
-                ).fetchall()
+            rows = conn.execute(query, params).fetchall()
 
             return [
                 Message(
@@ -461,6 +484,154 @@ class RuntimeDatabase:
                 )
                 for row in rows
             ]
+
+    def get_task_message_count(self, task_id: str) -> int:
+        """Get the count of messages in a task thread."""
+        with self._connect() as conn:
+            count = conn.execute(
+                """
+                SELECT COUNT(*) FROM messages
+                WHERE to_type = 'task' AND to_id = ?
+                """,
+                (task_id,),
+            ).fetchone()[0]
+            return count
+
+    def get_task_message_agents(self, task_id: str) -> list[str]:
+        """Get unique agent IDs who have sent messages about a task."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT from_agent_id FROM messages
+                WHERE to_type = 'task' AND to_id = ?
+                ORDER BY from_agent_id
+                """,
+                (task_id,),
+            ).fetchall()
+            return [row[0] for row in rows]
+
+    def search_messages(
+        self,
+        keyword: str | None = None,
+        from_agent_id: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        limit: int = 50,
+    ) -> list[Message]:
+        """Search messages with optional filters.
+
+        Args:
+            keyword: Search term to match in message text (case-insensitive)
+            from_agent_id: Filter by sender agent ID
+            since: Filter messages created after this time
+            until: Filter messages created before this time
+            limit: Maximum number of messages to return
+
+        Returns:
+            List of messages matching the search criteria
+        """
+        import json
+
+        # Build query dynamically based on filters
+        conditions = []
+        params = []
+
+        if keyword:
+            conditions.append("text LIKE ?")
+            params.append(f"%{keyword}%")
+
+        if from_agent_id:
+            conditions.append("from_agent_id = ?")
+            params.append(from_agent_id)
+
+        if since:
+            conditions.append("created_at > ?")
+            params.append(since.isoformat())
+
+        if until:
+            conditions.append("created_at < ?")
+            params.append(until.isoformat())
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        query = f"""
+            SELECT * FROM messages
+            WHERE {where_clause}
+            ORDER BY created_at DESC LIMIT ?
+        """
+        params.append(limit)
+
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+
+            return [
+                Message(
+                    message_id=row["message_id"],
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                    from_agent_id=row["from_agent_id"],
+                    to_type=MessageType(row["to_type"]),
+                    to_id=row["to_id"],
+                    text=row["text"],
+                    meta=json.loads(row["meta"]),
+                )
+                for row in rows
+            ]
+
+    def get_inbox_count(self, agent_id: str, since: datetime | None = None) -> int:
+        """Get count of messages in inbox."""
+        with self._connect() as conn:
+            if since:
+                result = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM messages
+                    WHERE to_type = 'agent' AND to_id = ? AND created_at > ?
+                    """,
+                    (agent_id, since.isoformat()),
+                ).fetchone()
+            else:
+                result = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM messages
+                    WHERE to_type = 'agent' AND to_id = ?
+                    """,
+                    (agent_id,),
+                ).fetchone()
+            return result[0] if result else 0
+
+    def wait_for_message(
+        self, agent_id: str, timeout_seconds: float | None = None, since: datetime | None = None
+    ) -> bool:
+        """Wait for a new message to arrive.
+
+        Returns True if a message was received, False if timeout occurred.
+        Uses polling with exponential backoff to check for new messages.
+        """
+        import time
+
+        # Check if there are already messages
+        if self.get_inbox_count(agent_id, since=since) > 0:
+            return True
+
+        # Poll with exponential backoff
+        start_time = time.time()
+        sleep_time = 0.1  # Start with 100ms
+        max_sleep = 2.0  # Cap at 2 seconds
+
+        while True:
+            # Check for timeout
+            if timeout_seconds is not None:
+                elapsed = time.time() - start_time
+                if elapsed >= timeout_seconds:
+                    return False
+
+            # Sleep before next check
+            time.sleep(sleep_time)
+
+            # Check for new messages
+            if self.get_inbox_count(agent_id, since=since) > 0:
+                return True
+
+            # Increase sleep time with exponential backoff
+            sleep_time = min(sleep_time * 1.5, max_sleep)
 
     # Statistics
 
