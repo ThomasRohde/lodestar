@@ -125,6 +125,7 @@ def status_command(
         TaskStatus.BLOCKED: "yellow",
         TaskStatus.DONE: "blue",
         TaskStatus.VERIFIED: "green",
+        TaskStatus.DELETED: "red dim",
     }
 
     for status in TaskStatus:
