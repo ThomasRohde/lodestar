@@ -755,6 +755,177 @@ tasks:
     status: verified
     created_at: '2025-12-27T13:15:53.183275'
     updated_at: '2025-12-27T13:22:58.344666'
+  TEST-002:
+    title: Implement webhook notification system
+    description: Implement a webhook notification system based on the API design from
+      TEST-001. Coordinate with the agent working on TEST-001 to clarify design decisions.
+      Create a mock implementation with documentation.
+    acceptance_criteria: []
+    depends_on:
+    - TEST-001
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-27T14:48:37.441475'
+    updated_at: '2025-12-27T14:48:37.441481'
+  MSG-001:
+    title: Fix or clarify task-scoped messaging
+    description: 'PRIORITY: High. FROM: Agent communication test report (REPORT.md).
+      ISSUE: ''lodestar msg thread task:<id>'' returns no messages even when agents
+      discuss the task. Agents attempted ''--to task:<id>'' but messages didn''t appear
+      in task threads. DECISION NEEDED: Either (1) fix task threading to work properly,
+      or (2) remove the feature and document that direct agent-to-agent messaging
+      is the primary pattern. ACCEPTANCE: Document the decision, update help text,
+      ensure msg thread works or is removed, update docs/cli/msg.md with clarified
+      usage patterns.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - messaging
+    - m7
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-27T15:04:43.210080'
+    updated_at: '2025-12-27T15:15:31.418218'
+  MSG-002:
+    title: Add message notification mechanism
+    description: 'PRIORITY: High. FROM: Agent communication test report (REPORT.md).
+      ISSUE: Agents poll ''lodestar msg inbox'' in loops with sleep delays, wasting
+      cycles. SOLUTION: Add ''lodestar msg wait'' command that blocks until new message
+      arrives. Also add message count to ''lodestar status'' output and ''--count''
+      flag to ''msg inbox''. ACCEPTANCE: (1) Implement ''lodestar msg wait [--timeout
+      SECONDS]'' that blocks on new messages, (2) Add message count to ''lodestar
+      status'', (3) Add ''--count'' flag to ''msg inbox'', (4) Write tests for blocking
+      behavior, (5) Update docs.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - messaging
+    - m7
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-27T15:04:47.410231'
+    updated_at: '2025-12-27T15:25:50.780781'
+  AGT-001:
+    title: Add agent metadata and discovery capabilities
+    description: 'PRIORITY: High. FROM: Agent communication test report (REPORT.md).
+      ISSUE: No way to discover what an agent specializes in. Agents can''t find the
+      right collaborator easily. SOLUTION: (1) Add optional ''--role'' and ''--capabilities''
+      fields to ''lodestar agent join'', (2) Store metadata in agents table, (3) Add
+      ''lodestar agent find --capability <name>'' command, (4) Show metadata in ''lodestar
+      agent list''. ACCEPTANCE: Extend agent join with optional metadata, implement
+      agent find command, display metadata in agent list, update docs with examples
+      of role/capability usage patterns.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - agent
+    - m7
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-27T15:04:50.542272'
+    updated_at: '2025-12-27T15:04:50.542277'
+  MSG-003:
+    title: Add message read status tracking
+    description: 'PRIORITY: Medium. FROM: Agent communication test report (REPORT.md).
+      ISSUE: No way for sender to know if recipient has read the message. SOLUTION:
+      (1) Track when messages are retrieved by ''msg inbox'', (2) Add ''read_at''
+      timestamp to messages table, (3) Add ''--show-read-status'' flag to ''msg inbox'',
+      (4) Show read/unread indicator in inbox output. ACCEPTANCE: Database migration
+      adds read_at field, inbox command updates read_at on retrieval, --show-read-status
+      flag shows read timestamps, update JSON schema and docs.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - messaging
+    - m7
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-27T15:04:53.836807'
+    updated_at: '2025-12-27T15:04:53.836813'
+  TSK-001:
+    title: Enhance task status display with communication context
+    description: 'PRIORITY: Medium. FROM: Agent communication test report (REPORT.md).
+      ISSUE: When checking ''lodestar task show COMM-002'', there''s no indication
+      of messages or agents working on related tasks. SOLUTION: (1) Show which agent
+      is working on the task (from active lease), (2) Show message count related to
+      task, (3) Display related agents who have sent messages about this task, (4)
+      Add ''Related communications'' section to task show. ACCEPTANCE: task show includes
+      current lease holder, message count, list of communicating agents, update docs
+      with example output.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - task
+    - m7
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-27T15:04:56.867433'
+    updated_at: '2025-12-27T15:20:17.108116'
+  DOC-001:
+    title: Add agent coordination guide and templates
+    description: 'PRIORITY: Medium. FROM: Agent communication test report (REPORT.md).
+      NEED: Agents need guidance on coordination patterns. SOLUTION: Create docs/guides/agent-coordination.md
+      with: (1) Example workflows for parallel agent work, (2) Message templates for
+      common scenarios (requesting design, clarifying requirements, confirming completion),
+      (3) Best practices for agent-to-agent communication, (4) Example multi-agent
+      scenarios with full message flows. ACCEPTANCE: New guide created, covers discovery->communication->completion
+      patterns, includes runnable examples, linked from main docs navigation.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - docs
+    - m7
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-27T15:05:01.449174'
+    updated_at: '2025-12-27T15:05:01.449179'
+  MSG-004:
+    title: Add message search and filtering
+    description: 'PRIORITY: Low. FROM: Agent communication test report (REPORT.md).
+      NEED: As agent conversations grow, finding specific messages becomes difficult.
+      SOLUTION: (1) Add ''lodestar msg search --keyword <term>'' command, (2) Add
+      ''--from <agent_id>'' filter to ''msg inbox'', (3) Add ''--since <date>'' and
+      ''--until <date>'' filters, (4) Support combining filters. ACCEPTANCE: Implement
+      msg search with keyword matching, add filtering options to inbox, support date
+      range queries, update docs with search examples.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - messaging
+    - m7
+    locks: []
+    priority: 3
+    status: verified
+    created_at: '2025-12-27T15:05:19.092843'
+    updated_at: '2025-12-27T15:26:24.357336'
+  AGT-002:
+    title: Add agent availability status tracking
+    description: 'PRIORITY: Low. FROM: Agent communication test report (REPORT.md).
+      NEED: Know which agents are actively working vs idle. SOLUTION: (1) Add agent
+      status field (active/idle/offline), (2) Auto-update status based on last activity,
+      (3) Show status in ''agent list'', (4) Add configurable inactivity threshold.
+      ACCEPTANCE: Extend agents table with status field, implement status calculation
+      logic, display in agent list with color coding, make threshold configurable,
+      update docs.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - agent
+    - m7
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-27T15:05:21.889544'
+    updated_at: '2025-12-27T15:05:21.889549'
 features:
   m0-skeleton:
   - F001
