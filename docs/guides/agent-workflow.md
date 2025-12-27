@@ -2,15 +2,49 @@
 
 This guide covers how to work effectively as an agent with Lodestar, whether you're a human developer or an AI agent.
 
+## Workflow Overview
+
+```mermaid
+graph TD
+    Start[Start Session] --> Status[Check Status]
+    Status --> Doctor[Run Health Check]
+    Doctor --> Join[Register as Agent]
+    Join --> Find[Find Work]
+    Find --> Claim[Claim Task]
+    Claim --> Work[Do Work]
+    Work --> Done[Mark Done]
+    Done --> Verify[Verify]
+    Verify --> Find
+    Work --> |Blocked| Release[Release Task]
+    Release --> Message[Leave Context]
+    Message --> Find
+```
+
 ## Starting a Session
 
 ### 1. Check Repository Status
 
 ```bash
-lodestar status
+$ lodestar status
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ my-project                                                                  │
+└─────────────────────────────── Branch: main ────────────────────────────────┘
+
+Tasks
+ Status    Count
+ ready         5
+ done          2
+ verified     10
+
+Runtime
+  Agents registered: 2
+  Active claims: 1
+
+Next Actions
+  lodestar task next - Get next claimable task (5 available)
 ```
 
-This shows:
+This gives you:
 
 - Current branch
 - Task counts by status
@@ -20,26 +54,48 @@ This shows:
 ### 2. Run Health Checks
 
 ```bash
-lodestar doctor
+$ lodestar doctor
+Health Check
+
+  ✓ repository: Repository found
+  ✓ spec.yaml: Valid spec with 17 tasks
+  ✓ dependencies: No cycles or missing dependencies
+  ✓ runtime.sqlite: Database is healthy
+  ✓ .gitignore: Runtime files are gitignored
+
+All checks passed!
 ```
 
-Verify the repository is in a healthy state before starting work.
+Fix any issues before proceeding.
 
 ### 3. Register as an Agent
 
 ```bash
-lodestar agent join
+$ lodestar agent join --name "Dev Session" --model claude-3.5-sonnet
+Registered as agent A1234ABCD
+
+Next steps:
+  lodestar task next - Get next task
+  lodestar task list - See all tasks
 ```
 
-Save your agent ID for use in subsequent commands.
+!!! tip "Save your agent ID"
+    Store your agent ID for use in subsequent commands. For AI agents, include it in your system prompt or context.
 
 ### 4. Find Available Work
 
 ```bash
-lodestar task next
+$ lodestar task next
+Next Claimable Tasks (3 available)
+
+  F002 P1  Add password reset
+  F005 P2  Implement search
+  D001 P2  Write documentation
+
+Run lodestar task claim F002 to claim
 ```
 
-Shows tasks that are:
+Claimable tasks are:
 
 - In `ready` status
 - Have all dependencies verified
@@ -49,82 +105,270 @@ Shows tasks that are:
 
 ### Claim Before Starting
 
-Always claim a task before beginning work:
+**Always claim a task before beginning work:**
 
 ```bash
-lodestar task claim <task-id> --agent <your-agent-id>
+$ lodestar task claim F002 --agent A1234ABCD
+Claimed task F002
+  Lease: L5678EFGH
+  Expires in: 15m
+
+Remember to:
+  - Renew with lodestar task renew F002 before expiry
+  - Mark done with lodestar task done F002 when complete
 ```
 
 This prevents duplicate work and signals to others what you're working on.
 
+### Review Task Details
+
+```bash
+$ lodestar task show F002
+F002 - Add password reset
+
+Status: ready
+Priority: 1
+Labels: feature, security
+Depends on: F001 (verified)
+
+Description:
+  Implement email-based password reset flow with secure token generation.
+
+Claimed by: A1234ABCD
+Lease expires: 14m remaining
+```
+
+### Check Thread for Context
+
+```bash
+$ lodestar msg thread F002
+Thread for F002 (2 messages)
+
+  A9999WXYZ  2h ago
+  Started work but got blocked on email service credentials
+
+  A9999WXYZ  2h ago
+  Released: need API keys from DevOps
+```
+
 ### Monitor Your Lease
 
-Leases expire after 15 minutes by default. If your work takes longer:
+Leases expire after 15 minutes by default. Renew before expiry:
 
 ```bash
-lodestar task renew <task-id>
+$ lodestar task renew F002
+Renewed lease for F002
+  Expires in: 15m
 ```
 
-### If You Get Blocked
+### When You Get Blocked
 
-If you can't complete the task, release it:
-
-```bash
-lodestar task release <task-id>
-```
-
-Optionally send a message explaining the blocker:
+If you can't complete the task:
 
 ```bash
-lodestar msg send all --from <your-agent-id> --body "Blocked on F002: need API credentials"
+# Release the task
+$ lodestar task release F002
+Released task F002
+
+# Leave context for the next agent
+$ lodestar msg send \
+    --to task:F002 \
+    --from A1234ABCD \
+    --text "60% done. Token generation works. Blocked on email template approval."
 ```
 
 ## Completing a Task
 
 ### 1. Finish Implementation
 
-- Make atomic, reviewable commits
-- Ensure tests pass
+Before marking done:
+
+- Ensure all tests pass
+- Commit your changes
 - Update documentation if needed
 
 ### 2. Mark as Done
 
 ```bash
-lodestar task done <task-id>
+$ lodestar task done F002
+Marked F002 as done
+Run lodestar task verify F002 after review
 ```
 
 ### 3. Verify
 
+Verification confirms the task meets acceptance criteria:
+
 ```bash
-lodestar task verify <task-id>
+$ lodestar task verify F002
+Verified F002
+Unblocked tasks: F005, F006
 ```
 
-Verification confirms the task meets acceptance criteria and unblocks dependent tasks.
+After verification, dependent tasks become claimable.
 
 ## Handoffs Between Agents
 
+### When to Hand Off
+
+- Context window is ending (AI agents)
+- Shift is ending (human developers)
+- Different expertise needed
+- Blocked and moving to other work
+
 ### Sending Context
 
-When handing off to another agent:
+Leave detailed context in the task thread:
 
 ```bash
-lodestar msg send <agent-id> \
-    --from <your-agent-id> \
-    --body "F002 context: auth tokens are stored in Redis, see src/auth/tokens.py"
+$ lodestar msg send \
+    --to task:F002 \
+    --from A1234ABCD \
+    --text "Progress: Token model done, endpoints done. TODO: Email templates, frontend integration. Key files: src/auth/reset.py, src/api/auth.py"
 ```
 
 ### Receiving Handoffs
 
-Check your inbox:
+When picking up someone else's task:
+
+1. Read the task thread
+2. Check recent commits
+3. Look for linked issues/PRs
 
 ```bash
-lodestar msg inbox <your-agent-id>
+# Read context
+$ lodestar msg thread F002
+
+# Claim the task
+$ lodestar task claim F002 --agent A5678EFGH
+```
+
+## Human vs AI Agent Patterns
+
+### Human Developers
+
+**Session Pattern:**
+
+```bash
+# Morning
+lodestar agent join --name "Alice"
+lodestar task next
+
+# Throughout the day
+lodestar task claim <id> --agent <id>
+# ... work ...
+lodestar task done <id>
+lodestar task verify <id>
+
+# End of day
+# Leave context messages for incomplete work
+```
+
+**Tips:**
+
+- Use longer TTLs for complex tasks: `--ttl 1h`
+- Renew before meetings or breaks
+- Leave detailed handoff notes
+
+### AI Agents
+
+**Single-Task Pattern:**
+
+```bash
+# At start of context
+lodestar agent join --model claude-3.5-sonnet
+lodestar task next
+
+# Claim and work on ONE task
+lodestar task claim <id> --agent <id>
+# ... implement ...
+lodestar task done <id>
+lodestar task verify <id>
+```
+
+**Multi-Turn Pattern:**
+
+```bash
+# Check for existing work
+lodestar status
+
+# Continue or start new
+lodestar task next
+```
+
+**Tips:**
+
+- Keep tasks small and focused
+- Release proactively if context is running low
+- Use `agent brief` for spawning sub-agents
+
+### Sub-Agent Spawning
+
+For AI agents that spawn helpers:
+
+```bash
+# Get context for a sub-agent
+$ lodestar agent brief --task F002 --format claude
+Task: F002 - Add password reset
+
+Status: ready
+Priority: 1
+Dependencies: F001 (verified)
+
+Description:
+  Implement email-based password reset flow...
+
+Context:
+  Previous work in thread...
+
+Files to review:
+  - src/auth/reset.py
+  - src/api/auth.py
 ```
 
 ## Best Practices
 
-1. **One task at a time**: Focus on a single task to completion
-2. **Renew early**: Don't let leases expire unexpectedly
-3. **Communicate blockers**: Use messaging to flag issues
-4. **Verify thoroughly**: Don't mark verified until you've tested
-5. **Commit often**: Make progress visible in git history
+### Do
+
+- **Claim before working**: Always claim before you start
+- **Renew proactively**: Don't wait for expiry
+- **One task at a time**: Focus on completion
+- **Leave context**: Help the next agent
+- **Verify thoroughly**: Test before marking verified
+- **Commit often**: Make progress visible
+
+### Don't
+
+- **Don't claim speculatively**: Only claim what you'll work on now
+- **Don't let leases expire**: Renew or release explicitly
+- **Don't skip verification**: It unblocks dependent work
+- **Don't work unclaimed**: Others might be working too
+- **Don't batch completions**: Mark done immediately
+
+## Quick Reference
+
+```bash
+# Session start
+lodestar status
+lodestar doctor
+lodestar agent join
+
+# Finding work
+lodestar task next
+lodestar task list
+lodestar task show <id>
+
+# Working
+lodestar task claim <id> --agent <agent-id>
+lodestar task renew <id>
+lodestar task release <id>
+
+# Completing
+lodestar task done <id>
+lodestar task verify <id>
+
+# Communication
+lodestar msg send --to task:<id> --from <agent-id> --text "..."
+lodestar msg thread <task-id>
+lodestar msg inbox --agent <agent-id>
+```
