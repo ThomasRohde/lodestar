@@ -16,7 +16,37 @@ from lodestar.spec.loader import SpecNotFoundError, load_spec
 from lodestar.util.output import console, print_json
 from lodestar.util.paths import find_lodestar_root, get_runtime_db_path
 
-app = typer.Typer(help="Agent identity and management commands.")
+app = typer.Typer(
+    help="Agent identity and management commands.",
+    no_args_is_help=False,
+)
+
+
+@app.callback(invoke_without_command=True)
+def agent_callback(ctx: typer.Context) -> None:
+    """Agent identity and management.
+
+    Use these commands to register as an agent and manage your session.
+    """
+    if ctx.invoked_subcommand is None:
+        # Show helpful workflow instead of error
+        console.print()
+        console.print("[bold]Agent Commands[/bold]")
+        console.print()
+        console.print("  [command]lodestar agent join[/command]")
+        console.print("      Register as an agent and get your ID (do this first)")
+        console.print()
+        console.print("  [command]lodestar agent list[/command]")
+        console.print("      List all registered agents")
+        console.print()
+        console.print("  [command]lodestar agent brief --task <id>[/command]")
+        console.print("      Get context for spawning a sub-agent on a task")
+        console.print()
+        console.print("[info]Typical workflow:[/info]")
+        console.print("  1. lodestar agent join --name 'My Agent'")
+        console.print("  2. Save the agent ID (e.g., A1234ABCD)")
+        console.print("  3. Use this ID in task claim: --agent A1234ABCD")
+        console.print()
 
 
 @app.command(name="join")
@@ -292,8 +322,8 @@ def agent_brief(
         "locks": task.locks,
         "labels": task.labels,
         "commands": {
-            "claim": f"lodestar task claim {task.id}",
-            "report_progress": f"lodestar msg send --to task:{task.id} --text 'Progress update'",
+            "claim": f"lodestar task claim {task.id} --agent <your-agent-id>",
+            "report_progress": f"lodestar msg send --to task:{task.id} --from <your-agent-id> --text 'Progress update'",
             "mark_done": f"lodestar task done {task.id}",
         },
     }
@@ -316,12 +346,14 @@ def agent_brief(
             for lock in task.locks:
                 console.print(f"  - {lock}")
             console.print()
-        console.print("[info]Commands:[/info]")
-        console.print(f"  Claim: [command]lodestar task claim {task.id}[/command]")
+        console.print("[info]Commands (replace <your-agent-id>):[/info]")
+        console.print(f"  Claim:  [command]lodestar task claim {task.id} --agent <id>[/command]")
         console.print(
-            f"  Report: [command]lodestar msg send --to task:{task.id} --text '...'[/command]"
+            f"  Report: [command]lodestar msg send --to task:{task.id} --from <id> --text '...'[/command]"
         )
-        console.print(f"  Done: [command]lodestar task done {task.id}[/command]")
+        console.print(f"  Done:   [command]lodestar task done {task.id}[/command]")
+        console.print()
+        console.print("[muted]Get your agent ID from 'lodestar agent join'[/muted]")
         console.print()
 
 

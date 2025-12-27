@@ -12,7 +12,41 @@ from lodestar.runtime.database import RuntimeDatabase
 from lodestar.util.output import console, print_json
 from lodestar.util.paths import find_lodestar_root, get_runtime_db_path
 
-app = typer.Typer(help="Agent messaging commands.")
+app = typer.Typer(
+    help="Agent messaging commands.",
+    no_args_is_help=False,
+)
+
+
+@app.callback(invoke_without_command=True)
+def msg_callback(ctx: typer.Context) -> None:
+    """Agent messaging.
+
+    Use these commands to communicate with other agents and leave context on tasks.
+    """
+    if ctx.invoked_subcommand is None:
+        # Show helpful workflow instead of error
+        console.print()
+        console.print("[bold]Message Commands[/bold]")
+        console.print()
+        console.print("[info]Sending messages:[/info]")
+        console.print("  [command]lodestar msg send --to task:<id> --from <agent-id> --text '...'[/command]")
+        console.print("      Leave context on a task thread (for handoffs)")
+        console.print()
+        console.print("  [command]lodestar msg send --to agent:<id> --from <agent-id> --text '...'[/command]")
+        console.print("      Send a direct message to another agent")
+        console.print()
+        console.print("[info]Reading messages:[/info]")
+        console.print("  [command]lodestar msg thread <task-id>[/command]")
+        console.print("      Read the message thread for a task")
+        console.print()
+        console.print("  [command]lodestar msg inbox --agent <agent-id>[/command]")
+        console.print("      Read messages sent to you")
+        console.print()
+        console.print("[info]Examples:[/info]")
+        console.print("  lodestar msg send --to task:F001 --from A123 --text 'Blocked on X'")
+        console.print("  lodestar msg thread F001")
+        console.print()
 
 
 @app.command(name="send")
@@ -21,7 +55,7 @@ def msg_send(
         ...,
         "--to",
         "-t",
-        help="Recipient: 'agent:A123' or 'task:T001'.",
+        help="Recipient: 'task:<task-id>' for task threads or 'agent:<agent-id>' for direct messages.",
     ),
     text: str = typer.Option(
         ...,
@@ -33,7 +67,7 @@ def msg_send(
         ...,
         "--from",
         "-f",
-        help="Your agent ID.",
+        help="Your agent ID (REQUIRED). Get it from 'lodestar agent join'.",
     ),
     json_output: bool = typer.Option(
         False,
@@ -46,7 +80,15 @@ def msg_send(
         help="Show what this command does.",
     ),
 ) -> None:
-    """Send a message to an agent or task thread."""
+    """Send a message to an agent or task thread.
+
+    Use task threads to leave context for other agents working on a task.
+    Use agent messages for direct communication.
+
+    Examples:
+        lodestar msg send --to task:F001 --from A123 --text 'Blocked on X'
+        lodestar msg send --to agent:B456 --from A123 --text 'Need help'
+    """
     if explain:
         _show_explain_send(json_output)
         return

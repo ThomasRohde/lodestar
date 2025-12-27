@@ -16,7 +16,44 @@ from lodestar.util.output import console, print_json
 from lodestar.util.paths import find_lodestar_root, get_runtime_db_path
 from lodestar.util.time import format_duration, parse_duration
 
-app = typer.Typer(help="Task management and scheduling commands.")
+app = typer.Typer(
+    help="Task management and scheduling commands.",
+    no_args_is_help=False,
+)
+
+
+@app.callback(invoke_without_command=True)
+def task_callback(ctx: typer.Context) -> None:
+    """Task management and scheduling.
+
+    Use these commands to find, claim, and complete tasks.
+    """
+    if ctx.invoked_subcommand is None:
+        # Show helpful workflow instead of error
+        console.print()
+        console.print("[bold]Task Commands[/bold]")
+        console.print()
+        console.print("[info]Finding work:[/info]")
+        console.print("  [command]lodestar task next[/command]       Find claimable tasks")
+        console.print("  [command]lodestar task list[/command]       List all tasks")
+        console.print("  [command]lodestar task show <id>[/command]  View task details")
+        console.print()
+        console.print("[info]Working on tasks:[/info]")
+        console.print("  [command]lodestar task claim <id> --agent <agent-id>[/command]")
+        console.print("      Claim a task (required before working)")
+        console.print()
+        console.print("  [command]lodestar task renew <id>[/command]")
+        console.print("      Extend your lease (do this every 10-15 min)")
+        console.print()
+        console.print("  [command]lodestar task release <id>[/command]")
+        console.print("      Release if you can't complete")
+        console.print()
+        console.print("[info]Completing tasks:[/info]")
+        console.print("  [command]lodestar task done <id>[/command]    Mark as done")
+        console.print("  [command]lodestar task verify <id>[/command]  Verify complete")
+        console.print()
+        console.print("[muted]Tip: Get your agent ID from 'lodestar agent join'[/muted]")
+        console.print()
 
 
 @app.command(name="list")
@@ -570,7 +607,12 @@ def task_next(
 @app.command(name="claim")
 def task_claim(
     task_id: str = typer.Argument(..., help="Task ID to claim."),
-    agent_id: str = typer.Option(..., "--agent", "-a", help="Your agent ID."),
+    agent_id: str = typer.Option(
+        ...,
+        "--agent",
+        "-a",
+        help="Your agent ID (REQUIRED). Get it from 'lodestar agent join'.",
+    ),
     ttl: str = typer.Option("15m", "--ttl", "-t", help="Lease duration (e.g., 15m, 1h)."),
     json_output: bool = typer.Option(
         False,
@@ -585,7 +627,11 @@ def task_claim(
 ) -> None:
     """Claim a task with a lease.
 
-    Claims are time-limited and auto-expire. Renew with 'task renew'.
+    Claims are time-limited (default 15min) and auto-expire.
+    Renew with 'lodestar task renew <id>' before expiry.
+
+    Example:
+        lodestar task claim F001 --agent A1234ABCD
     """
     if explain:
         _show_explain_claim(json_output)
@@ -720,7 +766,12 @@ def task_claim(
 @app.command(name="renew")
 def task_renew(
     task_id: str = typer.Argument(..., help="Task ID to renew."),
-    agent_id: str = typer.Option(..., "--agent", "-a", help="Your agent ID."),
+    agent_id: str = typer.Option(
+        ...,
+        "--agent",
+        "-a",
+        help="Your agent ID (REQUIRED). Same ID used when claiming.",
+    ),
     ttl: str = typer.Option("15m", "--ttl", "-t", help="New lease duration."),
     json_output: bool = typer.Option(
         False,
@@ -728,7 +779,14 @@ def task_renew(
         help="Output in JSON format.",
     ),
 ) -> None:
-    """Renew your claim on a task."""
+    """Renew your claim on a task.
+
+    Extend the lease before it expires (default 15min).
+    Only the agent who claimed the task can renew it.
+
+    Example:
+        lodestar task renew F001 --agent A1234ABCD
+    """
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -796,14 +854,27 @@ def task_renew(
 @app.command(name="release")
 def task_release(
     task_id: str = typer.Argument(..., help="Task ID to release."),
-    agent_id: str = typer.Option(..., "--agent", "-a", help="Your agent ID."),
+    agent_id: str = typer.Option(
+        ...,
+        "--agent",
+        "-a",
+        help="Your agent ID (REQUIRED). Same ID used when claiming.",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
         help="Output in JSON format.",
     ),
 ) -> None:
-    """Release your claim on a task."""
+    """Release your claim on a task.
+
+    Frees the task for others to claim. Use this when you're blocked
+    or can't complete the task. Consider leaving a message with context.
+
+    Example:
+        lodestar task release F001 --agent A1234ABCD
+        lodestar msg send --to task:F001 --from A1234ABCD --text 'Blocked on X'
+    """
     root = find_lodestar_root()
     if root is None:
         if json_output:
