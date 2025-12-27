@@ -52,6 +52,10 @@ def task_callback(ctx: typer.Context) -> None:
         console.print("  [command]lodestar task done <id>[/command]    Mark as done")
         console.print("  [command]lodestar task verify <id>[/command]  Verify complete")
         console.print()
+        console.print("[info]Creating tasks (planning agents):[/info]")
+        console.print("  [command]lodestar task create --title '...' --description '...'[/command]")
+        console.print("      Write detailed descriptions: WHAT, WHERE, WHY, ACCEPT, CONTEXT")
+        console.print()
         console.print("[muted]Tip: Get your agent ID from 'lodestar agent join'[/muted]")
         console.print()
 
@@ -295,7 +299,12 @@ def task_create(
         "--id",
         help="Task ID (auto-generated if not provided).",
     ),
-    description: str = typer.Option("", "--description", "-d", help="Task description."),
+    description: str = typer.Option(
+        "",
+        "--description",
+        "-d",
+        help="Task description. Include: WHAT (goal), WHERE (files), WHY (context), ACCEPT (criteria).",
+    ),
     priority: int = typer.Option(100, "--priority", "-p", help="Priority (lower = higher)."),
     status: str = typer.Option("ready", "--status", "-s", help="Initial status."),
     depends_on: list[str] | None = typer.Option(
@@ -315,7 +324,16 @@ def task_create(
         help="Output in JSON format.",
     ),
 ) -> None:
-    """Create a new task."""
+    """Create a new task.
+
+    Write detailed descriptions so executing agents have context:
+
+    \b
+    Example:
+        lodestar task create --id F001 --title "Add feature" \\
+            --description "WHAT: Add X. WHERE: src/x/. ACCEPT: tests pass" \\
+            --depends-on F000 --label feature
+    """
     root = find_lodestar_root()
     if root is None:
         if json_output:

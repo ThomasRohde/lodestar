@@ -30,6 +30,33 @@ uv run lodestar task done <id>
 uv run lodestar task verify <id>
 ```
 
+## Creating Tasks (Planning Agents)
+
+When creating tasks, write **detailed descriptions** so executing agents have full context:
+
+```bash
+uv run lodestar task create \
+    --id "F010" \
+    --title "Add email notifications" \
+    --description "WHAT: Add email notifications when tasks are completed.
+WHERE: src/notifications/, templates/email/
+WHY: Users requested alerts for task completion.
+ACCEPT: 1) Email sent on task.done 2) Template is configurable 3) Tests pass
+CONTEXT: Auth is in src/auth/, see notify() pattern in src/alerts.py" \
+    --priority 2 \
+    --label feature \
+    --depends-on "F009"
+```
+
+**Good descriptions include:**
+- WHAT: Clear goal and scope
+- WHERE: Relevant files/directories
+- WHY: Business context or motivation
+- ACCEPT: Measurable acceptance criteria
+- CONTEXT: Pointers to related code, patterns to follow
+
+This is critical for handoffs between planning agents (e.g., Opus) and executing agents (e.g., Sonnet).
+
 ## Get Help
 
 ```bash

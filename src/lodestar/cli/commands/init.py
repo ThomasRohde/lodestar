@@ -208,6 +208,18 @@ lodestar task done <id>
 lodestar task verify <id>
 ```
 
+## Creating Tasks
+
+Write **detailed descriptions** so executing agents have full context:
+
+```bash
+lodestar task create --id "F001" --title "Add feature X" \\
+    --description "WHAT: ... WHERE: ... WHY: ... ACCEPT: ... CONTEXT: ..." \\
+    --depends-on "F000" --label feature
+```
+
+Include: goal, relevant files, acceptance criteria, and pointers to related code.
+
 ## Get Help
 
 ```bash
