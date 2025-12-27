@@ -767,9 +767,9 @@ tasks:
     - feature
     locks: []
     priority: 2
-    status: ready
+    status: deleted
     created_at: '2025-12-27T14:48:37.441475'
-    updated_at: '2025-12-27T14:48:37.441481'
+    updated_at: '2025-12-27T19:39:12.745563'
   MSG-001:
     title: Fix or clarify task-scoped messaging
     description: 'PRIORITY: High. FROM: Agent communication test report (REPORT.md).
@@ -885,9 +885,9 @@ tasks:
     - m7
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-27T15:05:01.449174'
-    updated_at: '2025-12-27T15:05:01.449179'
+    updated_at: '2025-12-27T19:24:55.055430'
   MSG-004:
     title: Add message search and filtering
     description: 'PRIORITY: Low. FROM: Agent communication test report (REPORT.md).
@@ -923,9 +923,9 @@ tasks:
     - m7
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-27T15:05:21.889544'
-    updated_at: '2025-12-27T15:05:21.889549'
+    updated_at: '2025-12-27T19:35:19.412910'
   F032:
     title: Implement lodestar task delete command
     description: 'Add task deletion with soft-delete semantics:
@@ -1050,6 +1050,293 @@ tasks:
     status: deleted
     created_at: '2025-12-27T16:06:31.371286'
     updated_at: '2025-12-27T16:06:44.562085'
+  SQL-001:
+    title: Add SQLAlchemy and Alembic dependencies
+    description: Add sqlalchemy>=2.0.0 and alembic>=1.13.0 to pyproject.toml dependencies.
+      Run 'uv sync' to install. Verify with 'python -c "import sqlalchemy; import
+      alembic; print(sqlalchemy.__version__, alembic.__version__)"'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-27T19:52:56.855957'
+    updated_at: '2025-12-27T19:55:50.055397'
+  SQL-002:
+    title: Create SQLAlchemy ORM models
+    description: 'Create src/lodestar/runtime/models.py with SQLAlchemy ORM model
+      definitions:
+
+
+      1. Create Base class (DeclarativeBase)
+
+      2. Create JSONField TypeDecorator for JSON storage in TEXT columns
+
+      3. Create SchemaVersion model for version tracking
+
+      4. Create AgentModel with fields: agent_id (PK), display_name, role, created_at,
+      last_seen_at, capabilities (JSON list), session_meta (JSON dict)
+
+      5. Create LeaseModel with fields: lease_id (PK), task_id, agent_id (FK), created_at,
+      expires_at. Add indexes on task_id, agent_id, expires_at
+
+      6. Create MessageModel with fields: message_id (PK), created_at, from_agent_id
+      (FK), to_type, to_id, text, meta (JSON), read_at. Add composite index on (to_type,
+      to_id) and indexes on from_agent_id, created_at
+
+      7. Create EventModel with fields: event_id (autoincrement PK), created_at, event_type,
+      agent_id, task_id, data (JSON). Add indexes on created_at, event_type
+
+
+      Key design: Use String type for datetime fields (ISO format) to maintain compatibility
+      with existing data patterns. Add relationships between models.'
+    acceptance_criteria: []
+    depends_on:
+    - SQL-001
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-27T19:52:58.046756'
+    updated_at: '2025-12-27T19:56:50.033310'
+  SQL-003:
+    title: Create engine and session factory module
+    description: "Create src/lodestar/runtime/engine.py with SQLAlchemy engine and\
+      \ session management:\n\n1. create_runtime_engine(db_path: Path) function:\n\
+      \   - Create SQLAlchemy engine with sqlite:/// URL\n   - Disable connection\
+      \ pooling (poolclass=None) for CLI tool\n   - Register event listener to enable\
+      \ WAL mode on connect: PRAGMA journal_mode=WAL and PRAGMA busy_timeout=5000\n\
+      \n2. create_session_factory(engine) function:\n   - Return sessionmaker bound\
+      \ to engine with expire_on_commit=False\n\n3. get_session(session_factory) context\
+      \ manager:\n   - Yield session\n   - Auto-commit on success\n   - Auto-rollback\
+      \ on exception\n   - Always close session in finally block\n\nThis replicates\
+      \ the transaction semantics of the current _connect() context manager."
+    acceptance_criteria: []
+    depends_on:
+    - SQL-001
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-27T19:52:59.157273'
+    updated_at: '2025-12-27T19:57:44.848911'
+  SQL-004:
+    title: Create Pydantic to SQLAlchemy converters
+    description: "Create src/lodestar/runtime/converters.py with bidirectional conversion\
+      \ functions between Pydantic models (in models/runtime.py) and SQLAlchemy ORM\
+      \ models (in runtime/models.py):\n\n1. agent_to_orm(agent: Agent) -> AgentModel:\n\
+      \   - Convert datetime fields to ISO format strings\n   - Pass capabilities\
+      \ list and session_meta dict directly (JSONField handles serialization)\n\n\
+      2. orm_to_agent(model: AgentModel) -> Agent:\n   - Convert ISO strings back\
+      \ to datetime objects\n   - Handle backward compatibility: if capabilities is\
+      \ not a list, default to empty list\n   - Default role to empty string if None\n\
+      \n3. lease_to_orm(lease: Lease) -> LeaseModel:\n   - Convert datetime fields\
+      \ to ISO format strings\n\n4. orm_to_lease(model: LeaseModel) -> Lease:\n  \
+      \ - Convert ISO strings back to datetime objects\n\n5. message_to_orm(message:\
+      \ Message) -> MessageModel:\n   - Convert to_type enum to string value\n   -\
+      \ Convert read_at to ISO string or None\n\n6. orm_to_message(model: MessageModel)\
+      \ -> Message:\n   - Convert to_type string to MessageType enum\n   - Handle\
+      \ None read_at\n\nImport models from lodestar.models.runtime and lodestar.runtime.models."
+    acceptance_criteria: []
+    depends_on:
+    - SQL-002
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-27T19:53:25.308714'
+    updated_at: '2025-12-27T19:59:19.143725'
+  SQL-005:
+    title: Setup Alembic configuration and directory structure
+    description: "Configure Alembic for database migrations:\n\n1. Create alembic.ini\
+      \ in project root with:\n   - script_location = src/lodestar/runtime/alembic\n\
+      \   - prepend_sys_path = src\n   - Default sqlalchemy.url = sqlite:///.lodestar/runtime.sqlite\n\
+      \   - Standard logging configuration\n\n2. Create src/lodestar/runtime/alembic/\
+      \ directory\n\n3. Create src/lodestar/runtime/alembic/env.py:\n   - Import Base.metadata\
+      \ from lodestar.runtime.models\n   - get_url() function that checks LODESTAR_RUNTIME_DB_URL\
+      \ env var, then falls back to find_lodestar_root()\n   - Standard run_migrations_offline()\
+      \ and run_migrations_online() functions\n   - Use NullPool for online migrations\n\
+      \n4. Create src/lodestar/runtime/alembic/script.py.mako with standard Alembic\
+      \ template\n\n5. Create empty src/lodestar/runtime/alembic/versions/ directory\n\
+      \nVerify with: uv run alembic --help (should show alembic commands)"
+    acceptance_criteria: []
+    depends_on:
+    - SQL-002
+    labels:
+    - feature
+    locks: []
+    priority: 3
+    status: verified
+    created_at: '2025-12-27T19:53:26.532108'
+    updated_at: '2025-12-27T20:00:27.657865'
+  SQL-006:
+    title: Create initial Alembic migration
+    description: "Create the initial Alembic migration that creates the database schema:\n\
+      \nCreate src/lodestar/runtime/alembic/versions/001_initial_schema.py:\n\n1.\
+      \ Set revision = '001', down_revision = None\n\n2. upgrade() function creates\
+      \ all tables:\n   - schema_version: version (INTEGER PK)\n   - agents: agent_id\
+      \ (PK), display_name, role, created_at, last_seen_at, capabilities (TEXT JSON),\
+      \ session_meta (TEXT JSON)\n   - leases: lease_id (PK), task_id, agent_id (FK\
+      \ to agents), created_at, expires_at + indexes on task_id, agent_id, expires_at\n\
+      \   - messages: message_id (PK), created_at, from_agent_id (FK), to_type, to_id,\
+      \ text, meta (TEXT JSON), read_at + composite index on (to_type, to_id), indexes\
+      \ on from_agent_id, created_at\n   - events: event_id (INTEGER AUTOINCREMENT\
+      \ PK), created_at, event_type, agent_id, task_id, data (TEXT JSON) + indexes\
+      \ on created_at, event_type\n\n3. downgrade() function drops all tables in reverse\
+      \ order\n\nTest: Create a temp database and verify 'uv run alembic upgrade head'\
+      \ creates all tables with correct schema."
+    acceptance_criteria: []
+    depends_on:
+    - SQL-005
+    labels:
+    - feature
+    locks: []
+    priority: 3
+    status: verified
+    created_at: '2025-12-27T19:53:27.695108'
+    updated_at: '2025-12-27T20:01:32.012543'
+  SQL-007:
+    title: Refactor RuntimeDatabase to use SQLAlchemy
+    description: 'Refactor src/lodestar/runtime/database.py to use SQLAlchemy ORM
+      instead of raw sqlite3:
+
+
+      CRITICAL: Keep the same public interface - all method signatures must remain
+      unchanged so CLI commands don''t need modification.
+
+
+      Key changes:
+
+      1. __init__(): Create engine and session_factory instead of storing db_path
+      only
+
+      2. Replace _connect() usage with get_session(self._session_factory)
+
+      3. _ensure_initialized(): Use Base.metadata.create_all(self._engine) instead
+      of manual CREATE TABLE
+
+
+      Agent operations (refactor all):
+
+      - register_agent(): Use session.add(agent_to_orm(agent))
+
+      - get_agent(): Use select(AgentModel).where(...), return orm_to_agent()
+
+      - list_agents(): Use select(AgentModel).order_by(), convert all results
+
+      - find_agents_by_capability(): Use raw SQL with text() for json_each() SQLite
+      function
+
+      - find_agents_by_role(): Use select().where(AgentModel.role == role)
+
+      - update_heartbeat(): Use session.execute(update(AgentModel).where(...).values(...))
+
+
+      Lease operations (CRITICAL - maintain atomicity):
+
+      - create_lease(): Within single session, check for existing active lease, then
+      insert. Must remain atomic to prevent race conditions.
+
+      - get_active_lease(): Filter by expires_at > now.isoformat()
+
+      - get_agent_leases(): Filter by agent_id
+
+      - renew_lease(): Update expires_at
+
+      - release_lease(): Set expires_at to now
+
+
+      Message operations (refactor all):
+
+      - send_message(), get_inbox(), get_task_thread(), get_task_message_count(),
+      get_task_message_agents(), search_messages(), get_inbox_count(), wait_for_message()
+
+
+      Stats operations:
+
+      - get_stats(): Use func.count() aggregations
+
+      - get_agent_message_counts(): Use GROUP BY with func.count()
+
+
+      Internal:
+
+      - _log_event(): Accept session as first parameter to work within existing transaction
+
+      - Remove _create_schema(), _run_migrations(), SCHEMA_VERSION constant (Alembic
+      handles this now)
+
+
+      Test incrementally: Run ''uv run pytest tests/test_runtime.py'' frequently during
+      refactor.'
+    acceptance_criteria: []
+    depends_on:
+    - SQL-003
+    - SQL-004
+    - SQL-006
+    labels:
+    - feature
+    locks: []
+    priority: 4
+    status: verified
+    created_at: '2025-12-27T19:54:08.070867'
+    updated_at: '2025-12-27T20:05:16.418368'
+  SQL-008:
+    title: Update runtime tests for SQLAlchemy
+    description: "Update tests/test_runtime.py to work with the new SQLAlchemy-based\
+      \ RuntimeDatabase:\n\n1. Most tests should pass without changes since the public\
+      \ interface is unchanged\n\n2. Update test_expired_lease_not_active (or similar\
+      \ tests that access db._connect()):\n   - Replace: with db._connect() as conn:\
+      \ conn.execute(...)\n   - With: from lodestar.runtime.engine import get_session;\
+      \ from lodestar.runtime.converters import lease_to_orm; with get_session(db._session_factory)\
+      \ as session: session.add(lease_to_orm(lease))\n\n3. Add new tests for SQLAlchemy-specific\
+      \ functionality:\n   - Test WAL mode is enabled: Execute 'PRAGMA journal_mode'\
+      \ and verify returns 'wal'\n   - Test session rollback on exception\n   - Test\
+      \ JSONField serialization/deserialization edge cases (empty list, None handling)\n\
+      \n4. Run full test suite: uv run pytest tests/test_runtime.py -v\n\n5. Ensure\
+      \ all 40+ existing tests pass"
+    acceptance_criteria: []
+    depends_on:
+    - SQL-007
+    labels:
+    - test
+    locks: []
+    priority: 5
+    status: verified
+    created_at: '2025-12-27T19:54:09.237030'
+    updated_at: '2025-12-27T20:05:30.533008'
+  SQL-009:
+    title: End-to-end verification and cleanup
+    description: "Final verification and cleanup after SQLAlchemy migration:\n\n1.\
+      \ Delete existing .lodestar/runtime.sqlite if present (clean migration)\n\n\
+      2. Run full test suite:\n   - uv run pytest (all tests should pass)\n   - uv\
+      \ run ruff check src tests\n   - uv run ruff format --check src tests\n\n3.\
+      \ Test CLI commands manually:\n   - uv run lodestar init (in temp directory)\n\
+      \   - uv run lodestar agent join\n   - uv run lodestar task create --title 'Test\
+      \ task'\n   - uv run lodestar task claim <id>\n   - uv run lodestar task release\
+      \ <id>\n   - uv run lodestar msg send --to agent:<id> --text 'Test'\n   - uv\
+      \ run lodestar status\n\n4. Verify Alembic autogenerate detects no drift:\n\
+      \   - uv run alembic revision --autogenerate -m 'check' (should show 'No changes')\n\
+      \   - Delete the generated empty migration\n\n5. Update runtime/__init__.py\
+      \ if additional exports needed\n\n6. Optional: Add 'alembic' to .gitignore if\
+      \ it creates any cache files\n\n7. Update documentation if runtime internals\
+      \ are mentioned anywhere\n\nCommit message: 'feat: Migrate runtime database\
+      \ to SQLAlchemy ORM with Alembic migrations'"
+    acceptance_criteria: []
+    depends_on:
+    - SQL-008
+    labels:
+    - test
+    locks: []
+    priority: 6
+    status: verified
+    created_at: '2025-12-27T19:54:10.431185'
+    updated_at: '2025-12-27T20:08:07.952636'
 features:
   m0-skeleton:
   - F001
