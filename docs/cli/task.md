@@ -303,6 +303,9 @@ lodestar task release TASK_ID [OPTIONS]
 
 Frees the task so other agents can claim it. Use this when you're blocked or can't complete the task.
 
+!!! note "Auto-release on completion"
+    You don't need to manually release after `task done` or `task verify` - those commands auto-release the lease.
+
 ### Arguments
 
 | Argument | Description |
@@ -311,10 +314,11 @@ Frees the task so other agents can claim it. Use this when you're blocked or can
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--json` | Output in JSON format |
-| `--explain` | Show what this command does |
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--agent TEXT` | `-a` | Your agent ID (optional, infers from active lease) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
 
 ### Example
 
