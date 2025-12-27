@@ -697,6 +697,64 @@ tasks:
     status: verified
     created_at: '2025-12-27T10:25:37.271669'
     updated_at: '2025-12-27T10:48:37.109944'
+  D007:
+    title: Make README.md production ready for GitHub
+    description: 'WHAT: Rewrite README.md to be a professional, production-ready landing
+      page for the GitHub repository. Should attract users and clearly communicate
+      value.
+
+
+      WHERE: README.md (root)
+
+
+      WHY: Current README is minimal placeholder. Need professional presence for public
+      GitHub launch.
+
+
+      ACCEPT:
+
+      1) Has badges: PyPI version, CI status, docs link
+
+      2) Clear value proposition explaining what Lodestar does and why
+
+      3) Key features section highlighting: multi-agent coordination, lease-based
+      claims, two-plane model, self-documenting CLI
+
+      4) Installation section with uv and pip options
+
+      5) Quick start that actually works (use ''uv run lodestar'' for dev)
+
+      6) Link to full documentation (docs/ or GitHub Pages)
+
+      7) Architecture overview mentioning spec.yaml vs runtime.sqlite
+
+      8) Contributing section
+
+      9) License section with link to LICENSE file
+
+
+      CONTEXT:
+
+      - See docs/index.md for landing page content to adapt
+
+      - See docs/getting-started.md for installation/quickstart patterns
+
+      - See docs/concepts/two-plane-model.md for architecture explanation
+
+      - Package name is ''lodestar-cli'' on PyPI
+
+      - CI is GitHub Actions (.github/workflows/)
+
+      - Docs deploy to GitHub Pages'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - docs
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-27T13:15:53.183275'
+    updated_at: '2025-12-27T13:15:53.183287'
 features:
   m0-skeleton:
   - F001
