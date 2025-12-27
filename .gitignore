@@ -53,11 +53,6 @@ htmlcov/
 .lodestar/runtime.sqlite-shm
 .lodestar/runtime.jsonl
 
-# Klondike (bootstrapping tool - session state is local)
-.klondike/agent-progress.json
-.klondike/config.yaml
-agent-progress.md
-
 # Ruff
 .ruff_cache/
 

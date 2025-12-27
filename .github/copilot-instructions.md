@@ -11,13 +11,13 @@ Lodestar is a **Python CLI tool for multi-agent coordination in Git repositories
 ### Package Layout
 ```
 src/lodestar/
-├── cli/        # Typer commands, output formatting
-├── core/       # Domain services (scheduling, claims, validation)
-├── spec/       # YAML spec load/validate/save, DAG validation
-├── runtime/    # SQLite access layer + migrations
-├── models/     # Pydantic v2 models + JSON Schema export
-├── mcp/        # Optional MCP server (exposes tools)
-└── util/       # Locks, time parsing, path globs
+├── cli/           # Typer app + commands/ subdir for each command group
+├── core/          # Domain services (scheduling, claims, validation)
+├── spec/          # loader.py (YAML + portalocker), dag.py (cycle detection)
+├── runtime/       # database.py (SQLite WAL, CRUD for agents/leases/messages)
+├── models/        # Pydantic v2: envelope.py, spec.py, runtime.py
+├── mcp/           # Optional MCP server (exposes tools)
+└── util/          # paths.py, output.py (Rich + JSON), time.py
 ```
 
 ## Tech Stack
@@ -26,35 +26,40 @@ src/lodestar/
 |-----------|--------|-------|
 | Python | 3.12+ | Use `uv` for dev workflow |
 | CLI | Typer | `--json`, `--schema`, `--explain` on every command |
-| Output | Rich | Tables/panels for TTY; no ANSI in `--json` mode |
+| Output | Rich | Custom theme in `util/output.py`; no ANSI in `--json` mode |
 | Models | Pydantic v2 | Strict schemas, auto JSON Schema export |
-| Runtime DB | SQLite WAL | `portalocker` for spec writes |
-| Spec format | YAML | `.lodestar/spec.yaml` |
+| Runtime DB | SQLite WAL | `runtime/database.py` handles all CRUD |
+| Spec format | YAML | `spec/loader.py` with `portalocker` for atomic writes |
 
 ## Critical Patterns
 
 ### JSON Envelope (all `--json` output)
-```json
-{
-  "ok": true,
-  "data": { ... },
-  "next": [{"intent": "task.next", "cmd": "lodestar task next"}],
-  "warnings": []
-}
+Every command wraps output in `models/envelope.py`:
+```python
+Envelope.success(data, next_actions=[NEXT_ACTION_TASK_NEXT])
 ```
+Returns: `{"ok": true, "data": {...}, "next": [...], "warnings": []}`
+
+### CLI Command Structure
+Commands live in `cli/commands/<name>.py`. Each command:
+1. Accepts `--json`, `--explain` options
+2. Uses `print_json()` for JSON mode, `console.print()` for Rich
+3. Returns `Envelope` for consistent output
+4. See [status.py](src/lodestar/cli/commands/status.py#L1) as the canonical example
 
 ### Lease-Based Task Claims
-- Claims have TTL (default 15m); auto-expire without daemon
-- One active lease per task (atomic via SQLite transaction)
-- "Active claims" = filter out expired leases at read time
+- `RuntimeDatabase.create_lease()` is atomic (SQLite transaction)
+- Leases auto-expire; `is_expired()` checks `expires_at > now`
+- No daemon needed—expiry checked at read time
 
-### Task Scheduling Rules
+### Task Scheduling
 - Task is **claimable** when: `status == ready` AND all `depends_on` are `verified`
-- `lodestar task next` returns only claimable tasks, sorted by priority
+- `Spec.get_claimable_tasks()` returns sorted by priority
+- DAG validation in `spec/dag.py`: cycles, missing deps, orphans
 
-### Progressive Discovery
-- No-args commands return "next actions" suggestions
-- Interactive prompts only when TTY; require explicit flags otherwise
+### Path Discovery
+- `util/paths.py`: `find_lodestar_root()` walks up to find `.lodestar/`
+- All commands work from any subdirectory
 
 ## Developer Workflow
 
@@ -67,35 +72,34 @@ uv run ruff format src tests     # Format
 
 # CLI development
 uv run lodestar --help           # Test CLI entrypoint
+uv run lodestar status --json    # Test JSON output
 uv run pytest -k "test_name"     # Run specific test
 ```
 
 ## Key References
 
 - [PRD.md](../PRD.md) — Full product requirements with command specs
-- `.lodestar/spec.yaml` — Task definitions (versioned)
-- `.lodestar/runtime.sqlite` — Agent state (gitignored)
-- `AGENTS.md` — Generated contract for agents entering repos using Lodestar
+- [src/lodestar/models/](../src/lodestar/models/) — All Pydantic models
+- [src/lodestar/cli/commands/status.py](../src/lodestar/cli/commands/status.py) — Canonical command pattern
 
-## Bootstrapping Strategy
+## Dogfooding: This Repo Uses Lodestar
 
-**Lodestar is built using klondike, then will dogfood itself.**
+This project uses **lodestar itself** for task management. Tasks are defined in `.lodestar/spec.yaml`.
 
-1. **Phase 1 (now)**: Use `klondike` CLI for session/feature tracking during development
-2. **Phase 2**: Once core Lodestar features work, migrate to `lodestar` for self-coordination
-3. **Phase 3**: Deprecate klondike dependency
-
-### Current: Session Management (via klondike)
+### Session Management (via lodestar)
 ```bash
-klondike status                  # Project overview
-klondike feature list            # See features to implement
-klondike session start --focus "description"
-klondike session end --summary "..." --next "..."
+uv run lodestar status           # Project overview
+uv run lodestar task list        # See all tasks
+uv run lodestar task next        # Find available work
+uv run lodestar agent join       # Register as agent
+uv run lodestar task claim <id>  # Claim a task
+uv run lodestar task done <id>   # Mark task complete
+uv run lodestar task verify <id> # Verify task
 ```
 
 ## Testing Strategy
 
-- **Unit tests**: DAG validation, lease behaviors, scheduling rules, schema stability
-- **Integration tests**: Concurrent claims from multiple processes, spec locking
+- **Unit tests**: `tests/test_models.py`, `test_spec.py`, `test_runtime.py`
+- **Integration tests**: Concurrent claims, spec locking
 - **Golden tests**: CLI `--json` output snapshots
 - Test CLI end-to-end: `uv run lodestar <cmd>` with assertions on output

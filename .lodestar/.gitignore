@@ -1,0 +1,6 @@
+# Runtime files (ephemeral, not versioned)
+runtime.sqlite
+runtime.sqlite-wal
+runtime.sqlite-shm
+runtime.jsonl
+*.lock
