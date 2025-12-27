@@ -39,11 +39,16 @@ def agent_callback(ctx: typer.Context) -> None:
         console.print("  [command]lodestar agent list[/command]")
         console.print("      List all registered agents")
         console.print()
+        console.print("  [command]lodestar agent find --capability <name>[/command]")
+        console.print("      Find agents with a specific capability")
+        console.print()
         console.print("  [command]lodestar agent brief --task <id>[/command]")
         console.print("      Get context for spawning a sub-agent on a task")
         console.print()
         console.print("[info]Typical workflow:[/info]")
-        console.print("  1. lodestar agent join --name 'My Agent'")
+        console.print(
+            "  1. lodestar agent join --name 'My Agent' --role backend --capability python"
+        )
         console.print("  2. Save the agent ID (e.g., A1234ABCD)")
         console.print("  3. Use this ID in task claim: --agent A1234ABCD")
         console.print()
@@ -56,6 +61,18 @@ def agent_join(
         "--name",
         "-n",
         help="Display name for this agent.",
+    ),
+    role: str | None = typer.Option(
+        None,
+        "--role",
+        "-r",
+        help="Agent role (e.g., 'code-review', 'testing', 'documentation').",
+    ),
+    capabilities: list[str] | None = typer.Option(
+        None,
+        "--capability",
+        "-c",
+        help="Agent capability (can be repeated, e.g., -c python -c testing).",
     ),
     model: str | None = typer.Option(
         None,
@@ -111,6 +128,8 @@ def agent_join(
     # Create and register agent
     agent = Agent(
         display_name=name or "",
+        role=role or "",
+        capabilities=capabilities or [],
         session_meta=session_meta,
     )
     db.register_agent(agent)
@@ -126,6 +145,8 @@ def agent_join(
     result = {
         "agent_id": agent.agent_id,
         "display_name": agent.display_name,
+        "role": agent.role,
+        "capabilities": agent.capabilities,
         "registered_at": agent.created_at.isoformat(),
         "session_meta": session_meta,
     }
@@ -145,6 +166,10 @@ def agent_join(
         )
         if name:
             console.print(f"  Name: {name}")
+        if role:
+            console.print(f"  Role: {role}")
+        if capabilities:
+            console.print(f"  Capabilities: {', '.join(capabilities)}")
         console.print()
         console.print("[info]Next steps:[/info]")
         console.print(
@@ -193,6 +218,8 @@ def agent_list(
             {
                 "agent_id": a.agent_id,
                 "display_name": a.display_name,
+                "role": a.role,
+                "capabilities": a.capabilities,
                 "last_seen_at": a.last_seen_at.isoformat(),
                 "session_meta": a.session_meta,
             }
@@ -214,10 +241,120 @@ def agent_list(
             for agent in agents:
                 name_part = f" ({agent.display_name})" if agent.display_name else ""
                 console.print(f"  [agent_id]{agent.agent_id}[/agent_id]{name_part}")
+                if agent.role:
+                    console.print(f"    Role: {agent.role}")
+                if agent.capabilities:
+                    console.print(f"    Capabilities: {', '.join(agent.capabilities)}")
                 console.print(f"    Last seen: {agent.last_seen_at.isoformat()}")
                 if agent.session_meta:
                     meta_str = ", ".join(f"{k}={v}" for k, v in agent.session_meta.items())
                     console.print(f"    Meta: {meta_str}")
+        console.print()
+
+
+@app.command(name="find")
+def agent_find(
+    capability: str | None = typer.Option(
+        None,
+        "--capability",
+        "-c",
+        help="Find agents with this capability.",
+    ),
+    role: str | None = typer.Option(
+        None,
+        "--role",
+        "-r",
+        help="Find agents with this role.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Output in JSON format.",
+    ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
+) -> None:
+    """Find agents by capability or role.
+
+    Search for agents that have specific capabilities or roles.
+    Use this to discover which agents can help with particular tasks.
+    """
+    if explain:
+        _show_explain_find(json_output)
+        return
+
+    if not capability and not role:
+        if json_output:
+            print_json(Envelope.error("Must specify --capability or --role to search").model_dump())
+        else:
+            console.print("[error]Must specify --capability or --role to search[/error]")
+            console.print()
+            console.print("Examples:")
+            console.print("  [command]lodestar agent find --capability python[/command]")
+            console.print("  [command]lodestar agent find --role code-review[/command]")
+        raise typer.Exit(1)
+
+    root = find_lodestar_root()
+    if root is None:
+        if json_output:
+            print_json(Envelope.error("Not a Lodestar repository").model_dump())
+        else:
+            console.print("[error]Not a Lodestar repository[/error]")
+        raise typer.Exit(1)
+
+    runtime_path = get_runtime_db_path(root)
+    if not runtime_path.exists():
+        agents = []
+    else:
+        db = RuntimeDatabase(runtime_path)
+        if capability:
+            agents = db.find_agents_by_capability(capability)
+        elif role:
+            agents = db.find_agents_by_role(role)
+        else:
+            agents = []
+
+    search_term = capability if capability else role
+    search_type = "capability" if capability else "role"
+
+    result = {
+        "search": {
+            "type": search_type,
+            "term": search_term,
+        },
+        "agents": [
+            {
+                "agent_id": a.agent_id,
+                "display_name": a.display_name,
+                "role": a.role,
+                "capabilities": a.capabilities,
+                "last_seen_at": a.last_seen_at.isoformat(),
+            }
+            for a in agents
+        ],
+        "count": len(agents),
+    }
+
+    if json_output:
+        print_json(Envelope.success(result).model_dump())
+    else:
+        console.print()
+        if not agents:
+            console.print(f"[muted]No agents found with {search_type} '{search_term}'[/muted]")
+        else:
+            console.print(f"[bold]Agents with {search_type} '{search_term}' ({len(agents)})[/bold]")
+            console.print()
+            for agent in agents:
+                name_part = f" ({agent.display_name})" if agent.display_name else ""
+                console.print(f"  [agent_id]{agent.agent_id}[/agent_id]{name_part}")
+                if agent.role:
+                    console.print(f"    Role: {agent.role}")
+                if agent.capabilities:
+                    console.print(f"    Capabilities: {', '.join(agent.capabilities)}")
+                console.print(f"    Last seen: {agent.last_seen_at.isoformat()}")
         console.print()
 
 
@@ -419,4 +556,35 @@ def _show_explain_brief(json_output: bool) -> None:
         console.print("[info]lodestar agent brief[/info]")
         console.print()
         console.print("Get a concise brief for spawning a sub-agent on a task.")
+        console.print()
+
+
+def _show_explain_find(json_output: bool) -> None:
+    """Show find command explanation."""
+    explanation = {
+        "command": "lodestar agent find",
+        "purpose": "Find agents by capability or role.",
+        "examples": [
+            "lodestar agent find --capability python",
+            "lodestar agent find --capability testing",
+            "lodestar agent find --role code-review",
+        ],
+        "notes": [
+            "Search for agents that can help with specific tasks",
+            "Use --capability to find agents with a specific skill",
+            "Use --role to find agents with a specific job function",
+        ],
+    }
+
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print()
+        console.print("[info]lodestar agent find[/info]")
+        console.print()
+        console.print("Find agents by capability or role.")
+        console.print()
+        console.print("Examples:")
+        console.print("  [command]lodestar agent find --capability python[/command]")
+        console.print("  [command]lodestar agent find --role code-review[/command]")
         console.print()

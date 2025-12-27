@@ -16,7 +16,7 @@ from lodestar.util.paths import get_runtime_db_path
 class RuntimeDatabase:
     """SQLite database for runtime state with WAL mode for concurrency."""
 
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
 
     def __init__(self, db_path: Path | None = None):
         """Initialize the runtime database.
@@ -67,9 +67,10 @@ class RuntimeDatabase:
             CREATE TABLE IF NOT EXISTS agents (
                 agent_id TEXT PRIMARY KEY,
                 display_name TEXT DEFAULT '',
+                role TEXT DEFAULT '',
                 created_at TEXT NOT NULL,
                 last_seen_at TEXT NOT NULL,
-                capabilities TEXT DEFAULT '{}',
+                capabilities TEXT DEFAULT '[]',
                 session_meta TEXT DEFAULT '{}'
             );
 
@@ -134,6 +135,19 @@ class RuntimeDatabase:
 
             # Update schema version
             conn.execute("INSERT OR REPLACE INTO schema_version (version) VALUES (?)", (2,))
+            current_version = 2
+
+        # Migration 2 -> 3: Add role column to agents table
+        if current_version < 3:
+            # Check if column already exists (for safety)
+            cursor = conn.execute("PRAGMA table_info(agents)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if "role" not in columns:
+                conn.execute("ALTER TABLE agents ADD COLUMN role TEXT DEFAULT ''")
+
+            # Update schema version
+            conn.execute("INSERT OR REPLACE INTO schema_version (version) VALUES (?)", (3,))
 
     # Agent operations
 
@@ -144,13 +158,14 @@ class RuntimeDatabase:
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO agents (agent_id, display_name, created_at, last_seen_at,
+                INSERT INTO agents (agent_id, display_name, role, created_at, last_seen_at,
                                    capabilities, session_meta)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     agent.agent_id,
                     agent.display_name,
+                    agent.role,
                     agent.created_at.isoformat(),
                     agent.last_seen_at.isoformat(),
                     json.dumps(agent.capabilities),
@@ -172,12 +187,17 @@ class RuntimeDatabase:
             if row is None:
                 return None
 
+            # Handle backward compatibility: old agents have capabilities as dict
+            capabilities_raw = json.loads(row["capabilities"])
+            capabilities = capabilities_raw if isinstance(capabilities_raw, list) else []
+
             return Agent(
                 agent_id=row["agent_id"],
                 display_name=row["display_name"],
+                role=row["role"] or "",
                 created_at=datetime.fromisoformat(row["created_at"]),
                 last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
-                capabilities=json.loads(row["capabilities"]),
+                capabilities=capabilities,
                 session_meta=json.loads(row["session_meta"]),
             )
 
@@ -190,13 +210,101 @@ class RuntimeDatabase:
 
             agents = []
             for row in rows:
+                # Handle backward compatibility: old agents have capabilities as dict
+                capabilities_raw = json.loads(row["capabilities"])
+                capabilities = capabilities_raw if isinstance(capabilities_raw, list) else []
+
                 agents.append(
                     Agent(
                         agent_id=row["agent_id"],
                         display_name=row["display_name"],
+                        role=row["role"] or "",
                         created_at=datetime.fromisoformat(row["created_at"]),
                         last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
-                        capabilities=json.loads(row["capabilities"]),
+                        capabilities=capabilities,
+                        session_meta=json.loads(row["session_meta"]),
+                    )
+                )
+
+            return agents
+
+    def find_agents_by_capability(self, capability: str) -> list[Agent]:
+        """Find agents that have a specific capability.
+
+        Args:
+            capability: The capability name to search for.
+
+        Returns:
+            List of agents that have the specified capability.
+        """
+        import json
+
+        with self._connect() as conn:
+            # Use JSON functions to search within the capabilities array
+            # SQLite's json_each can expand a JSON array into rows
+            rows = conn.execute(
+                """
+                SELECT DISTINCT a.* FROM agents a, json_each(a.capabilities) AS cap
+                WHERE cap.value = ?
+                ORDER BY a.last_seen_at DESC
+                """,
+                (capability,),
+            ).fetchall()
+
+            agents = []
+            for row in rows:
+                # Handle backward compatibility: old agents have capabilities as dict
+                capabilities_raw = json.loads(row["capabilities"])
+                capabilities = capabilities_raw if isinstance(capabilities_raw, list) else []
+
+                agents.append(
+                    Agent(
+                        agent_id=row["agent_id"],
+                        display_name=row["display_name"],
+                        role=row["role"] or "",
+                        created_at=datetime.fromisoformat(row["created_at"]),
+                        last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
+                        capabilities=capabilities,
+                        session_meta=json.loads(row["session_meta"]),
+                    )
+                )
+
+            return agents
+
+    def find_agents_by_role(self, role: str) -> list[Agent]:
+        """Find agents that have a specific role.
+
+        Args:
+            role: The role to search for.
+
+        Returns:
+            List of agents with the specified role.
+        """
+        import json
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM agents WHERE role = ?
+                ORDER BY last_seen_at DESC
+                """,
+                (role,),
+            ).fetchall()
+
+            agents = []
+            for row in rows:
+                # Handle backward compatibility: old agents have capabilities as dict
+                capabilities_raw = json.loads(row["capabilities"])
+                capabilities = capabilities_raw if isinstance(capabilities_raw, list) else []
+
+                agents.append(
+                    Agent(
+                        agent_id=row["agent_id"],
+                        display_name=row["display_name"],
+                        role=row["role"] or "",
+                        created_at=datetime.fromisoformat(row["created_at"]),
+                        last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
+                        capabilities=capabilities,
                         session_meta=json.loads(row["session_meta"]),
                     )
                 )

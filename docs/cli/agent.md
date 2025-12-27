@@ -20,6 +20,8 @@ This is the canonical entrypoint for agents. Run this first to get your agent_id
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--name TEXT` | `-n` | Display name for this agent |
+| `--role TEXT` | `-r` | Agent role (e.g., 'code-review', 'testing', 'documentation') |
+| `--capability TEXT` | `-c` | Agent capability (can be repeated, e.g., `-c python -c testing`) |
 | `--model TEXT` | `-m` | Model name (e.g., claude-3.5-sonnet) |
 | `--tool TEXT` | `-t` | Tool name (e.g., claude-code, copilot) |
 | `--json` | | Output in JSON format |
@@ -28,8 +30,11 @@ This is the canonical entrypoint for agents. Run this first to get your agent_id
 ### Example
 
 ```bash
-$ lodestar agent join --name "Dev Agent" --model claude-3.5-sonnet
+$ lodestar agent join --name "Dev Agent" --role backend --capability python --capability testing
 Registered as agent A1234ABCD
+  Name: Dev Agent
+  Role: backend
+  Capabilities: python, testing
 
 Next steps:
   lodestar task next - Get next task
@@ -44,8 +49,11 @@ $ lodestar agent join --json
   "ok": true,
   "data": {
     "agent_id": "A1234ABCD",
-    "name": "Dev Agent",
-    "created_at": "2024-01-15T10:30:00Z"
+    "display_name": "Dev Agent",
+    "role": "backend",
+    "capabilities": ["python", "testing"],
+    "registered_at": "2024-01-15T10:30:00Z",
+    "session_meta": {}
   },
   "next": [
     {"intent": "task.next", "cmd": "lodestar task next"},
@@ -78,8 +86,88 @@ lodestar agent list [OPTIONS]
 $ lodestar agent list
 Agents (2)
 
-  A1234ABCD  Dev Agent       claude-3.5-sonnet  Last seen: 2m ago
-  A5678EFGH  Review Agent    gpt-4              Last seen: 1h ago
+  A1234ABCD (Dev Agent)
+    Role: backend
+    Capabilities: python, testing
+    Last seen: 2024-01-15T10:30:00
+  A5678EFGH (Review Agent)
+    Role: code-review
+    Capabilities: security, performance
+    Last seen: 2024-01-15T09:00:00
+```
+
+---
+
+## agent find
+
+Find agents by capability or role.
+
+```bash
+lodestar agent find [OPTIONS]
+```
+
+Search for agents that have specific capabilities or roles. Use this to discover which agents can help with particular tasks.
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--capability TEXT` | `-c` | Find agents with this capability |
+| `--role TEXT` | `-r` | Find agents with this role |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
+
+### Examples
+
+```bash
+# Find agents that can write Python
+$ lodestar agent find --capability python
+Agents with capability 'python' (2)
+
+  A1234ABCD (Dev Agent)
+    Role: backend
+    Capabilities: python, testing
+    Last seen: 2024-01-15T10:30:00
+  A9999WXYZ (Full Stack Dev)
+    Role: fullstack
+    Capabilities: python, javascript, sql
+    Last seen: 2024-01-15T10:25:00
+
+# Find agents that do code review
+$ lodestar agent find --role code-review
+Agents with role 'code-review' (1)
+
+  A5678EFGH (Review Agent)
+    Role: code-review
+    Capabilities: security, performance
+    Last seen: 2024-01-15T09:00:00
+```
+
+### JSON Output
+
+```bash
+$ lodestar agent find --capability python --json
+{
+  "ok": true,
+  "data": {
+    "search": {
+      "type": "capability",
+      "term": "python"
+    },
+    "agents": [
+      {
+        "agent_id": "A1234ABCD",
+        "display_name": "Dev Agent",
+        "role": "backend",
+        "capabilities": ["python", "testing"],
+        "last_seen_at": "2024-01-15T10:30:00"
+      }
+    ],
+    "count": 1
+  },
+  "next": [],
+  "warnings": []
+}
 ```
 
 ---

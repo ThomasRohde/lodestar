@@ -157,8 +157,9 @@ lodestar status                  # Show status + next actions
 lodestar doctor                  # Health check
 
 # Agent management
-lodestar agent join              # Register as agent
-lodestar agent list              # List all agents
+lodestar agent join              # Register as agent (--role, --capability for metadata)
+lodestar agent list              # List all agents (shows role/capabilities)
+lodestar agent find              # Find agents by --capability or --role
 lodestar agent show <id>         # Show agent details
 lodestar agent heartbeat <id>    # Update heartbeat
 

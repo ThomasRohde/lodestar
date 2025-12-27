@@ -827,9 +827,9 @@ tasks:
     - m7
     locks: []
     priority: 1
-    status: ready
+    status: done
     created_at: '2025-12-27T15:04:50.542272'
-    updated_at: '2025-12-27T15:04:50.542277'
+    updated_at: '2025-12-27T19:01:32.347979'
   MSG-003:
     title: Add message read status tracking
     description: 'PRIORITY: Medium. FROM: Agent communication test report (REPORT.md).

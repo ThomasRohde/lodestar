@@ -51,6 +51,86 @@ class TestAgentOperations:
         success = db.update_heartbeat(agent.agent_id)
         assert success is True
 
+    def test_register_agent_with_role_and_capabilities(self, db):
+        """Test registering an agent with role and capabilities metadata."""
+        agent = Agent(
+            display_name="CodeReviewer",
+            role="code-review",
+            capabilities=["python", "testing", "documentation"],
+        )
+        registered = db.register_agent(agent)
+        assert registered.role == "code-review"
+        assert registered.capabilities == ["python", "testing", "documentation"]
+
+        # Verify it persists
+        retrieved = db.get_agent(agent.agent_id)
+        assert retrieved.role == "code-review"
+        assert retrieved.capabilities == ["python", "testing", "documentation"]
+
+    def test_find_agents_by_capability(self, db):
+        """Test finding agents by capability."""
+        # Register agents with different capabilities
+        agent1 = Agent(
+            display_name="PythonDev",
+            capabilities=["python", "testing"],
+        )
+        agent2 = Agent(
+            display_name="JSDev",
+            capabilities=["javascript", "testing"],
+        )
+        agent3 = Agent(
+            display_name="DocWriter",
+            capabilities=["documentation"],
+        )
+        db.register_agent(agent1)
+        db.register_agent(agent2)
+        db.register_agent(agent3)
+
+        # Find by python capability
+        python_agents = db.find_agents_by_capability("python")
+        assert len(python_agents) == 1
+        assert python_agents[0].display_name == "PythonDev"
+
+        # Find by testing capability
+        testing_agents = db.find_agents_by_capability("testing")
+        assert len(testing_agents) == 2
+
+        # Find by non-existent capability
+        rust_agents = db.find_agents_by_capability("rust")
+        assert len(rust_agents) == 0
+
+    def test_find_agents_by_role(self, db):
+        """Test finding agents by role."""
+        # Register agents with different roles
+        agent1 = Agent(
+            display_name="Reviewer1",
+            role="code-review",
+        )
+        agent2 = Agent(
+            display_name="Reviewer2",
+            role="code-review",
+        )
+        agent3 = Agent(
+            display_name="Tester",
+            role="testing",
+        )
+        db.register_agent(agent1)
+        db.register_agent(agent2)
+        db.register_agent(agent3)
+
+        # Find by code-review role
+        reviewers = db.find_agents_by_role("code-review")
+        assert len(reviewers) == 2
+
+        # Find by testing role
+        testers = db.find_agents_by_role("testing")
+        assert len(testers) == 1
+        assert testers[0].display_name == "Tester"
+
+        # Find by non-existent role
+        designers = db.find_agents_by_role("design")
+        assert len(designers) == 0
+
 
 class TestLeaseOperations:
     """Test lease database operations."""

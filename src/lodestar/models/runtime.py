@@ -36,6 +36,10 @@ class Agent(BaseModel):
         default="",
         description="Human-readable agent name",
     )
+    role: str = Field(
+        default="",
+        description="Agent role (e.g., 'code-review', 'testing', 'documentation')",
+    )
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         description="When the agent registered",
@@ -44,9 +48,9 @@ class Agent(BaseModel):
         default_factory=datetime.utcnow,
         description="Last heartbeat timestamp",
     )
-    capabilities: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Agent capabilities (JSON)",
+    capabilities: list[str] = Field(
+        default_factory=list,
+        description="Agent capabilities (list of capability names)",
     )
     session_meta: dict[str, Any] = Field(
         default_factory=dict,
