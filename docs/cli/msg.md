@@ -2,6 +2,9 @@
 
 Commands for inter-agent messaging.
 
+!!! tip "Quick Start"
+    Run `lodestar msg` without a subcommand to see messaging examples and available commands.
+
 ## msg send
 
 Send a message to an agent or task thread.

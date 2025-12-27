@@ -2,6 +2,18 @@
 
 Lodestar provides a comprehensive CLI for managing multi-agent coordination.
 
+## Progressive Discovery
+
+The CLI is self-documenting. Run any command group without a subcommand to see available workflows:
+
+```bash
+lodestar agent    # Shows agent registration workflow
+lodestar task     # Shows task management workflow
+lodestar msg      # Shows messaging workflow
+```
+
+Each command also supports `--help` for detailed usage and `--explain` for context about what it does.
+
 ## Global Flags
 
 All commands support these flags:

@@ -2,6 +2,9 @@
 
 Commands for creating, claiming, and completing tasks.
 
+!!! tip "Quick Start"
+    Run `lodestar task` without a subcommand to see the typical workflow and available commands.
+
 ## task list
 
 List all tasks with optional filtering.

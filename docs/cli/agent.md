@@ -2,6 +2,9 @@
 
 Commands for managing agent registration and identity.
 
+!!! tip "Quick Start"
+    Run `lodestar agent` without a subcommand to see the typical workflow and available commands.
+
 ## agent join
 
 Register as an agent and get your identity.
