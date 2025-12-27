@@ -178,32 +178,87 @@ def _agents_md_content(project_name: str) -> str:
 
 This repository uses [Lodestar](https://github.com/lodestar-cli/lodestar) for multi-agent coordination.
 
-## Quick Start for Agents
-
-1. **Register**: Run `lodestar agent join` to get your agent ID
-2. **Find work**: Run `lodestar task next` to see available tasks
-3. **Claim task**: Run `lodestar task claim T123` to claim a task
-4. **Communicate**: Run `lodestar msg send --to task:T123 --text "Progress update"`
-
-## Commands
+## Session Start (Do This First)
 
 ```bash
-lodestar status          # Repository overview
-lodestar task list       # All tasks
-lodestar task next       # Next claimable task
-lodestar task show T123  # Task details
-lodestar msg inbox       # Your messages
+# 1. Check repository health
+lodestar doctor
+
+# 2. Register and save your agent ID
+lodestar agent join --name "Your Name"
+# Output: Registered as agent A1234ABCD  <-- SAVE THIS ID
+
+# 3. Find available work
+lodestar task next
 ```
+
+## Working on a Task
+
+```bash
+# Claim BEFORE starting (--agent is required)
+lodestar task claim <task-id> --agent <your-agent-id>
+
+# If work takes > 10 minutes, renew your lease
+lodestar task renew <task-id>
+
+# When done
+lodestar task done <task-id>
+lodestar task verify <task-id>
+```
+
+## If You Get Blocked
+
+```bash
+# Release the task
+lodestar task release <task-id>
+
+# Leave context for the next agent (--from and --to are required)
+lodestar msg send --to task:<task-id> --from <your-agent-id> --text "Blocked: reason here"
+```
+
+## Creating Tasks
+
+```bash
+# Create with good descriptions and dependencies
+lodestar task create \\
+    --id "F001" \\
+    --title "Short, clear title" \\
+    --description "What needs to be done, acceptance criteria, relevant files" \\
+    --priority 1 \\
+    --label feature \\
+    --depends-on "F000"  # Task that must be verified first
+```
+
+## Command Reference
+
+| Action | Command |
+|--------|---------|
+| Check health | `lodestar doctor` |
+| View status | `lodestar status` |
+| List all tasks | `lodestar task list` |
+| Find claimable work | `lodestar task next` |
+| View task details | `lodestar task show <id>` |
+| Claim task | `lodestar task claim <id> --agent <agent-id>` |
+| Extend lease | `lodestar task renew <id>` |
+| Release task | `lodestar task release <id>` |
+| Mark complete | `lodestar task done <id>` |
+| Verify complete | `lodestar task verify <id>` |
+| Send message | `lodestar msg send --to task:<id> --from <agent-id> --text "..."` |
+| Read task thread | `lodestar msg thread <task-id>` |
+| Check inbox | `lodestar msg inbox --agent <agent-id>` |
 
 ## Rules
 
-- Always claim before working on a task
-- Renew claims every 15 minutes for long tasks
-- Release claims if you can't complete the work
-- Post updates to task threads
+1. **Always claim before working** - Prevents duplicate work
+2. **Renew leases proactively** - Default is 15 minutes
+3. **Leave context when releasing** - Help the next agent
+4. **Verify after done** - Unblocks dependent tasks
+5. **Don't edit spec.yaml directly** - Use `lodestar task create/update`
 
 ## Files
 
-- `.lodestar/spec.yaml` - Task definitions (DO commit)
-- `.lodestar/runtime.sqlite` - Runtime state (DO NOT commit or edit)
+| File | Purpose | Git |
+|------|---------|-----|
+| `.lodestar/spec.yaml` | Task definitions | Commit |
+| `.lodestar/runtime.sqlite` | Agent/lease state | Gitignored |
 """
