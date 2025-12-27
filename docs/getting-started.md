@@ -11,23 +11,23 @@ This guide walks you through installing Lodestar and completing your first task 
 
 Lodestar is available on PyPI as `lodestar-cli`:
 
-=== "uv (recommended)"
+**Using uv (recommended):**
 
-    ```bash
-    uv add lodestar-cli
-    ```
+```bash
+uv add lodestar-cli
+```
 
-=== "pip"
+**Using pip:**
 
-    ```bash
-    pip install lodestar-cli
-    ```
+```bash
+pip install lodestar-cli
+```
 
-=== "pipx (for global install)"
+**Using pipx (for global install):**
 
-    ```bash
-    pipx install lodestar-cli
-    ```
+```bash
+pipx install lodestar-cli
+```
 
 Verify the installation:
 
