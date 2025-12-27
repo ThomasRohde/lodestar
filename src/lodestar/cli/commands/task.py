@@ -66,13 +66,18 @@ def task_list(
         None,
         "--status",
         "-s",
-        help="Filter by status (todo, ready, blocked, done, verified).",
+        help="Filter by status (todo, ready, blocked, done, verified, deleted).",
     ),
     label: str | None = typer.Option(
         None,
         "--label",
         "-l",
         help="Filter by label.",
+    ),
+    include_deleted: bool = typer.Option(
+        False,
+        "--include-deleted",
+        help="Include deleted tasks in the list.",
     ),
     json_output: bool = typer.Option(
         False,
@@ -85,7 +90,10 @@ def task_list(
         help="Show what this command does.",
     ),
 ) -> None:
-    """List all tasks with optional filtering."""
+    """List all tasks with optional filtering.
+
+    By default, deleted tasks are hidden. Use --include-deleted to show them.
+    """
     if explain:
         _show_explain_list(json_output)
         return
@@ -109,6 +117,10 @@ def task_list(
 
     # Filter tasks
     tasks = list(spec.tasks.values())
+
+    # Filter out deleted tasks by default (unless --include-deleted is used or filtering by status=deleted)
+    if not include_deleted and (not status_filter or status_filter.lower() != "deleted"):
+        tasks = [t for t in tasks if t.status != TaskStatus.DELETED]
 
     if status_filter:
         try:
@@ -169,6 +181,7 @@ def task_list(
                 TaskStatus.BLOCKED: "yellow",
                 TaskStatus.DONE: "blue",
                 TaskStatus.VERIFIED: "green",
+                TaskStatus.DELETED: "red dim",
             }
 
             for task in tasks:
@@ -266,9 +279,12 @@ def task_show(
         print_json(Envelope.success(result).model_dump())
     else:
         console.print()
+        status_display = task.status.value
+        if task.status == TaskStatus.DELETED:
+            status_display = f"[red dim]{task.status.value} (soft-deleted)[/red dim]"
         console.print(f"[bold][task_id]{task.id}[/task_id][/bold] - {task.title}")
         console.print()
-        console.print(f"[muted]Status:[/muted] {task.status.value}")
+        console.print(f"[muted]Status:[/muted] {status_display}")
         console.print(f"[muted]Priority:[/muted] {task.priority}")
         if task.labels:
             console.print(f"[muted]Labels:[/muted] {', '.join(task.labels)}")
@@ -1069,6 +1085,134 @@ def task_verify(
             console.print(
                 f"[info]Unblocked tasks:[/info] {', '.join(t.id for t in newly_unblocked)}"
             )
+
+
+@app.command(name="delete")
+def task_delete(
+    task_id: str = typer.Argument(..., help="Task ID to delete."),
+    cascade: bool = typer.Option(
+        False,
+        "--cascade",
+        help="Cascade delete to dependent tasks.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Output in JSON format.",
+    ),
+) -> None:
+    """Soft-delete a task (status=deleted).
+
+    Tasks are soft-deleted, not physically removed. Deleted tasks are
+    hidden from list by default (use --include-deleted to show them).
+
+    If the task is depended on by other tasks:
+    - Without --cascade: error with list of dependents
+    - With --cascade: delete this task and all its dependents
+
+    Example:
+        lodestar task delete F001              # Delete if no dependents
+        lodestar task delete F001 --cascade    # Delete and cascade to dependents
+    """
+    root = find_lodestar_root()
+    if root is None:
+        if json_output:
+            print_json(Envelope.error("Not a Lodestar repository").model_dump())
+        else:
+            console.print("[error]Not a Lodestar repository[/error]")
+        raise typer.Exit(1)
+
+    try:
+        spec = load_spec(root)
+    except SpecNotFoundError:
+        if json_output:
+            print_json(Envelope.error("Spec not found").model_dump())
+        else:
+            console.print("[error]Spec not found[/error]")
+        raise typer.Exit(1)
+
+    task = spec.get_task(task_id)
+    if task is None:
+        if json_output:
+            print_json(Envelope.error(f"Task {task_id} not found").model_dump())
+        else:
+            console.print(f"[error]Task {task_id} not found[/error]")
+        raise typer.Exit(1)
+
+    if task.status == TaskStatus.DELETED:
+        if json_output:
+            print_json(Envelope.error(f"Task {task_id} is already deleted").model_dump())
+        else:
+            console.print(f"[warning]Task {task_id} is already deleted[/warning]")
+        raise typer.Exit(1)
+
+    # Find tasks that depend on this one
+    dependency_graph = spec.get_dependency_graph()
+    dependents = dependency_graph.get(task_id, [])
+    # Filter out already deleted tasks
+    active_dependents = [d for d in dependents if spec.tasks[d].status != TaskStatus.DELETED]
+
+    if active_dependents and not cascade:
+        if json_output:
+            print_json(
+                Envelope.error(
+                    f"Task {task_id} has {len(active_dependents)} dependent(s). Use --cascade to delete all."
+                ).model_dump()
+            )
+        else:
+            console.print(f"[error]Cannot delete {task_id}[/error]")
+            console.print(f"  {len(active_dependents)} task(s) depend on this task:")
+            for dep in active_dependents:
+                console.print(f"    - {dep}: {spec.tasks[dep].title}")
+            console.print()
+            console.print(
+                "  Use [command]--cascade[/command] to delete this task and all dependents"
+            )
+        raise typer.Exit(1)
+
+    # Collect tasks to delete
+    tasks_to_delete = [task_id]
+    if cascade and active_dependents:
+        # Recursively collect all downstream dependents
+        to_process = active_dependents[:]
+        while to_process:
+            current = to_process.pop(0)
+            if current not in tasks_to_delete:
+                tasks_to_delete.append(current)
+                current_deps = dependency_graph.get(current, [])
+                active_current_deps = [
+                    d for d in current_deps if spec.tasks[d].status != TaskStatus.DELETED
+                ]
+                to_process.extend(active_current_deps)
+
+    # Mark all tasks as deleted
+    deleted_tasks = []
+    for tid in tasks_to_delete:
+        t = spec.tasks[tid]
+        t.status = TaskStatus.DELETED
+        t.updated_at = datetime.utcnow()
+        deleted_tasks.append({"id": tid, "title": t.title})
+
+    save_spec(spec, root)
+
+    result = {
+        "deleted": deleted_tasks,
+        "count": len(deleted_tasks),
+    }
+
+    if json_output:
+        print_json(Envelope.success(result).model_dump())
+    else:
+        console.print()
+        console.print(f"[success]Deleted {len(deleted_tasks)} task(s)[/success]")
+        for dt in deleted_tasks:
+            console.print(f"  - {dt['id']}: {dt['title']}")
+        console.print()
+        if len(deleted_tasks) > 1:
+            console.print(
+                "[muted]Tip: Use 'lodestar task list --include-deleted' to see deleted tasks[/muted]"
+            )
+        console.print()
 
 
 @app.command(name="graph")

@@ -20,6 +20,7 @@ class TaskStatus(str, Enum):
     BLOCKED = "blocked"
     DONE = "done"
     VERIFIED = "verified"
+    DELETED = "deleted"
 
 
 class Task(BaseModel):
@@ -75,6 +76,7 @@ class Task(BaseModel):
         A task is claimable when:
         - status is READY
         - all depends_on tasks are VERIFIED
+        - task is not deleted
         """
         if self.status != TaskStatus.READY:
             return False

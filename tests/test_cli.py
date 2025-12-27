@@ -432,3 +432,138 @@ class TestMessaging:
         assert "messages" in data["data"]
         assert data["data"]["messages"]["total"] >= 1
         assert agent2_id in data["data"]["messages"]["by_agent"]
+
+
+class TestTaskDelete:
+    """Test task delete command with soft-delete semantics."""
+
+    def test_delete_simple_task(self, temp_repo):
+        """Test deleting a task with no dependents."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task to delete"])
+
+        result = runner.invoke(app, ["task", "delete", "T001"])
+        assert result.exit_code == 0
+        assert "Deleted" in result.stdout
+
+    def test_delete_json_output(self, temp_repo):
+        """Test delete with JSON output."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task to delete"])
+
+        result = runner.invoke(app, ["task", "delete", "T001", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert data["data"]["count"] == 1
+        assert data["data"]["deleted"][0]["id"] == "T001"
+
+    def test_delete_with_dependents_fails(self, temp_repo):
+        """Test that deleting a task with dependents fails without --cascade."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Parent Task"])
+        runner.invoke(app, ["task", "create", "--title", "Child Task", "--depends-on", "T001"])
+
+        result = runner.invoke(app, ["task", "delete", "T001"])
+        assert result.exit_code == 1
+        assert "depend" in result.stdout.lower()
+
+    def test_delete_with_cascade(self, temp_repo):
+        """Test cascade delete removes task and all dependents."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Parent"])
+        runner.invoke(app, ["task", "create", "--title", "Child1", "--depends-on", "T001"])
+        runner.invoke(app, ["task", "create", "--title", "Child2", "--depends-on", "T001"])
+
+        result = runner.invoke(app, ["task", "delete", "T001", "--cascade", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert data["data"]["count"] == 3  # Parent + 2 children
+
+    def test_deleted_tasks_hidden_from_list(self, temp_repo):
+        """Test that deleted tasks are hidden from task list by default."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Active Task"])
+        runner.invoke(app, ["task", "create", "--title", "Task to Delete"])
+        runner.invoke(app, ["task", "delete", "T002"])
+
+        result = runner.invoke(app, ["task", "list", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["data"]["count"] == 1
+        assert data["data"]["tasks"][0]["id"] == "T001"
+
+    def test_include_deleted_flag(self, temp_repo):
+        """Test --include-deleted flag shows deleted tasks."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Active Task"])
+        runner.invoke(app, ["task", "create", "--title", "Deleted Task"])
+        runner.invoke(app, ["task", "delete", "T002"])
+
+        result = runner.invoke(app, ["task", "list", "--include-deleted", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["data"]["count"] == 2
+        deleted_task = [t for t in data["data"]["tasks"] if t["id"] == "T002"][0]
+        assert deleted_task["status"] == "deleted"
+
+    def test_show_deleted_task(self, temp_repo):
+        """Test that task show indicates deleted status."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task to Delete"])
+        runner.invoke(app, ["task", "delete", "T001"])
+
+        result = runner.invoke(app, ["task", "show", "T001"])
+        assert result.exit_code == 0
+        assert "deleted" in result.stdout.lower()
+
+    def test_delete_already_deleted(self, temp_repo):
+        """Test that deleting an already deleted task fails gracefully."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task"])
+        runner.invoke(app, ["task", "delete", "T001"])
+
+        result = runner.invoke(app, ["task", "delete", "T001"])
+        assert result.exit_code == 1
+        assert "already deleted" in result.stdout.lower()
+
+    def test_deleted_tasks_not_claimable(self, temp_repo):
+        """Test that deleted tasks don't appear in task next."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task 1"])
+        runner.invoke(app, ["task", "create", "--title", "Task 2"])
+        runner.invoke(app, ["task", "delete", "T001"])
+
+        result = runner.invoke(app, ["task", "next", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]["tasks"]) == 1
+        assert data["data"]["tasks"][0]["id"] == "T002"
+
+    def test_cascade_delete_complex_tree(self, temp_repo):
+        """Test cascade delete on a complex dependency tree."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Root"])
+        runner.invoke(app, ["task", "create", "--title", "Child1", "--depends-on", "T001"])
+        runner.invoke(app, ["task", "create", "--title", "Child2", "--depends-on", "T001"])
+        runner.invoke(app, ["task", "create", "--title", "Grandchild", "--depends-on", "T002"])
+
+        result = runner.invoke(app, ["task", "delete", "T001", "--cascade", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        # Should delete: T001, T002, T003, T004
+        assert data["data"]["count"] == 4
+
+    def test_filter_by_deleted_status(self, temp_repo):
+        """Test filtering task list by deleted status."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Active"])
+        runner.invoke(app, ["task", "create", "--title", "Deleted"])
+        runner.invoke(app, ["task", "delete", "T002"])
+
+        result = runner.invoke(app, ["task", "list", "--status", "deleted", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["data"]["count"] == 1
+        assert data["data"]["tasks"][0]["id"] == "T002"

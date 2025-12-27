@@ -926,6 +926,95 @@ tasks:
     status: ready
     created_at: '2025-12-27T15:05:21.889544'
     updated_at: '2025-12-27T15:05:21.889549'
+  F032:
+    title: Implement lodestar task delete command
+    description: 'Add task deletion with soft-delete semantics:
+
+      - Implement as state change (status=''deleted''), not physical removal
+
+      - If task is depended on by other tasks, exit gracefully with notice listing
+      dependents
+
+      - If task has downstream dependencies (depends_on this task), cascade delete
+      them
+
+      - Hide deleted tasks from task list by default
+
+      - Add --include-deleted flag to task list to show deleted tasks
+
+      - Add --cascade flag to explicitly confirm cascade deletion
+
+      - Update task show to indicate if task is deleted'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-27T15:46:04.462731'
+    updated_at: '2025-12-27T15:46:04.462741'
+  D010:
+    title: Update CLI documentation for task delete command
+    description: 'Update docs/cli/task.md to document:
+
+      - lodestar task delete <id> command
+
+      - --cascade flag behavior
+
+      - Soft-delete semantics and how deleted tasks are hidden
+
+      - --include-deleted flag on task list
+
+      - Error messages when task has dependents
+
+      - Examples of cascade deletion'
+    acceptance_criteria: []
+    depends_on:
+    - F032
+    labels:
+    - docs
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-27T15:46:13.609680'
+    updated_at: '2025-12-27T15:46:13.609686'
+  D011:
+    title: Update README for task delete feature
+    description: 'Update README.md CLI reference section to include:
+
+      - lodestar task delete command in quick reference
+
+      - Brief description of soft-delete behavior
+
+      - Update any task lifecycle mentions to include deletion'
+    acceptance_criteria: []
+    depends_on:
+    - F032
+    labels:
+    - docs
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-27T15:46:21.334152'
+    updated_at: '2025-12-27T15:46:21.334158'
+  D012:
+    title: Update CLAUDE.md CLI reference for task delete
+    description: 'Update CLAUDE.md to include:
+
+      - lodestar task delete command in CLI Command Reference section
+
+      - Note about soft-delete behavior in Critical Patterns if relevant'
+    acceptance_criteria: []
+    depends_on:
+    - F032
+    labels:
+    - docs
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-27T15:46:28.943346'
+    updated_at: '2025-12-27T15:46:28.943351'
 features:
   m0-skeleton:
   - F001
