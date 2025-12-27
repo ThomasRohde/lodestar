@@ -73,6 +73,7 @@ nav:
   - Guides:
       - guides/index.md
       - Agent Workflow: guides/agent-workflow.md
+      - Agent Coordination: guides/agent-coordination.md
       - CI Integration: guides/ci-integration.md
   - Reference:
       - reference/index.md

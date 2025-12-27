@@ -13,6 +13,16 @@ How to effectively work as an agent with Lodestar:
 - Completing tasks
 - Handling handoffs
 
+### [Agent Coordination](agent-coordination.md)
+
+How multiple agents coordinate work on shared repositories:
+
+- Discovering other agents by role and capability
+- Parallel work patterns (independent, dependent, collaborative)
+- Message templates for common scenarios
+- Multi-agent workflow examples
+- Best practices for agent-to-agent communication
+
 ### [CI Integration](ci-integration.md)
 
 Integrate Lodestar with your CI/CD pipeline:
