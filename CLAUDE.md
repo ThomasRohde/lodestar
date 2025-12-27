@@ -112,16 +112,14 @@ lodestar agent heartbeat <id>    # Update heartbeat
 lodestar task list               # List all tasks
 lodestar task show <id>          # Show task details
 lodestar task next               # Find claimable tasks
+lodestar task create             # Create new task
+lodestar task update <id>        # Update task
 lodestar task claim <id>         # Claim a task (lease)
 lodestar task renew <id>         # Renew lease
 lodestar task release <id>       # Release lease
 lodestar task done <id>          # Mark done
 lodestar task verify <id>        # Mark verified
-lodestar task block <id>         # Mark blocked
-lodestar task add                # Add new task
-lodestar task edit <id>          # Edit task
-lodestar task deps <id>          # Show dependencies
-lodestar task validate           # Validate DAG
+lodestar task graph              # Export dependency graph
 
 # Messaging
 lodestar msg send <to>           # Send message

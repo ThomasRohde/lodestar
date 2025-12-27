@@ -82,19 +82,65 @@ uv run pytest -k "test_name"     # Run specific test
 - [src/lodestar/models/](../src/lodestar/models/) — All Pydantic models
 - [src/lodestar/cli/commands/status.py](../src/lodestar/cli/commands/status.py) — Canonical command pattern
 
+## CLI Command Reference
+
+```bash
+# Top-level commands
+lodestar init                    # Initialize repository
+lodestar status                  # Show status + next actions
+lodestar doctor                  # Health check
+
+# Agent management
+lodestar agent join              # Register as agent
+lodestar agent list              # List all agents
+lodestar agent show <id>         # Show agent details
+lodestar agent heartbeat <id>    # Update heartbeat
+
+# Task operations
+lodestar task list               # List all tasks
+lodestar task show <id>          # Show task details
+lodestar task next               # Find claimable tasks
+lodestar task create             # Create new task
+lodestar task update <id>        # Update task
+lodestar task claim <id>         # Claim a task (lease)
+lodestar task renew <id>         # Renew lease
+lodestar task release <id>       # Release lease
+lodestar task done <id>          # Mark done
+lodestar task verify <id>        # Mark verified
+lodestar task graph              # Export dependency graph
+
+# Messaging
+lodestar msg send <to>           # Send message
+lodestar msg list                # List threads
+lodestar msg thread <id>         # Show thread
+
+# Export
+lodestar export snapshot         # Export full state
+```
+
+All commands support `--json`, `--schema`, and `--explain` flags.
+
 ## Dogfooding: This Repo Uses Lodestar
 
 This project uses **lodestar itself** for task management. Tasks are defined in `.lodestar/spec.yaml`.
 
-### Session Management (via lodestar)
+### Task Creation
 ```bash
-uv run lodestar status           # Project overview
-uv run lodestar task list        # See all tasks
-uv run lodestar task next        # Find available work
-uv run lodestar agent join       # Register as agent
-uv run lodestar task claim <id>  # Claim a task
-uv run lodestar task done <id>   # Mark task complete
-uv run lodestar task verify <id> # Verify task
+# Create a task
+lodestar task create --title "My task" --priority 1 --label "feature"
+
+# With dependencies
+lodestar task create --title "Step 2" --depends-on "STEP-001"
+```
+
+### Agent Workflow
+```bash
+lodestar status                  # Project overview
+lodestar agent join              # Register as agent
+lodestar task next               # Find available work
+lodestar task claim <id>         # Claim a task
+lodestar task done <id>          # Mark task complete
+lodestar task verify <id>        # Verify task
 ```
 
 ## Testing Strategy

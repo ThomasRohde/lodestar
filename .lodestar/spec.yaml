@@ -4,511 +4,645 @@ project:
   conventions:
     commit_style: conventional
     test_framework: pytest
-
 tasks:
   F001:
-    id: F001
     title: Initialize Typer CLI app with entry point
-    description: M0 skeleton. Use Typer for CLI framework. Entry point is lodestar. Create src/lodestar/cli/ structure with app.py.
+    description: M0 skeleton. Use Typer for CLI framework. Entry point is lodestar.
+      Create src/lodestar/cli/ structure with app.py.
     acceptance_criteria:
-      - lodestar command runs without error
-      - lodestar --help displays available commands
-      - --version flag works
+    - lodestar command runs without error
+    - lodestar --help displays available commands
+    - --version flag works
     depends_on: []
-    labels: [cli, m0]
+    labels:
+    - cli
+    - m0
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941178'
+    updated_at: '2025-12-27T10:18:05.941184'
   F002:
-    id: F002
     title: Implement lodestar init command
-    description: M0 skeleton. Creates two-plane structure. spec.yaml has project name and empty tasks dict. AGENTS.md provides quick-start for agents.
+    description: M0 skeleton. Creates two-plane structure. spec.yaml has project name
+      and empty tasks dict. AGENTS.md provides quick-start for agents.
     acceptance_criteria:
-      - Creates .lodestar/spec.yaml with default structure
-      - Creates .lodestar/.gitignore for runtime files
-      - Creates root AGENTS.md with agent instructions
-      - Command is idempotent - safe to run multiple times
-      - Supports --json output
+    - Creates .lodestar/spec.yaml with default structure
+    - Creates .lodestar/.gitignore for runtime files
+    - Creates root AGENTS.md with agent instructions
+    - Command is idempotent - safe to run multiple times
+    - Supports --json output
     depends_on: []
-    labels: [cli, m0]
+    labels:
+    - cli
+    - m0
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941194'
+    updated_at: '2025-12-27T10:18:05.941194'
   F003:
-    id: F003
     title: Implement lodestar doctor command
-    description: M0 skeleton. Health check command. Should detect common problems like missing files or corrupted database.
+    description: M0 skeleton. Health check command. Should detect common problems
+      like missing files or corrupted database.
     acceptance_criteria:
-      - Validates .lodestar directory exists
-      - Validates spec.yaml is valid YAML and schema-conformant
-      - Validates runtime.sqlite is accessible
-      - Reports issues with suggested fixes
-      - Supports --json output
+    - Validates .lodestar directory exists
+    - Validates spec.yaml is valid YAML and schema-conformant
+    - Validates runtime.sqlite is accessible
+    - Reports issues with suggested fixes
+    - Supports --json output
     depends_on: []
-    labels: [cli, m0]
+    labels:
+    - cli
+    - m0
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941200'
+    updated_at: '2025-12-27T10:18:05.941200'
   F004:
-    id: F004
     title: Implement lodestar status command
-    description: M0 skeleton. Progressive discovery entry point. When run with no args lodestar should behave like status.
+    description: M0 skeleton. Progressive discovery entry point. When run with no
+      args lodestar should behave like status.
     acceptance_criteria:
-      - Shows repo initialized status
-      - Shows agent registration status
-      - Shows task counts by status (ready/blocked/claimed/done/verified)
-      - Shows active agent count
-      - Suggests next actions (3-5 commands)
-      - Supports --json output
+    - Shows repo initialized status
+    - Shows agent registration status
+    - Shows task counts by status (ready/blocked/claimed/done/verified)
+    - Shows active agent count
+    - Suggests next actions (3-5 commands)
+    - Supports --json output
     depends_on: []
-    labels: [cli, m0]
+    labels:
+    - cli
+    - m0
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941205'
+    updated_at: '2025-12-27T10:18:05.941205'
   F005:
-    id: F005
     title: Implement spec plane with YAML schema
-    description: M0 skeleton. Core spec plane. Use Pydantic v2 for models. spec.yaml is committed to git. Validate depends_on references exist.
+    description: M0 skeleton. Core spec plane. Use Pydantic v2 for models. spec.yaml
+      is committed to git. Validate depends_on references exist.
     acceptance_criteria:
-      - spec.yaml loads and validates against Pydantic schema
-      - Project section with name and default_branch
-      - Tasks dictionary with all required fields
-      - Atomic file writes with portalocker
-      - DAG cycle detection on save
+    - spec.yaml loads and validates against Pydantic schema
+    - Project section with name and default_branch
+    - Tasks dictionary with all required fields
+    - Atomic file writes with portalocker
+    - DAG cycle detection on save
     depends_on: []
-    labels: [spec, m0]
+    labels:
+    - spec
+    - m0
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941209'
+    updated_at: '2025-12-27T10:18:05.941209'
   F006:
-    id: F006
     title: Implement runtime plane with SQLite WAL
-    description: M0 skeleton. Core runtime plane. Use SQLite WAL for concurrent access. Tables agents/leases/messages/events(optional).
+    description: M0 skeleton. Core runtime plane. Use SQLite WAL for concurrent access.
+      Tables agents/leases/messages/events(optional).
     acceptance_criteria:
-      - runtime.sqlite created with WAL mode
-      - agents table with schema from PRD
-      - leases table with schema from PRD
-      - messages table with schema from PRD
-      - Database migrations framework
-      - Gitignored automatically
+    - runtime.sqlite created with WAL mode
+    - agents table with schema from PRD
+    - leases table with schema from PRD
+    - messages table with schema from PRD
+    - Database migrations framework
+    - Gitignored automatically
     depends_on: []
-    labels: [runtime, m0]
+    labels:
+    - runtime
+    - m0
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941213'
+    updated_at: '2025-12-27T10:18:05.941214'
   F007:
-    id: F007
     title: Implement Pydantic models with JSON Schema export
-    description: M0 skeleton. Models in src/lodestar/models/. Every command must support --schema to export its output schema.
+    description: M0 skeleton. Models in src/lodestar/models/. Every command must support
+      --schema to export its output schema.
     acceptance_criteria:
-      - All spec models defined with Pydantic v2
-      - All runtime models defined with Pydantic v2
-      - JSON Schema export via --schema flag
-      - Consistent JSON envelope structure (ok/data/next/warnings)
+    - All spec models defined with Pydantic v2
+    - All runtime models defined with Pydantic v2
+    - JSON Schema export via --schema flag
+    - Consistent JSON envelope structure (ok/data/next/warnings)
     depends_on: []
-    labels: [models, m0]
+    labels:
+    - models
+    - m0
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941218'
+    updated_at: '2025-12-27T10:18:05.941218'
   F008:
-    id: F008
     title: Implement --json and --explain flags for all commands
-    description: M0 skeleton. Core CLI infrastructure. Use Rich for human output but disable for --json. --explain helps agents understand what commands do.
+    description: M0 skeleton. Core CLI infrastructure. Use Rich for human output but
+      disable for --json. --explain helps agents understand what commands do.
     acceptance_criteria:
-      - All commands support --json flag
-      - --json output uses consistent envelope structure
-      - No ANSI codes in --json output
-      - All commands support --explain flag
-      - --explain returns agent-friendly command description
+    - All commands support --json flag
+    - --json output uses consistent envelope structure
+    - No ANSI codes in --json output
+    - All commands support --explain flag
+    - --explain returns agent-friendly command description
     depends_on: []
-    labels: [cli, m0]
+    labels:
+    - cli
+    - m0
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941224'
+    updated_at: '2025-12-27T10:18:05.941225'
   F009:
-    id: F009
     title: Implement lodestar agent join command
-    description: M1 agent identity. Canonical entrypoint for agents. agent_id should be stable UUID. Store in runtime.sqlite agents table.
+    description: M1 agent identity. Canonical entrypoint for agents. agent_id should
+      be stable UUID. Store in runtime.sqlite agents table.
     acceptance_criteria:
-      - Registers new agent with unique agent_id
-      - Resumes existing agent if already registered
-      - Returns agent_id in JSON response
-      - Returns suggested next actions
-      - Stores session_meta (tool name and model)
-      - Supports --json output
+    - Registers new agent with unique agent_id
+    - Resumes existing agent if already registered
+    - Returns agent_id in JSON response
+    - Returns suggested next actions
+    - Stores session_meta (tool name and model)
+    - Supports --json output
     depends_on: []
-    labels: [agent, m1]
+    labels:
+    - agent
+    - m1
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941228'
+    updated_at: '2025-12-27T10:18:05.941229'
   F010:
-    id: F010
     title: Implement lodestar agent list command
-    description: M1 agent identity. Show agents from runtime.sqlite. Active = last_seen_at within configurable window.
+    description: M1 agent identity. Show agents from runtime.sqlite. Active = last_seen_at
+      within configurable window.
     acceptance_criteria:
-      - Lists all registered agents
-      - Shows agent_id and display_name and last_seen_at
-      - Filters by active/inactive status
-      - Supports --json output
+    - Lists all registered agents
+    - Shows agent_id and display_name and last_seen_at
+    - Filters by active/inactive status
+    - Supports --json output
     depends_on: []
-    labels: [agent, m1]
+    labels:
+    - agent
+    - m1
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941237'
+    updated_at: '2025-12-27T10:18:05.941238'
   F011:
-    id: F011
     title: Implement lodestar agent heartbeat command
-    description: M1 agent identity. Updates agents.last_seen_at. Allows agents to signal they are still active.
+    description: M1 agent identity. Updates agents.last_seen_at. Allows agents to
+      signal they are still active.
     acceptance_criteria:
-      - Updates last_seen_at for current agent
-      - Returns time until next heartbeat needed
-      - Can be called periodically by agent
-      - Supports --json output
+    - Updates last_seen_at for current agent
+    - Returns time until next heartbeat needed
+    - Can be called periodically by agent
+    - Supports --json output
     depends_on: []
-    labels: [agent, m1]
+    labels:
+    - agent
+    - m1
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941241'
+    updated_at: '2025-12-27T10:18:05.941242'
   F012:
-    id: F012
     title: Implement lodestar agent brief command
-    description: M1 agent identity. Used by orchestrator to spawn sub-agents. Brief should be self-contained context for task execution.
+    description: M1 agent identity. Used by orchestrator to spawn sub-agents. Brief
+      should be self-contained context for task execution.
     acceptance_criteria:
-      - Generates brief for specified task
-      - Includes goal and acceptance criteria
-      - Includes allowed paths/locks
-      - Includes check commands
-      - Supports --format flag (copilot/claude/generic)
-      - Supports --json output
+    - Generates brief for specified task
+    - Includes goal and acceptance criteria
+    - Includes allowed paths/locks
+    - Includes check commands
+    - Supports --format flag (copilot/claude/generic)
+    - Supports --json output
     depends_on: []
-    labels: [agent, m1]
+    labels:
+    - agent
+    - m1
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941246'
+    updated_at: '2025-12-27T10:18:05.941246'
   F013:
-    id: F013
     title: Implement lodestar task list command
-    description: M2 tasks. Read from spec.yaml. Show which tasks are blocked vs ready. Cross-reference with runtime for claim status.
+    description: M2 tasks. Read from spec.yaml. Show which tasks are blocked vs ready.
+      Cross-reference with runtime for claim status.
     acceptance_criteria:
-      - Lists all tasks from spec.yaml
-      - Shows task_id and title and status
-      - Filters by status and labels
-      - Shows dependency status
-      - Supports --json output
+    - Lists all tasks from spec.yaml
+    - Shows task_id and title and status
+    - Filters by status and labels
+    - Shows dependency status
+    - Supports --json output
     depends_on: []
-    labels: [task, m2]
+    labels:
+    - task
+    - m2
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941250'
+    updated_at: '2025-12-27T10:18:05.941251'
   F014:
-    id: F014
     title: Implement lodestar task show command
-    description: M2 tasks. Merge spec and runtime data. Show which deps are satisfied vs pending.
+    description: M2 tasks. Merge spec and runtime data. Show which deps are satisfied
+      vs pending.
     acceptance_criteria:
-      - Shows full task details by ID
-      - Shows all fields from spec
-      - Shows current claim status from runtime
-      - Shows dependency tree
-      - Supports --json output
+    - Shows full task details by ID
+    - Shows all fields from spec
+    - Shows current claim status from runtime
+    - Shows dependency tree
+    - Supports --json output
     depends_on: []
-    labels: [task, m2]
+    labels:
+    - task
+    - m2
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941254'
+    updated_at: '2025-12-27T10:18:05.941255'
   F015:
-    id: F015
     title: Implement lodestar task create command
-    description: M2 tasks. Atomic write with portalocker. DAG validation is critical. Task IDs can be arbitrary strings or auto-generated.
+    description: M2 tasks. Atomic write with portalocker. DAG validation is critical.
+      Task IDs can be arbitrary strings or auto-generated.
     acceptance_criteria:
-      - Creates new task in spec.yaml
-      - Validates required fields
-      - Validates depends_on references exist
-      - Validates no DAG cycles created
-      - Assigns unique task_id if not provided
-      - Supports --json output
+    - Creates new task in spec.yaml
+    - Validates required fields
+    - Validates depends_on references exist
+    - Validates no DAG cycles created
+    - Assigns unique task_id if not provided
+    - Supports --json output
     depends_on: []
-    labels: [task, m2]
+    labels:
+    - task
+    - m2
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941258'
+    updated_at: '2025-12-27T10:18:05.941259'
   F016:
-    id: F016
     title: Implement lodestar task update command
-    description: M2 tasks. Update any field except task_id. Re-validate DAG on dependency changes.
+    description: M2 tasks. Update any field except task_id. Re-validate DAG on dependency
+      changes.
     acceptance_criteria:
-      - Updates existing task fields
-      - Validates field values
-      - Validates no DAG cycles if depends_on changes
-      - Atomic spec.yaml write
-      - Supports --json output
+    - Updates existing task fields
+    - Validates field values
+    - Validates no DAG cycles if depends_on changes
+    - Atomic spec.yaml write
+    - Supports --json output
     depends_on: []
-    labels: [task, m2]
+    labels:
+    - task
+    - m2
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941262'
+    updated_at: '2025-12-27T10:18:05.941263'
   F017:
-    id: F017
     title: Implement lodestar task next command
-    description: M2 tasks. Core scheduling command. Must filter out expired leases. Include priority sorting.
+    description: M2 tasks. Core scheduling command. Must filter out expired leases.
+      Include priority sorting.
     acceptance_criteria:
-      - Returns only claimable tasks
-      - Claimable = status ready AND all depends_on verified
-      - Sorted by priority (lower number = higher priority)
-      - Excludes tasks with active claims
-      - Returns suggested claim command
-      - Supports --json output
+    - Returns only claimable tasks
+    - Claimable = status ready AND all depends_on verified
+    - Sorted by priority (lower number = higher priority)
+    - Excludes tasks with active claims
+    - Returns suggested claim command
+    - Supports --json output
     depends_on: []
-    labels: [task, m2]
+    labels:
+    - task
+    - m2
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941266'
+    updated_at: '2025-12-27T10:18:05.941267'
   F018:
-    id: F018
     title: Implement lodestar task graph command
-    description: M2 tasks. DAG visualization. Useful for external schedulers or debugging. Consider graphviz DOT format as --format dot.
+    description: M2 tasks. DAG visualization. Useful for external schedulers or debugging.
+      Consider graphviz DOT format as --format dot.
     acceptance_criteria:
-      - Exports task DAG as JSON
-      - Optional DOT format output
-      - Shows dependency relationships
-      - Shows task statuses
-      - Supports --json output
+    - Exports task DAG as JSON
+    - Optional DOT format output
+    - Shows dependency relationships
+    - Shows task statuses
+    - Supports --json output
     depends_on: []
-    labels: [task, m2]
+    labels:
+    - task
+    - m2
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941270'
+    updated_at: '2025-12-27T10:18:05.941271'
   F019:
-    id: F019
     title: Implement DAG validation for task dependencies
-    description: M2 tasks. Core spec validation. Use topological sort or DFS for cycle detection. Critical for task scheduling correctness.
+    description: M2 tasks. Core spec validation. Use topological sort or DFS for cycle
+      detection. Critical for task scheduling correctness.
     acceptance_criteria:
-      - Detects cycles in depends_on graph
-      - Validates all depends_on references exist
-      - Runs on spec load and save
-      - Returns clear error messages for violations
-      - Prevents invalid spec from being saved
+    - Detects cycles in depends_on graph
+    - Validates all depends_on references exist
+    - Runs on spec load and save
+    - Returns clear error messages for violations
+    - Prevents invalid spec from being saved
     depends_on: []
-    labels: [spec, m2]
+    labels:
+    - spec
+    - m2
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941276'
+    updated_at: '2025-12-27T10:18:05.941276'
   F020:
-    id: F020
     title: Implement lodestar task done command
-    description: M2 tasks. Transition from claimed to done. Agent must hold the lease. Consider validation of acceptance criteria.
+    description: M2 tasks. Transition from claimed to done. Agent must hold the lease.
+      Consider validation of acceptance criteria.
     acceptance_criteria:
-      - Marks task status as done
-      - Requires active claim by current agent
-      - Releases the lease
-      - Updates spec.yaml atomically
-      - Supports --json output
+    - Marks task status as done
+    - Requires active claim by current agent
+    - Releases the lease
+    - Updates spec.yaml atomically
+    - Supports --json output
     depends_on: []
-    labels: [task, m2]
+    labels:
+    - task
+    - m2
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941280'
+    updated_at: '2025-12-27T10:18:05.941280'
   F021:
-    id: F021
     title: Implement lodestar task verify command
-    description: M2 tasks. Final task state. Verified tasks satisfy dependencies. May be done by different agent than implementer.
+    description: M2 tasks. Final task state. Verified tasks satisfy dependencies.
+      May be done by different agent than implementer.
     acceptance_criteria:
-      - Marks task status as verified
-      - Verifies task was in done status
-      - Updates spec.yaml atomically
-      - Unlocks dependent tasks
-      - Supports --json output
+    - Marks task status as verified
+    - Verifies task was in done status
+    - Updates spec.yaml atomically
+    - Unlocks dependent tasks
+    - Supports --json output
     depends_on: []
-    labels: [task, m2]
+    labels:
+    - task
+    - m2
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941284'
+    updated_at: '2025-12-27T10:18:05.941284'
   F022:
-    id: F022
     title: Implement lodestar task claim command
-    description: M3 leases. Core claim logic. Use SQLite transaction for atomicity. Check task status=ready AND deps satisfied AND no active lease.
+    description: M3 leases. Core claim logic. Use SQLite transaction for atomicity.
+      Check task status=ready AND deps satisfied AND no active lease.
     acceptance_criteria:
-      - Creates lease for task with TTL
-      - Only succeeds if task is claimable
-      - Only succeeds if no active lease exists
-      - Atomic transaction prevents race conditions
-      - Default TTL is 15 minutes
-      - Supports --ttl flag for custom TTL
-      - Supports --json output
+    - Creates lease for task with TTL
+    - Only succeeds if task is claimable
+    - Only succeeds if no active lease exists
+    - Atomic transaction prevents race conditions
+    - Default TTL is 15 minutes
+    - Supports --ttl flag for custom TTL
+    - Supports --json output
     depends_on: []
-    labels: [lease, m3]
+    labels:
+    - lease
+    - m3
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941287'
+    updated_at: '2025-12-27T10:18:05.941288'
   F023:
-    id: F023
     title: Implement lodestar task renew command
-    description: M3 leases. Keep lease alive while working. Default renewal extends by same TTL as original claim.
+    description: M3 leases. Keep lease alive while working. Default renewal extends
+      by same TTL as original claim.
     acceptance_criteria:
-      - Extends lease expires_at
-      - Only current lease holder can renew
-      - Returns new expiration time
-      - Supports --ttl flag for renewal duration
-      - Supports --json output
+    - Extends lease expires_at
+    - Only current lease holder can renew
+    - Returns new expiration time
+    - Supports --ttl flag for renewal duration
+    - Supports --json output
     depends_on: []
-    labels: [lease, m3]
+    labels:
+    - lease
+    - m3
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941293'
+    updated_at: '2025-12-27T10:18:05.941293'
   F024:
-    id: F024
     title: Implement lodestar task release command
-    description: M3 leases. Abandon work without marking done. Useful when agent cannot complete the task.
+    description: M3 leases. Abandon work without marking done. Useful when agent cannot
+      complete the task.
     acceptance_criteria:
-      - Releases lease without completing task
-      - Only current lease holder can release
-      - Task becomes claimable again
-      - Supports --json output
+    - Releases lease without completing task
+    - Only current lease holder can release
+    - Task becomes claimable again
+    - Supports --json output
     depends_on: []
-    labels: [lease, m3]
+    labels:
+    - lease
+    - m3
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941296'
+    updated_at: '2025-12-27T10:18:05.941297'
   F025:
-    id: F025
     title: Implement automatic lease expiry handling
-    description: M3 leases. Core expiry behavior. All queries that check for active leases must filter by expires_at > now. No daemon needed.
+    description: M3 leases. Core expiry behavior. All queries that check for active
+      leases must filter by expires_at > now. No daemon needed.
     acceptance_criteria:
-      - Expired leases filtered out at read time
-      - No background daemon required
-      - task next excludes expired claims
-      - Expired tasks become claimable
-      - Consistent expiry logic across all commands
+    - Expired leases filtered out at read time
+    - No background daemon required
+    - task next excludes expired claims
+    - Expired tasks become claimable
+    - Consistent expiry logic across all commands
     depends_on: []
-    labels: [lease, m3]
+    labels:
+    - lease
+    - m3
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941300'
+    updated_at: '2025-12-27T10:18:05.941301'
   F026:
-    id: F026
     title: Implement concurrent claim atomicity
-    description: M3 leases. Critical correctness requirement. Use SQLite BEGIN IMMEDIATE or EXCLUSIVE transaction. Test with multiprocessing.
+    description: M3 leases. Critical correctness requirement. Use SQLite BEGIN IMMEDIATE
+      or EXCLUSIVE transaction. Test with multiprocessing.
     acceptance_criteria:
-      - Two simultaneous claims result in exactly one success
-      - SQLite transaction isolation
-      - No race conditions in claim logic
-      - Concurrency test passes with multiple processes
+    - Two simultaneous claims result in exactly one success
+    - SQLite transaction isolation
+    - No race conditions in claim logic
+    - Concurrency test passes with multiple processes
     depends_on: []
-    labels: [lease, m3]
+    labels:
+    - lease
+    - m3
+    locks: []
     priority: 1
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941304'
+    updated_at: '2025-12-27T10:18:05.941305'
   F027:
-    id: F027
     title: Implement lodestar msg send command
-    description: M4 messaging. Store from_agent_id and to_type and to_id. Text in --text flag. Optional meta as JSON.
+    description: M4 messaging. Store from_agent_id and to_type and to_id. Text in
+      --text flag. Optional meta as JSON.
     acceptance_criteria:
-      - Sends message to agent or task thread
-      - Supports --to agent:A1 format
-      - Supports --to task:T123 format
-      - Stores in runtime.sqlite messages table
-      - Returns message_id
-      - Supports --json output
+    - Sends message to agent or task thread
+    - Supports --to agent:A1 format
+    - Supports --to task:T123 format
+    - Stores in runtime.sqlite messages table
+    - Returns message_id
+    - Supports --json output
     depends_on: []
-    labels: [messaging, m4]
+    labels:
+    - messaging
+    - m4
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941309'
+    updated_at: '2025-12-27T10:18:05.941309'
   F028:
-    id: F028
     title: Implement lodestar msg inbox command
-    description: M4 messaging. Filter by to_type=agent and to_id=current_agent_id. Cursor can be message_id or timestamp.
+    description: M4 messaging. Filter by to_type=agent and to_id=current_agent_id.
+      Cursor can be message_id or timestamp.
     acceptance_criteria:
-      - Lists messages sent to current agent
-      - Supports --since cursor for pagination
-      - Returns messages in chronological order
-      - Returns cursor for next page
-      - Supports --json output
+    - Lists messages sent to current agent
+    - Supports --since cursor for pagination
+    - Returns messages in chronological order
+    - Returns cursor for next page
+    - Supports --json output
     depends_on: []
-    labels: [messaging, m4]
+    labels:
+    - messaging
+    - m4
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941313'
+    updated_at: '2025-12-27T10:18:05.941313'
   F029:
-    id: F029
     title: Implement lodestar msg thread command
-    description: M4 messaging. Filter by to_type=task and to_id=task_id. Thread allows agents to discuss a specific task.
+    description: M4 messaging. Filter by to_type=task and to_id=task_id. Thread allows
+      agents to discuss a specific task.
     acceptance_criteria:
-      - Lists messages for a task thread
-      - Supports --since cursor for pagination
-      - Returns messages in chronological order
-      - Returns cursor for next page
-      - Supports --json output
+    - Lists messages for a task thread
+    - Supports --since cursor for pagination
+    - Returns messages in chronological order
+    - Returns cursor for next page
+    - Supports --json output
     depends_on: []
-    labels: [messaging, m4]
+    labels:
+    - messaging
+    - m4
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941317'
+    updated_at: '2025-12-27T10:18:05.941317'
   F030:
-    id: F030
     title: Implement lodestar mcp serve command
-    description: M5 optional. MCP server for agents that prefer tool calls. Use mcp SDK. Each CLI command becomes an MCP tool.
+    description: M5 optional. MCP server for agents that prefer tool calls. Use mcp
+      SDK. Each CLI command becomes an MCP tool.
     acceptance_criteria:
-      - Starts MCP server on stdio or socket
-      - Exposes all CLI operations as MCP tools
-      - Tools mirror CLI command structure
-      - Local-only authentication
-      - Supports --json output
+    - Starts MCP server on stdio or socket
+    - Exposes all CLI operations as MCP tools
+    - Tools mirror CLI command structure
+    - Local-only authentication
+    - Supports --json output
     depends_on: []
-    labels: [mcp, m5]
+    labels:
+    - mcp
+    - m5
+    locks: []
     priority: 3
     status: ready
-
+    created_at: '2025-12-27T10:18:05.941323'
+    updated_at: '2025-12-27T10:18:05.941324'
   F031:
-    id: F031
     title: Implement lodestar export snapshot command
-    description: For CI systems and external dashboards. Combine spec.yaml data with runtime.sqlite data into single snapshot.
+    description: For CI systems and external dashboards. Combine spec.yaml data with
+      runtime.sqlite data into single snapshot.
     acceptance_criteria:
-      - Exports combined spec and runtime state
-      - Includes all tasks with claim status
-      - Includes all active agents
-      - Includes message counts
-      - JSON format output
-      - Useful for CI and external tools
+    - Exports combined spec and runtime state
+    - Includes all tasks with claim status
+    - Includes all active agents
+    - Includes message counts
+    - JSON format output
+    - Useful for CI and external tools
     depends_on: []
-    labels: [cli, m2]
+    labels:
+    - cli
+    - m2
+    locks: []
     priority: 2
     status: verified
-
+    created_at: '2025-12-27T10:18:05.941328'
+    updated_at: '2025-12-27T10:18:05.941329'
+  TEST-001:
+    title: Test task creation
+    description: ''
+    acceptance_criteria: []
+    depends_on: []
+    labels: []
+    locks: []
+    priority: 100
+    status: verified
+    created_at: '2025-12-27T10:18:05.941359'
+    updated_at: '2025-12-27T10:18:13.535341'
 features:
   m0-skeleton:
-    - F001
-    - F002
-    - F003
-    - F004
-    - F005
-    - F006
-    - F007
-    - F008
+  - F001
+  - F002
+  - F003
+  - F004
+  - F005
+  - F006
+  - F007
+  - F008
   m1-agent-identity:
-    - F009
-    - F010
-    - F011
-    - F012
+  - F009
+  - F010
+  - F011
+  - F012
   m2-tasks:
-    - F013
-    - F014
-    - F015
-    - F016
-    - F017
-    - F018
-    - F019
-    - F020
-    - F021
-    - F031
+  - F013
+  - F014
+  - F015
+  - F016
+  - F017
+  - F018
+  - F019
+  - F020
+  - F021
+  - F031
   m3-leases:
-    - F022
-    - F023
-    - F024
-    - F025
-    - F026
+  - F022
+  - F023
+  - F024
+  - F025
+  - F026
   m4-messaging:
-    - F027
-    - F028
-    - F029
+  - F027
+  - F028
+  - F029
   m5-mcp:
-    - F030
+  - F030
