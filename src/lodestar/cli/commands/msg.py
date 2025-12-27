@@ -43,13 +43,15 @@ def msg_callback(ctx: typer.Context) -> None:
         console.print("[info]Reading messages:[/info]")
         console.print("  [command]lodestar msg thread <task-id>[/command]")
         console.print("      Read the message thread for a task")
+        console.print("      (accepts 'F001' or 'task:F001' format)")
         console.print()
         console.print("  [command]lodestar msg inbox --agent <agent-id>[/command]")
         console.print("      Read messages sent to you")
         console.print()
         console.print("[info]Examples:[/info]")
         console.print("  lodestar msg send --to task:F001 --from A123 --text 'Blocked on X'")
-        console.print("  lodestar msg thread F001")
+        console.print("  lodestar msg thread F001        # Both formats work")
+        console.print("  lodestar msg thread task:F001   # Both formats work")
         console.print()
 
 
@@ -248,7 +250,9 @@ def msg_inbox(
 
 @app.command(name="thread")
 def msg_thread(
-    task_id: str = typer.Argument(..., help="Task ID to view thread for."),
+    task_id: str = typer.Argument(
+        ..., help="Task ID to view thread for (with or without 'task:' prefix)."
+    ),
     since: str | None = typer.Option(
         None,
         "--since",
@@ -284,6 +288,10 @@ def msg_thread(
         else:
             console.print("[error]Not a Lodestar repository[/error]")
         raise typer.Exit(1)
+
+    # Strip 'task:' prefix if present for consistency
+    if task_id.startswith("task:"):
+        task_id = task_id[5:]
 
     runtime_path = get_runtime_db_path(root)
     if not runtime_path.exists():
