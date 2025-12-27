@@ -49,7 +49,7 @@ Task threads are useful for leaving context about your work for other agents who
 
 ## msg inbox
 
-Read messages from your inbox.
+Read messages from your inbox with optional filtering.
 
 ```bash
 lodestar msg inbox [OPTIONS]
@@ -60,8 +60,14 @@ lodestar msg inbox [OPTIONS]
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--agent TEXT` | `-a` | Your agent ID (required) |
-| `--since TEXT` | `-s` | Cursor (ISO timestamp) to fetch messages after |
+| `--since TEXT` | `-s` | Filter messages created after this timestamp (ISO format) |
+| `--until TEXT` | `-u` | Filter messages created before this timestamp (ISO format) |
+| `--from TEXT` | `-f` | Filter by sender agent ID |
 | `--limit INTEGER` | `-n` | Maximum messages to return (default: 50) |
+| `--unread-only` | | Show only unread messages |
+| `--show-read-status` | | Display read timestamps in output |
+| `--mark-as-read` / `--no-mark-as-read` | | Mark messages as read when retrieving them (default: True) |
+| `--count` | | Only return the count of messages, not the full list |
 | `--json` | | Output in JSON format |
 | `--explain` | | Show what this command does |
 
@@ -78,12 +84,119 @@ Messages (2)
   F001 is now verified
 ```
 
-### Pagination
+### Filtering
 
-Use `--since` to fetch messages after a certain point (useful for polling):
+Filter by sender:
 
 ```bash
-$ lodestar msg inbox --agent A1234ABCD --since 2024-01-15T10:00:00Z
+$ lodestar msg inbox --agent A1234ABCD --from A5678EFGH
+```
+
+Filter by date range:
+
+```bash
+$ lodestar msg inbox --agent A1234ABCD --since 2025-01-01T00:00:00 --until 2025-01-31T23:59:59
+```
+
+Show only unread messages:
+
+```bash
+$ lodestar msg inbox --agent A1234ABCD --unread-only
+```
+
+Show read status for messages:
+
+```bash
+$ lodestar msg inbox --agent A1234ABCD --show-read-status
+```
+
+Combine multiple filters:
+
+```bash
+$ lodestar msg inbox --agent A1234ABCD --from A5678EFGH --since 2025-01-15T10:00:00
+```
+
+### Read Status Tracking
+
+By default, messages are marked as read when you retrieve them with `msg inbox`. This helps you track which messages you've already seen.
+
+To prevent marking messages as read:
+
+```bash
+$ lodestar msg inbox --agent A1234ABCD --no-mark-as-read
+```
+
+To see only messages you haven't read yet:
+
+```bash
+$ lodestar msg inbox --agent A1234ABCD --unread-only
+```
+
+To display when each message was read:
+
+```bash
+$ lodestar msg inbox --agent A1234ABCD --show-read-status
+```
+
+---
+
+## msg search
+
+Search across all messages with filters.
+
+```bash
+lodestar msg search [OPTIONS]
+```
+
+Search through all messages in the system with keyword matching and filtering options. At least one filter must be provided.
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--keyword TEXT` | `-k` | Search keyword to match in message text (case-insensitive) |
+| `--from TEXT` | `-f` | Filter by sender agent ID |
+| `--since TEXT` | `-s` | Filter messages created after this timestamp (ISO format) |
+| `--until TEXT` | `-u` | Filter messages created before this timestamp (ISO format) |
+| `--limit INTEGER` | `-n` | Maximum messages to return (default: 50) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
+
+### Examples
+
+Search for messages containing a keyword:
+
+```bash
+$ lodestar msg search --keyword 'bug'
+Search Results (3 messages)
+
+  2025-01-15T14:30:00
+  From: A1234ABCD
+  To: task:F002
+  Found a bug in the authentication flow
+
+  2025-01-15T10:15:00
+  From: A5678EFGH
+  To: task:F003
+  This bug is now fixed
+```
+
+Search by sender:
+
+```bash
+$ lodestar msg search --from A1234ABCD
+```
+
+Search with date range:
+
+```bash
+$ lodestar msg search --keyword 'error' --since 2025-01-01T00:00:00 --until 2025-01-31T23:59:59
+```
+
+Combine multiple filters:
+
+```bash
+$ lodestar msg search --keyword 'bug' --from A1234ABCD --since 2025-01-15T00:00:00
 ```
 
 ---

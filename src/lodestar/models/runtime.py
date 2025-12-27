@@ -106,3 +106,7 @@ class Message(BaseModel):
         default_factory=dict,
         description="Additional message metadata",
     )
+    read_at: datetime | None = Field(
+        default=None,
+        description="When the message was read (None if unread)",
+    )

@@ -16,7 +16,7 @@ from lodestar.util.paths import get_runtime_db_path
 class RuntimeDatabase:
     """SQLite database for runtime state with WAL mode for concurrency."""
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, db_path: Path | None = None):
         """Initialize the runtime database.
@@ -36,6 +36,8 @@ class RuntimeDatabase:
 
             # Create schema
             self._create_schema(conn)
+            # Run migrations
+            self._run_migrations(conn)
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -112,6 +114,26 @@ class RuntimeDatabase:
             CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
             """
         )
+
+    def _run_migrations(self, conn: sqlite3.Connection) -> None:
+        """Run database migrations."""
+        # Get current schema version
+        result = conn.execute(
+            "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
+        ).fetchone()
+        current_version = result[0] if result else 0
+
+        # Migration 1 -> 2: Add read_at column to messages table
+        if current_version < 2:
+            # Check if column already exists (for safety)
+            cursor = conn.execute("PRAGMA table_info(messages)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if "read_at" not in columns:
+                conn.execute("ALTER TABLE messages ADD COLUMN read_at TEXT DEFAULT NULL")
+
+            # Update schema version
+            conn.execute("INSERT OR REPLACE INTO schema_version (version) VALUES (?)", (2,))
 
     # Agent operations
 
@@ -391,6 +413,8 @@ class RuntimeDatabase:
         until: datetime | None = None,
         from_agent_id: str | None = None,
         limit: int = 50,
+        unread_only: bool = False,
+        mark_as_read: bool = False,
     ) -> list[Message]:
         """Get messages for an agent.
 
@@ -400,6 +424,8 @@ class RuntimeDatabase:
             until: Filter messages created before this time
             from_agent_id: Filter by sender agent ID
             limit: Maximum number of messages to return
+            unread_only: If True, only return unread messages (read_at IS NULL)
+            mark_as_read: If True, mark returned messages as read
 
         Returns:
             List of messages matching the criteria
@@ -422,6 +448,9 @@ class RuntimeDatabase:
             conditions.append("from_agent_id = ?")
             params.append(from_agent_id)
 
+        if unread_only:
+            conditions.append("read_at IS NULL")
+
         where_clause = " AND ".join(conditions)
         query = f"""
             SELECT * FROM messages
@@ -433,7 +462,7 @@ class RuntimeDatabase:
         with self._connect() as conn:
             rows = conn.execute(query, params).fetchall()
 
-            return [
+            messages = [
                 Message(
                     message_id=row["message_id"],
                     created_at=datetime.fromisoformat(row["created_at"]),
@@ -442,9 +471,26 @@ class RuntimeDatabase:
                     to_id=row["to_id"],
                     text=row["text"],
                     meta=json.loads(row["meta"]),
+                    read_at=datetime.fromisoformat(row["read_at"]) if row["read_at"] else None,
                 )
                 for row in rows
             ]
+
+            # Mark messages as read if requested
+            if mark_as_read and messages:
+                now = datetime.utcnow()
+                message_ids = [msg.message_id for msg in messages]
+                placeholders = ",".join("?" * len(message_ids))
+                conn.execute(
+                    f"UPDATE messages SET read_at = ? WHERE message_id IN ({placeholders})",
+                    [now.isoformat()] + message_ids,
+                )
+                # Update the messages in-memory to reflect the read status
+                for msg in messages:
+                    if msg.read_at is None:
+                        msg.read_at = now
+
+            return messages
 
     def get_task_thread(
         self, task_id: str, since: datetime | None = None, limit: int = 50
@@ -481,6 +527,7 @@ class RuntimeDatabase:
                     to_id=row["to_id"],
                     text=row["text"],
                     meta=json.loads(row["meta"]),
+                    read_at=datetime.fromisoformat(row["read_at"]) if row["read_at"] else None,
                 )
                 for row in rows
             ]
@@ -572,6 +619,7 @@ class RuntimeDatabase:
                     to_id=row["to_id"],
                     text=row["text"],
                     meta=json.loads(row["meta"]),
+                    read_at=datetime.fromisoformat(row["read_at"]) if row["read_at"] else None,
                 )
                 for row in rows
             ]
@@ -654,6 +702,23 @@ class RuntimeDatabase:
                 "active_leases": active_leases,
                 "total_messages": total_messages,
             }
+
+    def get_agent_message_counts(self) -> dict[str, int]:
+        """Get message count per agent.
+
+        Returns a dictionary mapping agent_id to message count.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT to_id, COUNT(*) as count
+                FROM messages
+                WHERE to_type = 'agent'
+                GROUP BY to_id
+                """
+            ).fetchall()
+
+            return {row[0]: row[1] for row in rows}
 
     def _log_event(
         self,

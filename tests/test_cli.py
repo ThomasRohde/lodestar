@@ -312,3 +312,123 @@ class TestMessaging:
         result = runner.invoke(app, ["msg", "thread", "T001"])
         assert result.exit_code == 0
         assert "Hello" in result.stdout
+
+    def test_inbox_count(self, temp_repo):
+        """Test --count flag on inbox command."""
+        runner.invoke(app, ["init"])
+        agent1_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent1_id = json.loads(agent1_result.stdout)["data"]["agent_id"]
+
+        agent2_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent2_id = json.loads(agent2_result.stdout)["data"]["agent_id"]
+
+        # Send messages to agent2
+        runner.invoke(
+            app,
+            [
+                "msg",
+                "send",
+                "--to",
+                f"agent:{agent2_id}",
+                "--text",
+                "Message 1",
+                "--from",
+                agent1_id,
+            ],
+        )
+        runner.invoke(
+            app,
+            [
+                "msg",
+                "send",
+                "--to",
+                f"agent:{agent2_id}",
+                "--text",
+                "Message 2",
+                "--from",
+                agent1_id,
+            ],
+        )
+
+        # Test count-only mode
+        result = runner.invoke(app, ["msg", "inbox", "--agent", agent2_id, "--count"])
+        assert result.exit_code == 0
+        assert "2" in result.stdout
+
+        # Test count in JSON output
+        result = runner.invoke(app, ["msg", "inbox", "--agent", agent2_id, "--count", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert data["data"]["count"] == 2
+
+    def test_msg_wait_with_existing_messages(self, temp_repo):
+        """Test msg wait returns immediately when messages already exist."""
+        runner.invoke(app, ["init"])
+        agent1_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent1_id = json.loads(agent1_result.stdout)["data"]["agent_id"]
+
+        agent2_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent2_id = json.loads(agent2_result.stdout)["data"]["agent_id"]
+
+        # Send a message to agent2
+        runner.invoke(
+            app,
+            ["msg", "send", "--to", f"agent:{agent2_id}", "--text", "Hello", "--from", agent1_id],
+        )
+
+        # Wait should return immediately since message exists
+        result = runner.invoke(app, ["msg", "wait", "--agent", agent2_id, "--timeout", "1"])
+        assert result.exit_code == 0
+        assert "received" in result.stdout.lower()
+
+    def test_msg_wait_timeout(self, temp_repo):
+        """Test msg wait times out when no messages arrive."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+
+        # Wait should timeout after 1 second
+        result = runner.invoke(app, ["msg", "wait", "--agent", agent_id, "--timeout", "1"])
+        assert result.exit_code == 0
+        assert "timeout" in result.stdout.lower()
+
+    def test_msg_wait_json(self, temp_repo):
+        """Test msg wait JSON output."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+
+        # Test timeout in JSON
+        result = runner.invoke(
+            app, ["msg", "wait", "--agent", agent_id, "--timeout", "1", "--json"]
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert data["data"]["received"] is False
+        assert data["data"]["timeout"] is True
+
+    def test_status_includes_message_counts(self, temp_repo):
+        """Test that status command includes message counts."""
+        runner.invoke(app, ["init"])
+        agent1_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent1_id = json.loads(agent1_result.stdout)["data"]["agent_id"]
+
+        agent2_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent2_id = json.loads(agent2_result.stdout)["data"]["agent_id"]
+
+        # Send messages
+        runner.invoke(
+            app,
+            ["msg", "send", "--to", f"agent:{agent2_id}", "--text", "Test", "--from", agent1_id],
+        )
+
+        # Check status includes messages
+        result = runner.invoke(app, ["status", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert "messages" in data["data"]
+        assert data["data"]["messages"]["total"] >= 1
+        assert agent2_id in data["data"]["messages"]["by_agent"]
