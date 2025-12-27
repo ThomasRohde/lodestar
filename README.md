@@ -93,6 +93,9 @@ lodestar task done TASK-001
 # Verify completion (unblocks dependent tasks)
 lodestar task verify TASK-001
 
+# Delete a task (soft-delete, preserves in spec.yaml)
+lodestar task delete TASK-002
+
 # Check status
 lodestar status
 ```
@@ -137,7 +140,7 @@ This separation provides:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Tasks flow through states: `ready` → `done` → `verified`. A task becomes claimable when it's `ready` and all its dependencies are `verified`.
+Tasks flow through states: `ready` → `done` → `verified`. A task becomes claimable when it's `ready` and all its dependencies are `verified`. Tasks can also be soft-deleted (status set to `deleted`) to hide them from normal views while preserving history.
 
 ## Documentation
 

@@ -17,8 +17,9 @@ lodestar task list [OPTIONS]
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--status TEXT` | `-s` | Filter by status (todo, ready, blocked, done, verified) |
+| `--status TEXT` | `-s` | Filter by status (todo, ready, blocked, done, verified, deleted) |
 | `--label TEXT` | `-l` | Filter by label |
+| `--include-deleted` | | Include deleted tasks in the list |
 | `--json` | | Output in JSON format |
 | `--explain` | | Show what this command does |
 
@@ -391,6 +392,112 @@ Changes the task status to `verified`. Any tasks that depend on this task will b
 $ lodestar task verify F002
 Verified F002
 Unblocked tasks: F005, F006
+```
+
+---
+
+## task delete
+
+Soft-delete a task.
+
+```bash
+lodestar task delete TASK_ID [OPTIONS]
+```
+
+Tasks are soft-deleted (status set to `deleted`), not physically removed from the spec. Deleted tasks are hidden from `task list` by default.
+
+!!! warning "Dependency Protection"
+    If a task has dependents (other tasks depend on it), you must use `--cascade` to delete it along with all its dependents.
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `TASK_ID` | Task ID to delete (required) |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--cascade` | Delete this task and all tasks that depend on it |
+| `--json` | Output in JSON format |
+
+### Soft-Delete Semantics
+
+- Deleted tasks have `status = deleted` in spec.yaml
+- `task list` hides deleted tasks by default
+- Use `task list --include-deleted` to see deleted tasks
+- Use `task list --status deleted` to see only deleted tasks
+- `task show` indicates if a task is deleted
+- Deleted tasks don't appear in `task next` (not claimable)
+
+### Example (Simple Delete)
+
+```bash
+$ lodestar task delete F010
+Deleted 1 task(s)
+  - F010: Add email notifications
+```
+
+### Example (Delete with Dependents - Error)
+
+```bash
+$ lodestar task delete F001
+Cannot delete F001
+  2 task(s) depend on this task:
+    - F002: Add password reset
+    - F003: Update documentation
+
+  Use --cascade to delete this task and all dependents
+```
+
+### Example (Cascade Delete)
+
+```bash
+$ lodestar task delete F001 --cascade
+Deleted 3 task(s)
+  - F001: User authentication
+  - F002: Add password reset
+  - F003: Update documentation
+
+Tip: Use 'lodestar task list --include-deleted' to see deleted tasks
+```
+
+### Viewing Deleted Tasks
+
+```bash
+# Show all tasks including deleted
+$ lodestar task list --include-deleted
+
+# Show only deleted tasks
+$ lodestar task list --status deleted
+
+# View details of a deleted task
+$ lodestar task show F010
+F010 - Add email notifications
+
+Status: deleted (soft-deleted)
+Priority: 2
+...
+```
+
+### Common Use Cases
+
+**Removing obsolete tasks:**
+```bash
+lodestar task delete F099  # No dependents
+```
+
+**Removing a feature branch:**
+```bash
+# Delete root task and entire feature tree
+lodestar task delete AUTH-001 --cascade
+```
+
+**Cleaning up mistakes:**
+```bash
+# Delete accidentally created task
+lodestar task delete T042
 ```
 
 ---

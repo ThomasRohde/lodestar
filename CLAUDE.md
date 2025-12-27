@@ -124,6 +124,14 @@ Every command must support `--json`, `--schema`, and `--explain` flags.
 - Task is **claimable** when: `status == ready` AND all `depends_on` are `verified`
 - `lodestar task next` returns only claimable tasks, sorted by priority
 
+### Soft-Delete Semantics
+
+- Tasks are soft-deleted (status set to `deleted`), not physically removed
+- Deleted tasks are hidden from `task list` by default
+- Use `task list --include-deleted` or `task list --status deleted` to view deleted tasks
+- Deleting a task with dependents requires `--cascade` flag
+- Cascade delete recursively deletes all downstream dependent tasks
+
 ### Progressive Discovery
 
 - No-args commands return "next actions" suggestions
@@ -165,6 +173,7 @@ lodestar task renew <id>         # Renew lease
 lodestar task release <id>       # Release lease
 lodestar task done <id>          # Mark done
 lodestar task verify <id>        # Mark verified
+lodestar task delete <id>        # Soft-delete task (--cascade for dependents)
 lodestar task graph              # Export dependency graph
 
 # Messaging
@@ -266,6 +275,11 @@ uv run lodestar task release <id> # Release without completing
 # Completing tasks
 uv run lodestar task done <id>   # Mark task done
 uv run lodestar task verify <id> # Mark task verified
+
+# Deleting tasks
+uv run lodestar task delete <id>         # Soft-delete (hides from list)
+uv run lodestar task delete <id> --cascade # Delete with all dependents
+uv run lodestar task list --include-deleted # Show deleted tasks
 
 # Agent management
 uv run lodestar agent join       # Register as agent
