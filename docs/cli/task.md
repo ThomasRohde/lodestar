@@ -93,18 +93,32 @@ Create a new task.
 lodestar task create [OPTIONS]
 ```
 
+!!! important "Write Detailed Descriptions"
+    For the planning→executing agent workflow (e.g., Opus creates, Sonnet executes),
+    include enough context for executing agents to work independently.
+
 ### Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--title TEXT` | `-t` | Task title (required) |
 | `--id TEXT` | | Task ID (auto-generated if not provided) |
-| `--description TEXT` | `-d` | Task description |
+| `--description TEXT` | `-d` | Detailed description (see below) |
 | `--priority INTEGER` | `-p` | Priority, lower = higher (default: 100) |
 | `--status TEXT` | `-s` | Initial status (default: ready) |
 | `--depends-on TEXT` | | Task IDs this depends on (repeatable) |
 | `--label TEXT` | `-l` | Labels for the task (repeatable) |
 | `--json` | | Output in JSON format |
+
+### Writing Good Descriptions
+
+Include these elements so executing agents have full context:
+
+- **WHAT**: Clear goal and scope
+- **WHERE**: Relevant files and directories
+- **WHY**: Business context or motivation
+- **ACCEPT**: Measurable acceptance criteria
+- **CONTEXT**: Pointers to related code, patterns to follow
 
 ### Example
 
@@ -112,10 +126,13 @@ lodestar task create [OPTIONS]
 $ lodestar task create \
     --id F010 \
     --title "Add email notifications" \
-    --description "Send email on important events" \
+    --description "WHAT: Send email when tasks complete.
+WHERE: src/notifications/, templates/email/
+WHY: Users requested completion alerts.
+ACCEPT: 1) Email on task.done 2) Configurable template 3) Tests pass
+CONTEXT: See notify() in src/alerts.py for pattern" \
     --priority 2 \
     --label feature \
-    --label notifications \
     --depends-on F001
 Created task F010
 ```
