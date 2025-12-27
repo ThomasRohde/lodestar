@@ -1,22 +1,30 @@
-"""SQLite runtime database management with WAL mode."""
+"""SQLite runtime database management with SQLAlchemy ORM."""
 
 from __future__ import annotations
 
-import sqlite3
-from collections.abc import Generator
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import func, select, text, update
+from sqlalchemy.orm import Session
+
 from lodestar.models.runtime import Agent, Lease, Message, MessageType
+from lodestar.runtime.converters import (
+    agent_to_orm,
+    lease_to_orm,
+    message_to_orm,
+    orm_to_agent,
+    orm_to_lease,
+    orm_to_message,
+)
+from lodestar.runtime.engine import create_runtime_engine, create_session_factory, get_session
+from lodestar.runtime.models import AgentModel, Base, EventModel, LeaseModel, MessageModel
 from lodestar.util.paths import get_runtime_db_path
 
 
 class RuntimeDatabase:
     """SQLite database for runtime state with WAL mode for concurrency."""
-
-    SCHEMA_VERSION = 3
 
     def __init__(self, db_path: Path | None = None):
         """Initialize the runtime database.
@@ -25,208 +33,50 @@ class RuntimeDatabase:
             db_path: Path to the database file. If None, uses default location.
         """
         self.db_path = db_path or get_runtime_db_path()
+        self._engine = create_runtime_engine(self.db_path)
+        self._session_factory = create_session_factory(self._engine)
         self._ensure_initialized()
 
     def _ensure_initialized(self) -> None:
-        """Ensure database is created and migrated."""
-        with self._connect() as conn:
-            # Enable WAL mode for better concurrency
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA busy_timeout=5000")
+        """Ensure database tables are created."""
+        Base.metadata.create_all(self._engine)
 
-            # Create schema
-            self._create_schema(conn)
-            # Run migrations
-            self._run_migrations(conn)
+    def dispose(self) -> None:
+        """Dispose of the engine and release resources.
 
-    @contextmanager
-    def _connect(self) -> Generator[sqlite3.Connection, None, None]:
-        """Get a database connection."""
-        conn = sqlite3.connect(
-            self.db_path,
-            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-        )
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
-    def _create_schema(self, conn: sqlite3.Connection) -> None:
-        """Create database schema."""
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS schema_version (
-                version INTEGER PRIMARY KEY
-            );
-
-            CREATE TABLE IF NOT EXISTS agents (
-                agent_id TEXT PRIMARY KEY,
-                display_name TEXT DEFAULT '',
-                role TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                last_seen_at TEXT NOT NULL,
-                capabilities TEXT DEFAULT '[]',
-                session_meta TEXT DEFAULT '{}'
-            );
-
-            CREATE TABLE IF NOT EXISTS leases (
-                lease_id TEXT PRIMARY KEY,
-                task_id TEXT NOT NULL,
-                agent_id TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                expires_at TEXT NOT NULL,
-                FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_leases_task_id ON leases(task_id);
-            CREATE INDEX IF NOT EXISTS idx_leases_agent_id ON leases(agent_id);
-            CREATE INDEX IF NOT EXISTS idx_leases_expires_at ON leases(expires_at);
-
-            CREATE TABLE IF NOT EXISTS messages (
-                message_id TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL,
-                from_agent_id TEXT NOT NULL,
-                to_type TEXT NOT NULL,
-                to_id TEXT NOT NULL,
-                text TEXT NOT NULL,
-                meta TEXT DEFAULT '{}',
-                FOREIGN KEY (from_agent_id) REFERENCES agents(agent_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_type, to_id);
-            CREATE INDEX IF NOT EXISTS idx_messages_from ON messages(from_agent_id);
-            CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
-
-            CREATE TABLE IF NOT EXISTS events (
-                event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                created_at TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                agent_id TEXT,
-                task_id TEXT,
-                data TEXT DEFAULT '{}'
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
-            CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
-            """
-        )
-
-    def _run_migrations(self, conn: sqlite3.Connection) -> None:
-        """Run database migrations."""
-        # Get current schema version
-        result = conn.execute(
-            "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
-        ).fetchone()
-        current_version = result[0] if result else 0
-
-        # Migration 1 -> 2: Add read_at column to messages table
-        if current_version < 2:
-            # Check if column already exists (for safety)
-            cursor = conn.execute("PRAGMA table_info(messages)")
-            columns = [row[1] for row in cursor.fetchall()]
-
-            if "read_at" not in columns:
-                conn.execute("ALTER TABLE messages ADD COLUMN read_at TEXT DEFAULT NULL")
-
-            # Update schema version
-            conn.execute("INSERT OR REPLACE INTO schema_version (version) VALUES (?)", (2,))
-            current_version = 2
-
-        # Migration 2 -> 3: Add role column to agents table
-        if current_version < 3:
-            # Check if column already exists (for safety)
-            cursor = conn.execute("PRAGMA table_info(agents)")
-            columns = [row[1] for row in cursor.fetchall()]
-
-            if "role" not in columns:
-                conn.execute("ALTER TABLE agents ADD COLUMN role TEXT DEFAULT ''")
-
-            # Update schema version
-            conn.execute("INSERT OR REPLACE INTO schema_version (version) VALUES (?)", (3,))
+        Call this method to properly close all connections and release
+        file locks on Windows.
+        """
+        self._engine.dispose()
 
     # Agent operations
 
     def register_agent(self, agent: Agent) -> Agent:
         """Register a new agent."""
-        import json
-
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO agents (agent_id, display_name, role, created_at, last_seen_at,
-                                   capabilities, session_meta)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    agent.agent_id,
-                    agent.display_name,
-                    agent.role,
-                    agent.created_at.isoformat(),
-                    agent.last_seen_at.isoformat(),
-                    json.dumps(agent.capabilities),
-                    json.dumps(agent.session_meta),
-                ),
-            )
-
-            self._log_event(conn, "agent.join", agent.agent_id, None, {})
+        with get_session(self._session_factory) as session:
+            orm_agent = agent_to_orm(agent)
+            session.add(orm_agent)
+            self._log_event(session, "agent.join", agent.agent_id, None, {})
 
         return agent
 
     def get_agent(self, agent_id: str) -> Agent | None:
         """Get an agent by ID."""
-        import json
+        with get_session(self._session_factory) as session:
+            stmt = select(AgentModel).where(AgentModel.agent_id == agent_id)
+            result = session.execute(stmt).scalar_one_or_none()
 
-        with self._connect() as conn:
-            row = conn.execute("SELECT * FROM agents WHERE agent_id = ?", (agent_id,)).fetchone()
-
-            if row is None:
+            if result is None:
                 return None
 
-            # Handle backward compatibility: old agents have capabilities as dict
-            capabilities_raw = json.loads(row["capabilities"])
-            capabilities = capabilities_raw if isinstance(capabilities_raw, list) else []
-
-            return Agent(
-                agent_id=row["agent_id"],
-                display_name=row["display_name"],
-                role=row["role"] or "",
-                created_at=datetime.fromisoformat(row["created_at"]),
-                last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
-                capabilities=capabilities,
-                session_meta=json.loads(row["session_meta"]),
-            )
+            return orm_to_agent(result)
 
     def list_agents(self, active_only: bool = False) -> list[Agent]:
         """List all registered agents."""
-        import json
-
-        with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM agents ORDER BY last_seen_at DESC").fetchall()
-
-            agents = []
-            for row in rows:
-                # Handle backward compatibility: old agents have capabilities as dict
-                capabilities_raw = json.loads(row["capabilities"])
-                capabilities = capabilities_raw if isinstance(capabilities_raw, list) else []
-
-                agents.append(
-                    Agent(
-                        agent_id=row["agent_id"],
-                        display_name=row["display_name"],
-                        role=row["role"] or "",
-                        created_at=datetime.fromisoformat(row["created_at"]),
-                        last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
-                        capabilities=capabilities,
-                        session_meta=json.loads(row["session_meta"]),
-                    )
-                )
-
-            return agents
+        with get_session(self._session_factory) as session:
+            stmt = select(AgentModel).order_by(AgentModel.last_seen_at.desc())
+            results = session.execute(stmt).scalars().all()
+            return [orm_to_agent(r) for r in results]
 
     def find_agents_by_capability(self, capability: str) -> list[Agent]:
         """Find agents that have a specific capability.
@@ -239,33 +89,40 @@ class RuntimeDatabase:
         """
         import json
 
-        with self._connect() as conn:
-            # Use JSON functions to search within the capabilities array
-            # SQLite's json_each can expand a JSON array into rows
-            rows = conn.execute(
-                """
+        with get_session(self._session_factory) as session:
+            # Use SQLite's json_each to search within the capabilities array
+            stmt = text("""
                 SELECT DISTINCT a.* FROM agents a, json_each(a.capabilities) AS cap
-                WHERE cap.value = ?
+                WHERE cap.value = :capability
                 ORDER BY a.last_seen_at DESC
-                """,
-                (capability,),
-            ).fetchall()
+            """)
+            results = session.execute(stmt, {"capability": capability}).fetchall()
 
             agents = []
-            for row in rows:
-                # Handle backward compatibility: old agents have capabilities as dict
-                capabilities_raw = json.loads(row["capabilities"])
+            for row in results:
+                # Handle backward compatibility for capabilities
+                capabilities_raw = (
+                    json.loads(row.capabilities)
+                    if isinstance(row.capabilities, str)
+                    else row.capabilities
+                )
                 capabilities = capabilities_raw if isinstance(capabilities_raw, list) else []
+
+                session_meta = (
+                    json.loads(row.session_meta)
+                    if isinstance(row.session_meta, str)
+                    else row.session_meta
+                )
 
                 agents.append(
                     Agent(
-                        agent_id=row["agent_id"],
-                        display_name=row["display_name"],
-                        role=row["role"] or "",
-                        created_at=datetime.fromisoformat(row["created_at"]),
-                        last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
+                        agent_id=row.agent_id,
+                        display_name=row.display_name,
+                        role=row.role or "",
+                        created_at=datetime.fromisoformat(row.created_at),
+                        last_seen_at=datetime.fromisoformat(row.last_seen_at),
                         capabilities=capabilities,
-                        session_meta=json.loads(row["session_meta"]),
+                        session_meta=session_meta or {},
                     )
                 )
 
@@ -280,47 +137,25 @@ class RuntimeDatabase:
         Returns:
             List of agents with the specified role.
         """
-        import json
-
-        with self._connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT * FROM agents WHERE role = ?
-                ORDER BY last_seen_at DESC
-                """,
-                (role,),
-            ).fetchall()
-
-            agents = []
-            for row in rows:
-                # Handle backward compatibility: old agents have capabilities as dict
-                capabilities_raw = json.loads(row["capabilities"])
-                capabilities = capabilities_raw if isinstance(capabilities_raw, list) else []
-
-                agents.append(
-                    Agent(
-                        agent_id=row["agent_id"],
-                        display_name=row["display_name"],
-                        role=row["role"] or "",
-                        created_at=datetime.fromisoformat(row["created_at"]),
-                        last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
-                        capabilities=capabilities,
-                        session_meta=json.loads(row["session_meta"]),
-                    )
-                )
-
-            return agents
+        with get_session(self._session_factory) as session:
+            stmt = (
+                select(AgentModel)
+                .where(AgentModel.role == role)
+                .order_by(AgentModel.last_seen_at.desc())
+            )
+            results = session.execute(stmt).scalars().all()
+            return [orm_to_agent(r) for r in results]
 
     def update_heartbeat(self, agent_id: str) -> bool:
         """Update an agent's heartbeat timestamp."""
-        with self._connect() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE agents SET last_seen_at = ? WHERE agent_id = ?
-                """,
-                (datetime.utcnow().isoformat(), agent_id),
+        with get_session(self._session_factory) as session:
+            stmt = (
+                update(AgentModel)
+                .where(AgentModel.agent_id == agent_id)
+                .values(last_seen_at=datetime.utcnow().isoformat())
             )
-            return cursor.rowcount > 0
+            result = session.execute(stmt)
+            return result.rowcount > 0
 
     # Lease operations
 
@@ -331,36 +166,23 @@ class RuntimeDatabase:
         """
         now = datetime.utcnow()
 
-        with self._connect() as conn:
+        with get_session(self._session_factory) as session:
             # Check for existing active lease (atomic within transaction)
-            existing = conn.execute(
-                """
-                SELECT lease_id FROM leases
-                WHERE task_id = ? AND expires_at > ?
-                """,
-                (lease.task_id, now.isoformat()),
-            ).fetchone()
+            stmt = select(LeaseModel).where(
+                LeaseModel.task_id == lease.task_id,
+                LeaseModel.expires_at > now.isoformat(),
+            )
+            existing = session.execute(stmt).scalar_one_or_none()
 
             if existing:
                 return None  # Task already claimed
 
             # Create the lease
-            conn.execute(
-                """
-                INSERT INTO leases (lease_id, task_id, agent_id, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    lease.lease_id,
-                    lease.task_id,
-                    lease.agent_id,
-                    lease.created_at.isoformat(),
-                    lease.expires_at.isoformat(),
-                ),
-            )
+            orm_lease = lease_to_orm(lease)
+            session.add(orm_lease)
 
             self._log_event(
-                conn,
+                session,
                 "task.claim",
                 lease.agent_id,
                 lease.task_id,
@@ -373,87 +195,73 @@ class RuntimeDatabase:
         """Get the active lease for a task, if any."""
         now = datetime.utcnow()
 
-        with self._connect() as conn:
-            row = conn.execute(
-                """
-                SELECT * FROM leases
-                WHERE task_id = ? AND expires_at > ?
-                ORDER BY expires_at DESC LIMIT 1
-                """,
-                (task_id, now.isoformat()),
-            ).fetchone()
+        with get_session(self._session_factory) as session:
+            stmt = (
+                select(LeaseModel)
+                .where(
+                    LeaseModel.task_id == task_id,
+                    LeaseModel.expires_at > now.isoformat(),
+                )
+                .order_by(LeaseModel.expires_at.desc())
+                .limit(1)
+            )
+            result = session.execute(stmt).scalar_one_or_none()
 
-            if row is None:
+            if result is None:
                 return None
 
-            return Lease(
-                lease_id=row["lease_id"],
-                task_id=row["task_id"],
-                agent_id=row["agent_id"],
-                created_at=datetime.fromisoformat(row["created_at"]),
-                expires_at=datetime.fromisoformat(row["expires_at"]),
-            )
+            return orm_to_lease(result)
 
     def get_agent_leases(self, agent_id: str, active_only: bool = True) -> list[Lease]:
         """Get all leases for an agent."""
         now = datetime.utcnow()
 
-        with self._connect() as conn:
+        with get_session(self._session_factory) as session:
             if active_only:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM leases
-                    WHERE agent_id = ? AND expires_at > ?
-                    ORDER BY expires_at DESC
-                    """,
-                    (agent_id, now.isoformat()),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM leases
-                    WHERE agent_id = ?
-                    ORDER BY expires_at DESC
-                    """,
-                    (agent_id,),
-                ).fetchall()
-
-            return [
-                Lease(
-                    lease_id=row["lease_id"],
-                    task_id=row["task_id"],
-                    agent_id=row["agent_id"],
-                    created_at=datetime.fromisoformat(row["created_at"]),
-                    expires_at=datetime.fromisoformat(row["expires_at"]),
+                stmt = (
+                    select(LeaseModel)
+                    .where(
+                        LeaseModel.agent_id == agent_id,
+                        LeaseModel.expires_at > now.isoformat(),
+                    )
+                    .order_by(LeaseModel.expires_at.desc())
                 )
-                for row in rows
-            ]
+            else:
+                stmt = (
+                    select(LeaseModel)
+                    .where(LeaseModel.agent_id == agent_id)
+                    .order_by(LeaseModel.expires_at.desc())
+                )
+
+            results = session.execute(stmt).scalars().all()
+            return [orm_to_lease(r) for r in results]
 
     def renew_lease(self, lease_id: str, new_expires_at: datetime, agent_id: str) -> bool:
         """Renew a lease (only if owned by agent and still active)."""
         now = datetime.utcnow()
 
-        with self._connect() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE leases
-                SET expires_at = ?
-                WHERE lease_id = ? AND agent_id = ? AND expires_at > ?
-                """,
-                (new_expires_at.isoformat(), lease_id, agent_id, now.isoformat()),
+        with get_session(self._session_factory) as session:
+            stmt = (
+                update(LeaseModel)
+                .where(
+                    LeaseModel.lease_id == lease_id,
+                    LeaseModel.agent_id == agent_id,
+                    LeaseModel.expires_at > now.isoformat(),
+                )
+                .values(expires_at=new_expires_at.isoformat())
             )
+            result = session.execute(stmt)
 
-            if cursor.rowcount > 0:
+            if result.rowcount > 0:
                 # Get task_id for logging
-                row = conn.execute(
-                    "SELECT task_id FROM leases WHERE lease_id = ?", (lease_id,)
-                ).fetchone()
-                if row:
+                lease_stmt = select(LeaseModel.task_id).where(LeaseModel.lease_id == lease_id)
+                task_id = session.execute(lease_stmt).scalar_one_or_none()
+                if task_id:
                     self._log_event(
-                        conn,
+                        session,
                         "task.renew",
                         agent_id,
-                        row["task_id"],
+                        task_id,
                         {"lease_id": lease_id},
                     )
                 return True
@@ -464,18 +272,20 @@ class RuntimeDatabase:
         """Release a lease (set expires_at to now)."""
         now = datetime.utcnow()
 
-        with self._connect() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE leases
-                SET expires_at = ?
-                WHERE task_id = ? AND agent_id = ? AND expires_at > ?
-                """,
-                (now.isoformat(), task_id, agent_id, now.isoformat()),
+        with get_session(self._session_factory) as session:
+            stmt = (
+                update(LeaseModel)
+                .where(
+                    LeaseModel.task_id == task_id,
+                    LeaseModel.agent_id == agent_id,
+                    LeaseModel.expires_at > now.isoformat(),
+                )
+                .values(expires_at=now.isoformat())
             )
+            result = session.execute(stmt)
 
-            if cursor.rowcount > 0:
-                self._log_event(conn, "task.release", agent_id, task_id, {})
+            if result.rowcount > 0:
+                self._log_event(session, "task.release", agent_id, task_id, {})
                 return True
 
             return False
@@ -484,28 +294,12 @@ class RuntimeDatabase:
 
     def send_message(self, message: Message) -> Message:
         """Send a message."""
-        import json
-
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO messages (message_id, created_at, from_agent_id,
-                                     to_type, to_id, text, meta)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    message.message_id,
-                    message.created_at.isoformat(),
-                    message.from_agent_id,
-                    message.to_type.value,
-                    message.to_id,
-                    message.text,
-                    json.dumps(message.meta),
-                ),
-            )
+        with get_session(self._session_factory) as session:
+            orm_message = message_to_orm(message)
+            session.add(orm_message)
 
             self._log_event(
-                conn,
+                session,
                 "message.send",
                 message.from_agent_id,
                 message.to_id if message.to_type == MessageType.TASK else None,
@@ -538,61 +332,40 @@ class RuntimeDatabase:
         Returns:
             List of messages matching the criteria
         """
-        import json
+        with get_session(self._session_factory) as session:
+            # Build query with filters
+            stmt = select(MessageModel).where(
+                MessageModel.to_type == "agent",
+                MessageModel.to_id == agent_id,
+            )
 
-        # Build query dynamically based on filters
-        conditions = ["to_type = 'agent'", "to_id = ?"]
-        params = [agent_id]
+            if since:
+                stmt = stmt.where(MessageModel.created_at > since.isoformat())
 
-        if since:
-            conditions.append("created_at > ?")
-            params.append(since.isoformat())
+            if until:
+                stmt = stmt.where(MessageModel.created_at < until.isoformat())
 
-        if until:
-            conditions.append("created_at < ?")
-            params.append(until.isoformat())
+            if from_agent_id:
+                stmt = stmt.where(MessageModel.from_agent_id == from_agent_id)
 
-        if from_agent_id:
-            conditions.append("from_agent_id = ?")
-            params.append(from_agent_id)
+            if unread_only:
+                stmt = stmt.where(MessageModel.read_at.is_(None))
 
-        if unread_only:
-            conditions.append("read_at IS NULL")
+            stmt = stmt.order_by(MessageModel.created_at.desc()).limit(limit)
 
-        where_clause = " AND ".join(conditions)
-        query = f"""
-            SELECT * FROM messages
-            WHERE {where_clause}
-            ORDER BY created_at DESC LIMIT ?
-        """
-        params.append(limit)
-
-        with self._connect() as conn:
-            rows = conn.execute(query, params).fetchall()
-
-            messages = [
-                Message(
-                    message_id=row["message_id"],
-                    created_at=datetime.fromisoformat(row["created_at"]),
-                    from_agent_id=row["from_agent_id"],
-                    to_type=MessageType(row["to_type"]),
-                    to_id=row["to_id"],
-                    text=row["text"],
-                    meta=json.loads(row["meta"]),
-                    read_at=datetime.fromisoformat(row["read_at"]) if row["read_at"] else None,
-                )
-                for row in rows
-            ]
+            results = session.execute(stmt).scalars().all()
+            messages = [orm_to_message(r) for r in results]
 
             # Mark messages as read if requested
             if mark_as_read and messages:
                 now = datetime.utcnow()
                 message_ids = [msg.message_id for msg in messages]
-                placeholders = ",".join("?" * len(message_ids))
-                conn.execute(
-                    f"UPDATE messages SET read_at = ? WHERE message_id IN ({placeholders})",
-                    [now.isoformat()] + message_ids,
+                update_stmt = (
+                    update(MessageModel)
+                    .where(MessageModel.message_id.in_(message_ids))
+                    .values(read_at=now.isoformat())
                 )
+                session.execute(update_stmt)
                 # Update the messages in-memory to reflect the read status
                 for msg in messages:
                     if msg.read_at is None:
@@ -604,66 +377,48 @@ class RuntimeDatabase:
         self, task_id: str, since: datetime | None = None, limit: int = 50
     ) -> list[Message]:
         """Get messages for a task thread."""
-        import json
+        with get_session(self._session_factory) as session:
+            stmt = select(MessageModel).where(
+                MessageModel.to_type == "task",
+                MessageModel.to_id == task_id,
+            )
 
-        with self._connect() as conn:
             if since:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM messages
-                    WHERE to_type = 'task' AND to_id = ? AND created_at > ?
-                    ORDER BY created_at ASC LIMIT ?
-                    """,
-                    (task_id, since.isoformat(), limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM messages
-                    WHERE to_type = 'task' AND to_id = ?
-                    ORDER BY created_at ASC LIMIT ?
-                    """,
-                    (task_id, limit),
-                ).fetchall()
+                stmt = stmt.where(MessageModel.created_at > since.isoformat())
 
-            return [
-                Message(
-                    message_id=row["message_id"],
-                    created_at=datetime.fromisoformat(row["created_at"]),
-                    from_agent_id=row["from_agent_id"],
-                    to_type=MessageType(row["to_type"]),
-                    to_id=row["to_id"],
-                    text=row["text"],
-                    meta=json.loads(row["meta"]),
-                    read_at=datetime.fromisoformat(row["read_at"]) if row["read_at"] else None,
-                )
-                for row in rows
-            ]
+            stmt = stmt.order_by(MessageModel.created_at.asc()).limit(limit)
+
+            results = session.execute(stmt).scalars().all()
+            return [orm_to_message(r) for r in results]
 
     def get_task_message_count(self, task_id: str) -> int:
         """Get the count of messages in a task thread."""
-        with self._connect() as conn:
-            count = conn.execute(
-                """
-                SELECT COUNT(*) FROM messages
-                WHERE to_type = 'task' AND to_id = ?
-                """,
-                (task_id,),
-            ).fetchone()[0]
-            return count
+        with get_session(self._session_factory) as session:
+            stmt = (
+                select(func.count())
+                .select_from(MessageModel)
+                .where(
+                    MessageModel.to_type == "task",
+                    MessageModel.to_id == task_id,
+                )
+            )
+            result = session.execute(stmt).scalar()
+            return result or 0
 
     def get_task_message_agents(self, task_id: str) -> list[str]:
         """Get unique agent IDs who have sent messages about a task."""
-        with self._connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT DISTINCT from_agent_id FROM messages
-                WHERE to_type = 'task' AND to_id = ?
-                ORDER BY from_agent_id
-                """,
-                (task_id,),
-            ).fetchall()
-            return [row[0] for row in rows]
+        with get_session(self._session_factory) as session:
+            stmt = (
+                select(MessageModel.from_agent_id)
+                .distinct()
+                .where(
+                    MessageModel.to_type == "task",
+                    MessageModel.to_id == task_id,
+                )
+                .order_by(MessageModel.from_agent_id)
+            )
+            results = session.execute(stmt).scalars().all()
+            return list(results)
 
     def search_messages(
         self,
@@ -685,73 +440,43 @@ class RuntimeDatabase:
         Returns:
             List of messages matching the search criteria
         """
-        import json
+        with get_session(self._session_factory) as session:
+            stmt = select(MessageModel)
 
-        # Build query dynamically based on filters
-        conditions = []
-        params = []
+            if keyword:
+                stmt = stmt.where(MessageModel.text.like(f"%{keyword}%"))
 
-        if keyword:
-            conditions.append("text LIKE ?")
-            params.append(f"%{keyword}%")
+            if from_agent_id:
+                stmt = stmt.where(MessageModel.from_agent_id == from_agent_id)
 
-        if from_agent_id:
-            conditions.append("from_agent_id = ?")
-            params.append(from_agent_id)
+            if since:
+                stmt = stmt.where(MessageModel.created_at > since.isoformat())
 
-        if since:
-            conditions.append("created_at > ?")
-            params.append(since.isoformat())
+            if until:
+                stmt = stmt.where(MessageModel.created_at < until.isoformat())
 
-        if until:
-            conditions.append("created_at < ?")
-            params.append(until.isoformat())
+            stmt = stmt.order_by(MessageModel.created_at.desc()).limit(limit)
 
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        query = f"""
-            SELECT * FROM messages
-            WHERE {where_clause}
-            ORDER BY created_at DESC LIMIT ?
-        """
-        params.append(limit)
-
-        with self._connect() as conn:
-            rows = conn.execute(query, params).fetchall()
-
-            return [
-                Message(
-                    message_id=row["message_id"],
-                    created_at=datetime.fromisoformat(row["created_at"]),
-                    from_agent_id=row["from_agent_id"],
-                    to_type=MessageType(row["to_type"]),
-                    to_id=row["to_id"],
-                    text=row["text"],
-                    meta=json.loads(row["meta"]),
-                    read_at=datetime.fromisoformat(row["read_at"]) if row["read_at"] else None,
-                )
-                for row in rows
-            ]
+            results = session.execute(stmt).scalars().all()
+            return [orm_to_message(r) for r in results]
 
     def get_inbox_count(self, agent_id: str, since: datetime | None = None) -> int:
         """Get count of messages in inbox."""
-        with self._connect() as conn:
+        with get_session(self._session_factory) as session:
+            stmt = (
+                select(func.count())
+                .select_from(MessageModel)
+                .where(
+                    MessageModel.to_type == "agent",
+                    MessageModel.to_id == agent_id,
+                )
+            )
+
             if since:
-                result = conn.execute(
-                    """
-                    SELECT COUNT(*) FROM messages
-                    WHERE to_type = 'agent' AND to_id = ? AND created_at > ?
-                    """,
-                    (agent_id, since.isoformat()),
-                ).fetchone()
-            else:
-                result = conn.execute(
-                    """
-                    SELECT COUNT(*) FROM messages
-                    WHERE to_type = 'agent' AND to_id = ?
-                    """,
-                    (agent_id,),
-                ).fetchone()
-            return result[0] if result else 0
+                stmt = stmt.where(MessageModel.created_at > since.isoformat())
+
+            result = session.execute(stmt).scalar()
+            return result or 0
 
     def wait_for_message(
         self, agent_id: str, timeout_seconds: float | None = None, since: datetime | None = None
@@ -795,20 +520,23 @@ class RuntimeDatabase:
         """Get runtime statistics."""
         now = datetime.utcnow()
 
-        with self._connect() as conn:
-            agent_count = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
+        with get_session(self._session_factory) as session:
+            agent_count = session.execute(select(func.count()).select_from(AgentModel)).scalar()
 
-            active_leases = conn.execute(
-                "SELECT COUNT(*) FROM leases WHERE expires_at > ?",
-                (now.isoformat(),),
-            ).fetchone()[0]
+            active_leases = session.execute(
+                select(func.count())
+                .select_from(LeaseModel)
+                .where(LeaseModel.expires_at > now.isoformat())
+            ).scalar()
 
-            total_messages = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+            total_messages = session.execute(
+                select(func.count()).select_from(MessageModel)
+            ).scalar()
 
             return {
-                "agents": agent_count,
-                "active_leases": active_leases,
-                "total_messages": total_messages,
+                "agents": agent_count or 0,
+                "active_leases": active_leases or 0,
+                "total_messages": total_messages or 0,
             }
 
     def get_agent_message_counts(self) -> dict[str, int]:
@@ -816,39 +544,29 @@ class RuntimeDatabase:
 
         Returns a dictionary mapping agent_id to message count.
         """
-        with self._connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT to_id, COUNT(*) as count
-                FROM messages
-                WHERE to_type = 'agent'
-                GROUP BY to_id
-                """
-            ).fetchall()
-
-            return {row[0]: row[1] for row in rows}
+        with get_session(self._session_factory) as session:
+            stmt = (
+                select(MessageModel.to_id, func.count().label("count"))
+                .where(MessageModel.to_type == "agent")
+                .group_by(MessageModel.to_id)
+            )
+            results = session.execute(stmt).all()
+            return {row.to_id: row.count for row in results}
 
     def _log_event(
         self,
-        conn: sqlite3.Connection,
+        session: Session,
         event_type: str,
         agent_id: str | None,
         task_id: str | None,
         data: dict[str, Any],
     ) -> None:
         """Log an event to the events table."""
-        import json
-
-        conn.execute(
-            """
-            INSERT INTO events (created_at, event_type, agent_id, task_id, data)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                datetime.utcnow().isoformat(),
-                event_type,
-                agent_id,
-                task_id,
-                json.dumps(data),
-            ),
+        event = EventModel(
+            created_at=datetime.utcnow().isoformat(),
+            event_type=event_type,
+            agent_id=agent_id,
+            task_id=task_id,
+            data=data,
         )
+        session.add(event)

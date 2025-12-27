@@ -17,7 +17,10 @@ def db():
     """Create a temporary runtime database."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "runtime.sqlite"
-        yield RuntimeDatabase(db_path)
+        database = RuntimeDatabase(db_path)
+        yield database
+        # Properly dispose of the engine to release file locks on Windows
+        database.dispose()
 
 
 class TestAgentOperations:
@@ -177,22 +180,14 @@ class TestLeaseOperations:
         # Create an already expired lease
         expires = datetime.utcnow() - timedelta(minutes=1)
         lease = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
-        # Directly insert the lease bypassing the check
+        # Directly insert the lease bypassing the check using SQLAlchemy session
 
-        with db._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO leases (lease_id, task_id, agent_id, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    lease.lease_id,
-                    lease.task_id,
-                    lease.agent_id,
-                    lease.created_at.isoformat(),
-                    lease.expires_at.isoformat(),
-                ),
-            )
+        from lodestar.runtime.converters import lease_to_orm
+        from lodestar.runtime.engine import get_session
+
+        with get_session(db._session_factory) as session:
+            orm_lease = lease_to_orm(lease)
+            session.add(orm_lease)
 
         active = db.get_active_lease("T001")
         assert active is None  # Expired lease should not be returned
