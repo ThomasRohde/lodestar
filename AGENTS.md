@@ -25,9 +25,12 @@ uv run lodestar task claim <id> --agent <your-agent-id>
 # 2. Renew if work takes > 10 min
 uv run lodestar task renew <id> --agent <your-agent-id>
 
-# 3. Complete
+# 3. Complete (auto-releases lease)
 uv run lodestar task done <id>
 uv run lodestar task verify <id>
+
+# Only if you CAN'T complete - release for others to pick up
+uv run lodestar task release <id>
 ```
 
 ## Creating Tasks (Planning Agents)

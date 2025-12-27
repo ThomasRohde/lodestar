@@ -872,11 +872,11 @@ def task_renew(
 @app.command(name="release")
 def task_release(
     task_id: str = typer.Argument(..., help="Task ID to release."),
-    agent_id: str = typer.Option(
-        ...,
+    agent_id: str | None = typer.Option(
+        None,
         "--agent",
         "-a",
-        help="Your agent ID (REQUIRED). Same ID used when claiming.",
+        help="Your agent ID. If omitted, infers from active lease.",
     ),
     json_output: bool = typer.Option(
         False,
@@ -889,8 +889,11 @@ def task_release(
     Frees the task for others to claim. Use this when you're blocked
     or can't complete the task. Consider leaving a message with context.
 
+    Note: You don't need to release after 'task done' or 'task verify' -
+    those commands auto-release the lease.
+
     Example:
-        lodestar task release F001 --agent A1234ABCD
+        lodestar task release F001
         lodestar msg send --to task:F001 --from A1234ABCD --text 'Blocked on X'
     """
     root = find_lodestar_root()
@@ -902,6 +905,18 @@ def task_release(
         raise typer.Exit(1)
 
     db = RuntimeDatabase(get_runtime_db_path(root))
+
+    # If agent_id not provided, infer from active lease
+    if agent_id is None:
+        active_lease = db.get_active_lease(task_id)
+        if active_lease is None:
+            if json_output:
+                print_json(Envelope.error(f"No active lease for {task_id}").model_dump())
+            else:
+                console.print(f"[error]No active lease for {task_id}[/error]")
+            raise typer.Exit(1)
+        agent_id = active_lease.agent_id
+
     success = db.release_lease(task_id, agent_id)
 
     if not success:
@@ -1009,6 +1024,12 @@ def task_verify(
     task.status = TaskStatus.VERIFIED
     task.updated_at = datetime.utcnow()
     save_spec(spec, root)
+
+    # Auto-release any active lease (task is complete, lease no longer needed)
+    db = RuntimeDatabase(get_runtime_db_path(root))
+    active_lease = db.get_active_lease(task_id)
+    if active_lease:
+        db.release_lease(task_id, active_lease.agent_id)
 
     # Check what tasks are now unblocked
     new_claimable = spec.get_claimable_tasks()

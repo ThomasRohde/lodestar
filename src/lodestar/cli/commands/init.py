@@ -203,9 +203,12 @@ lodestar task claim <id> --agent <your-agent-id>
 # Renew if work takes > 10 min
 lodestar task renew <id> --agent <your-agent-id>
 
-# Complete
+# Complete (auto-releases lease)
 lodestar task done <id>
 lodestar task verify <id>
+
+# Only if you CAN'T complete - release for others
+lodestar task release <id>
 ```
 
 ## Creating Tasks
