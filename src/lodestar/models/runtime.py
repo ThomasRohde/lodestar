@@ -2,12 +2,46 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
+
+# Default inactivity thresholds for agent status calculation
+# These can be overridden via environment variables:
+#   LODESTAR_AGENT_IDLE_THRESHOLD_MINUTES (default: 15)
+#   LODESTAR_AGENT_OFFLINE_THRESHOLD_MINUTES (default: 60)
+DEFAULT_IDLE_THRESHOLD_MINUTES = 15
+DEFAULT_OFFLINE_THRESHOLD_MINUTES = 60
+
+
+class AgentStatus(str, Enum):
+    """Agent availability status based on activity."""
+
+    ACTIVE = "active"  # Recently active (within idle threshold)
+    IDLE = "idle"  # No recent activity (between idle and offline thresholds)
+    OFFLINE = "offline"  # No activity for extended period (beyond offline threshold)
+
+
+def get_agent_thresholds() -> tuple[int, int]:
+    """Get agent status thresholds from environment or defaults.
+
+    Returns:
+        Tuple of (idle_threshold_minutes, offline_threshold_minutes)
+    """
+    import os
+
+    idle = int(
+        os.environ.get("LODESTAR_AGENT_IDLE_THRESHOLD_MINUTES", DEFAULT_IDLE_THRESHOLD_MINUTES)
+    )
+    offline = int(
+        os.environ.get(
+            "LODESTAR_AGENT_OFFLINE_THRESHOLD_MINUTES", DEFAULT_OFFLINE_THRESHOLD_MINUTES
+        )
+    )
+    return idle, offline
 
 
 def generate_agent_id() -> str:
@@ -56,6 +90,28 @@ class Agent(BaseModel):
         default_factory=dict,
         description="Session metadata (tool name, model, etc.)",
     )
+
+    def get_status(self, now: datetime | None = None) -> AgentStatus:
+        """Calculate agent status based on last activity.
+
+        Args:
+            now: Current time for comparison. Uses UTC now if not provided.
+
+        Returns:
+            AgentStatus based on time since last_seen_at.
+        """
+        if now is None:
+            now = datetime.utcnow()
+
+        idle_threshold, offline_threshold = get_agent_thresholds()
+        time_since_seen = now - self.last_seen_at
+
+        if time_since_seen < timedelta(minutes=idle_threshold):
+            return AgentStatus.ACTIVE
+        elif time_since_seen < timedelta(minutes=offline_threshold):
+            return AgentStatus.IDLE
+        else:
+            return AgentStatus.OFFLINE
 
 
 class Lease(BaseModel):

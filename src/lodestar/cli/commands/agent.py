@@ -10,7 +10,7 @@ from lodestar.models.envelope import (
     NEXT_ACTION_TASK_NEXT,
     Envelope,
 )
-from lodestar.models.runtime import Agent
+from lodestar.models.runtime import Agent, AgentStatus
 from lodestar.runtime.database import RuntimeDatabase
 from lodestar.spec.loader import SpecNotFoundError, load_spec
 from lodestar.util.output import console, print_json
@@ -20,6 +20,16 @@ app = typer.Typer(
     help="Agent identity and management commands.",
     no_args_is_help=False,
 )
+
+
+def _get_status_style(status: AgentStatus) -> str:
+    """Get Rich style for agent status."""
+    styles = {
+        AgentStatus.ACTIVE: "green",
+        AgentStatus.IDLE: "yellow",
+        AgentStatus.OFFLINE: "dim",
+    }
+    return styles.get(status, "white")
 
 
 @app.callback(invoke_without_command=True)
@@ -219,6 +229,7 @@ def agent_list(
                 "agent_id": a.agent_id,
                 "display_name": a.display_name,
                 "role": a.role,
+                "status": a.get_status().value,
                 "capabilities": a.capabilities,
                 "last_seen_at": a.last_seen_at.isoformat(),
                 "session_meta": a.session_meta,
@@ -239,8 +250,11 @@ def agent_list(
             console.print(f"[bold]Agents ({len(agents)})[/bold]")
             console.print()
             for agent in agents:
+                status = agent.get_status()
+                status_style = _get_status_style(status)
                 name_part = f" ({agent.display_name})" if agent.display_name else ""
-                console.print(f"  [agent_id]{agent.agent_id}[/agent_id]{name_part}")
+                status_badge = f"[{status_style}]{status.value}[/{status_style}]"
+                console.print(f"  [agent_id]{agent.agent_id}[/agent_id]{name_part} {status_badge}")
                 if agent.role:
                     console.print(f"    Role: {agent.role}")
                 if agent.capabilities:
@@ -330,6 +344,7 @@ def agent_find(
                 "agent_id": a.agent_id,
                 "display_name": a.display_name,
                 "role": a.role,
+                "status": a.get_status().value,
                 "capabilities": a.capabilities,
                 "last_seen_at": a.last_seen_at.isoformat(),
             }
@@ -348,8 +363,11 @@ def agent_find(
             console.print(f"[bold]Agents with {search_type} '{search_term}' ({len(agents)})[/bold]")
             console.print()
             for agent in agents:
+                status = agent.get_status()
+                status_style = _get_status_style(status)
                 name_part = f" ({agent.display_name})" if agent.display_name else ""
-                console.print(f"  [agent_id]{agent.agent_id}[/agent_id]{name_part}")
+                status_badge = f"[{status_style}]{status.value}[/{status_style}]"
+                console.print(f"  [agent_id]{agent.agent_id}[/agent_id]{name_part} {status_badge}")
                 if agent.role:
                     console.print(f"    Role: {agent.role}")
                 if agent.capabilities:

@@ -5,6 +5,28 @@ Commands for managing agent registration and identity.
 !!! tip "Quick Start"
     Run `lodestar agent` without a subcommand to see the typical workflow and available commands.
 
+## Agent Availability Status
+
+Agents are automatically assigned an availability status based on their last activity (heartbeat):
+
+| Status | Color | Description |
+|--------|-------|-------------|
+| `active` | Green | Agent was active within the idle threshold (default: 15 minutes) |
+| `idle` | Yellow | Agent has been inactive beyond the idle threshold but within the offline threshold |
+| `offline` | Gray | Agent has been inactive beyond the offline threshold (default: 60 minutes) |
+
+### Configuring Thresholds
+
+You can customize the status thresholds via environment variables:
+
+```bash
+# Set idle threshold to 30 minutes (default: 15)
+export LODESTAR_AGENT_IDLE_THRESHOLD_MINUTES=30
+
+# Set offline threshold to 2 hours (default: 60)
+export LODESTAR_AGENT_OFFLINE_THRESHOLD_MINUTES=120
+```
+
 ## agent join
 
 Register as an agent and get your identity.
@@ -86,14 +108,48 @@ lodestar agent list [OPTIONS]
 $ lodestar agent list
 Agents (2)
 
-  A1234ABCD (Dev Agent)
+  A1234ABCD (Dev Agent) active
     Role: backend
     Capabilities: python, testing
     Last seen: 2024-01-15T10:30:00
-  A5678EFGH (Review Agent)
+  A5678EFGH (Review Agent) offline
     Role: code-review
     Capabilities: security, performance
     Last seen: 2024-01-15T09:00:00
+```
+
+### JSON Output
+
+```bash
+$ lodestar agent list --json
+{
+  "ok": true,
+  "data": {
+    "agents": [
+      {
+        "agent_id": "A1234ABCD",
+        "display_name": "Dev Agent",
+        "role": "backend",
+        "status": "active",
+        "capabilities": ["python", "testing"],
+        "last_seen_at": "2024-01-15T10:30:00",
+        "session_meta": {}
+      },
+      {
+        "agent_id": "A5678EFGH",
+        "display_name": "Review Agent",
+        "role": "code-review",
+        "status": "offline",
+        "capabilities": ["security", "performance"],
+        "last_seen_at": "2024-01-15T09:00:00",
+        "session_meta": {}
+      }
+    ],
+    "count": 2
+  },
+  "next": [],
+  "warnings": []
+}
 ```
 
 ---
@@ -124,11 +180,11 @@ Search for agents that have specific capabilities or roles. Use this to discover
 $ lodestar agent find --capability python
 Agents with capability 'python' (2)
 
-  A1234ABCD (Dev Agent)
+  A1234ABCD (Dev Agent) active
     Role: backend
     Capabilities: python, testing
     Last seen: 2024-01-15T10:30:00
-  A9999WXYZ (Full Stack Dev)
+  A9999WXYZ (Full Stack Dev) idle
     Role: fullstack
     Capabilities: python, javascript, sql
     Last seen: 2024-01-15T10:25:00
@@ -137,7 +193,7 @@ Agents with capability 'python' (2)
 $ lodestar agent find --role code-review
 Agents with role 'code-review' (1)
 
-  A5678EFGH (Review Agent)
+  A5678EFGH (Review Agent) offline
     Role: code-review
     Capabilities: security, performance
     Last seen: 2024-01-15T09:00:00
@@ -159,6 +215,7 @@ $ lodestar agent find --capability python --json
         "agent_id": "A1234ABCD",
         "display_name": "Dev Agent",
         "role": "backend",
+        "status": "active",
         "capabilities": ["python", "testing"],
         "last_seen_at": "2024-01-15T10:30:00"
       }
