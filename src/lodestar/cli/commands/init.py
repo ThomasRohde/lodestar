@@ -178,82 +178,42 @@ def _agents_md_content(project_name: str) -> str:
 
 This repository uses [Lodestar](https://github.com/lodestar-cli/lodestar) for multi-agent coordination.
 
-## Session Start (Do This First)
+The CLI is self-documenting. Run these commands to see workflows:
 
 ```bash
-# 1. Check repository health
-lodestar doctor
-
-# 2. Register and save your agent ID
-lodestar agent join --name "Your Name"
-# Output: Registered as agent A1234ABCD  <-- SAVE THIS ID
-
-# 3. Find available work
-lodestar task next
+lodestar agent     # Agent registration workflow
+lodestar task      # Task management workflow
+lodestar msg       # Messaging workflow
 ```
 
-## Working on a Task
+## Quick Start
 
 ```bash
-# Claim BEFORE starting (--agent is required)
-lodestar task claim <task-id> --agent <your-agent-id>
-
-# If work takes > 10 minutes, renew your lease
-lodestar task renew <task-id>
-
-# When done
-lodestar task done <task-id>
-lodestar task verify <task-id>
+lodestar doctor                        # Check repository health
+lodestar agent join --name "Your Name" # Register, SAVE the agent ID
+lodestar task next                     # Find available work
 ```
 
-## If You Get Blocked
+## Essential Workflow
 
 ```bash
-# Release the task
-lodestar task release <task-id>
+# Claim before working (--agent is required)
+lodestar task claim <id> --agent <your-agent-id>
 
-# Leave context for the next agent (--from and --to are required)
-lodestar msg send --to task:<task-id> --from <your-agent-id> --text "Blocked: reason here"
+# Renew if work takes > 10 min
+lodestar task renew <id> --agent <your-agent-id>
+
+# Complete
+lodestar task done <id>
+lodestar task verify <id>
 ```
 
-## Creating Tasks
+## Get Help
 
 ```bash
-# Create with good descriptions and dependencies
-lodestar task create \\
-    --id "F001" \\
-    --title "Short, clear title" \\
-    --description "What needs to be done, acceptance criteria, relevant files" \\
-    --priority 1 \\
-    --label feature \\
-    --depends-on "F000"  # Task that must be verified first
+lodestar task claim --help    # See all options
+lodestar task claim --explain # Understand what it does
 ```
-
-## Command Reference
-
-| Action | Command |
-|--------|---------|
-| Check health | `lodestar doctor` |
-| View status | `lodestar status` |
-| List all tasks | `lodestar task list` |
-| Find claimable work | `lodestar task next` |
-| View task details | `lodestar task show <id>` |
-| Claim task | `lodestar task claim <id> --agent <agent-id>` |
-| Extend lease | `lodestar task renew <id>` |
-| Release task | `lodestar task release <id>` |
-| Mark complete | `lodestar task done <id>` |
-| Verify complete | `lodestar task verify <id>` |
-| Send message | `lodestar msg send --to task:<id> --from <agent-id> --text "..."` |
-| Read task thread | `lodestar msg thread <task-id>` |
-| Check inbox | `lodestar msg inbox --agent <agent-id>` |
-
-## Rules
-
-1. **Always claim before working** - Prevents duplicate work
-2. **Renew leases proactively** - Default is 15 minutes
-3. **Leave context when releasing** - Help the next agent
-4. **Verify after done** - Unblocks dependent tasks
-5. **Don't edit spec.yaml directly** - Use `lodestar task create/update`
 
 ## Files
 

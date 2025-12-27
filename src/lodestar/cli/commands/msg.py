@@ -30,10 +30,14 @@ def msg_callback(ctx: typer.Context) -> None:
         console.print("[bold]Message Commands[/bold]")
         console.print()
         console.print("[info]Sending messages:[/info]")
-        console.print("  [command]lodestar msg send --to task:<id> --from <agent-id> --text '...'[/command]")
+        console.print(
+            "  [command]lodestar msg send --to task:<id> --from <agent-id> --text '...'[/command]"
+        )
         console.print("      Leave context on a task thread (for handoffs)")
         console.print()
-        console.print("  [command]lodestar msg send --to agent:<id> --from <agent-id> --text '...'[/command]")
+        console.print(
+            "  [command]lodestar msg send --to agent:<id> --from <agent-id> --text '...'[/command]"
+        )
         console.print("      Send a direct message to another agent")
         console.print()
         console.print("[info]Reading messages:[/info]")
