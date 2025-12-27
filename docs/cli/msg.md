@@ -4,61 +4,68 @@ Commands for inter-agent messaging.
 
 ## msg send
 
-Send a message to another agent or broadcast.
+Send a message to an agent or task thread.
 
 ```bash
-lodestar msg send TO [OPTIONS]
+lodestar msg send [OPTIONS]
 ```
-
-### Arguments
-
-| Argument | Description |
-|----------|-------------|
-| `TO` | Recipient agent ID or "all" for broadcast |
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--from TEXT` | Sender agent ID (required) |
-| `--body TEXT` | Message body (required) |
-| `--thread TEXT` | Thread ID (for replies) |
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--to TEXT` | `-t` | Recipient: 'agent:A123' or 'task:T001' (required) |
+| `--text TEXT` | `-m` | Message text (required) |
+| `--from TEXT` | `-f` | Your agent ID (required) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
 
-### Example
+### Example: Message to an Agent
 
 ```bash
-$ lodestar msg send A5678EFGH \
+$ lodestar msg send \
+    --to agent:A5678EFGH \
     --from A1234ABCD \
-    --body "F002 is ready for review"
-Sent message M1234
+    --text "F002 is ready for review"
+Sent message M1234567
 ```
+
+### Example: Message to a Task Thread
+
+```bash
+$ lodestar msg send \
+    --to task:F002 \
+    --from A1234ABCD \
+    --text "Started work on password reset flow"
+Sent message M1234568
+```
+
+Task threads are useful for leaving context about your work for other agents who may pick up the task later.
 
 ---
 
 ## msg inbox
 
-View messages for an agent.
+Read messages from your inbox.
 
 ```bash
-lodestar msg inbox AGENT_ID [OPTIONS]
+lodestar msg inbox [OPTIONS]
 ```
-
-### Arguments
-
-| Argument | Description |
-|----------|-------------|
-| `AGENT_ID` | Agent ID to check inbox for |
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--unread` | Show only unread messages |
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--agent TEXT` | `-a` | Your agent ID (required) |
+| `--since TEXT` | `-s` | Cursor (ISO timestamp) to fetch messages after |
+| `--limit INTEGER` | `-n` | Maximum messages to return (default: 50) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
 
 ### Example
 
 ```bash
-$ lodestar msg inbox A1234ABCD
+$ lodestar msg inbox --agent A1234ABCD
 Messages (2)
 
   From: A5678EFGH  2m ago
@@ -68,34 +75,92 @@ Messages (2)
   F001 is now verified
 ```
 
+### Pagination
+
+Use `--since` to fetch messages after a certain point (useful for polling):
+
+```bash
+$ lodestar msg inbox --agent A1234ABCD --since 2024-01-15T10:00:00Z
+```
+
 ---
 
 ## msg thread
 
-View a message thread.
+Read messages in a task thread.
 
 ```bash
-lodestar msg thread THREAD_ID [OPTIONS]
+lodestar msg thread TASK_ID [OPTIONS]
 ```
+
+View the conversation history for a specific task. Useful for understanding context and previous work.
 
 ### Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `THREAD_ID` | Thread ID to view |
+| `TASK_ID` | Task ID to view thread for (required) |
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--since TEXT` | `-s` | Cursor (ISO timestamp) to fetch messages after |
+| `--limit INTEGER` | `-n` | Maximum messages to return (default: 50) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
 
 ### Example
 
 ```bash
-$ lodestar msg thread T1234
-Thread T1234 (3 messages)
+$ lodestar msg thread F002
+Thread for F002 (3 messages)
 
   A1234ABCD  10m ago
-  Starting work on F002
+  Starting work on password reset
 
   A5678EFGH  5m ago
-  Let me know if you need the auth context
+  Auth tokens are in src/auth/tokens.py
 
   A1234ABCD  2m ago
-  Thanks, got it working
+  Thanks, found it. Implementation complete.
+```
+
+## Messaging Patterns
+
+### Handoff Messages
+
+When releasing a task, leave context for the next agent:
+
+```bash
+# Release the task
+lodestar task release F002
+
+# Leave context in the thread
+lodestar msg send \
+    --to task:F002 \
+    --from A1234ABCD \
+    --text "Blocked on API credentials. Need access to email service."
+```
+
+### Status Updates
+
+Keep other agents informed of progress:
+
+```bash
+lodestar msg send \
+    --to task:F002 \
+    --from A1234ABCD \
+    --text "50% complete. Token generation done, working on email templates."
+```
+
+### Direct Questions
+
+Ask specific agents for help:
+
+```bash
+lodestar msg send \
+    --to agent:A5678EFGH \
+    --from A1234ABCD \
+    --text "What email library should I use for F002?"
 ```

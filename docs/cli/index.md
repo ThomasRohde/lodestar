@@ -9,7 +9,6 @@ All commands support these flags:
 | Flag | Description |
 |------|-------------|
 | `--json` | Output in JSON format (for programmatic use) |
-| `--schema` | Show JSON schema for command output |
 | `--explain` | Show detailed explanation of what command does |
 | `--help` | Show help message |
 
@@ -17,70 +16,104 @@ All commands support these flags:
 
 ### [Agent Commands](agent.md)
 
-Manage agent registration and status.
+Manage agent registration and identity.
 
-```bash
-lodestar agent join       # Register as an agent
-lodestar agent list       # List all agents
-lodestar agent heartbeat  # Update agent heartbeat
-lodestar agent brief      # Get agent status brief
-```
+| Command | Description |
+|---------|-------------|
+| `agent join` | Register as an agent and get your identity |
+| `agent list` | List all registered agents |
+| `agent heartbeat` | Update agent heartbeat timestamp |
+| `agent brief` | Get a concise brief for spawning a sub-agent |
 
 ### [Task Commands](task.md)
 
 Create, claim, and complete tasks.
 
-```bash
-lodestar task list        # List all tasks
-lodestar task show        # Show task details
-lodestar task create      # Create a new task
-lodestar task update      # Update a task
-lodestar task next        # Find claimable tasks
-lodestar task claim       # Claim a task
-lodestar task renew       # Renew a lease
-lodestar task release     # Release a lease
-lodestar task done        # Mark task done
-lodestar task verify      # Mark task verified
-lodestar task graph       # Export dependency graph
-```
+| Command | Description |
+|---------|-------------|
+| `task list` | List all tasks with optional filtering |
+| `task show` | Show detailed information about a task |
+| `task create` | Create a new task |
+| `task update` | Update an existing task's properties |
+| `task next` | Get the next claimable task(s) |
+| `task claim` | Claim a task with a lease |
+| `task renew` | Renew your claim on a task |
+| `task release` | Release your claim on a task |
+| `task done` | Mark a task as done |
+| `task verify` | Mark a task as verified |
+| `task graph` | Export the task dependency graph |
 
 ### [Message Commands](msg.md)
 
 Inter-agent messaging.
 
-```bash
-lodestar msg send         # Send a message
-lodestar msg inbox        # View inbox
-lodestar msg thread       # View message thread
-```
+| Command | Description |
+|---------|-------------|
+| `msg send` | Send a message to an agent or task thread |
+| `msg inbox` | Read messages from your inbox |
+| `msg thread` | Read messages in a task thread |
 
 ### [Other Commands](other.md)
 
 Repository management and utilities.
 
-```bash
-lodestar init             # Initialize repository
-lodestar status           # Show repository status
-lodestar doctor           # Run health checks
-lodestar export snapshot  # Export full state
-```
+| Command | Description |
+|---------|-------------|
+| `init` | Initialize a new Lodestar repository |
+| `status` | Show repository status and suggested next actions |
+| `doctor` | Check repository health and diagnose issues |
+| `export snapshot` | Export a complete snapshot of spec and runtime state |
 
 ## JSON Output
 
-All commands support `--json` for programmatic access:
+All commands support `--json` for programmatic access. Output follows this envelope:
 
-```bash
-$ lodestar status --json
+```json
 {
   "ok": true,
-  "data": {
-    "branch": "main",
-    "tasks": {"ready": 5, "done": 2, "verified": 10},
-    "agents": {"count": 2, "active_claims": 1}
-  },
+  "data": { },
   "next": [
     {"intent": "task.next", "cmd": "lodestar task next"}
   ],
   "warnings": []
 }
+```
+
+| Field | Description |
+|-------|-------------|
+| `ok` | Whether the command succeeded |
+| `data` | Command-specific output data |
+| `next` | Suggested next actions with commands |
+| `warnings` | Non-fatal issues or notices |
+
+## Quick Reference
+
+```bash
+# Repository setup
+lodestar init                       # Initialize repository
+lodestar status                     # View status and next actions
+lodestar doctor                     # Check health
+
+# Agent registration
+lodestar agent join                 # Register as agent
+lodestar agent list                 # List all agents
+
+# Finding work
+lodestar task list                  # List all tasks
+lodestar task next                  # Find claimable tasks
+lodestar task show <id>             # View task details
+
+# Working on tasks
+lodestar task claim <id> -a <agent> # Claim a task
+lodestar task renew <id>            # Extend lease
+lodestar task release <id>          # Release without completing
+
+# Completing tasks
+lodestar task done <id>             # Mark as done
+lodestar task verify <id>           # Mark as verified
+
+# Messaging
+lodestar msg send -t <to> -f <from> -m "text"  # Send message
+lodestar msg inbox -a <agent>                   # Check inbox
+lodestar msg thread <task-id>                   # View task thread
 ```
