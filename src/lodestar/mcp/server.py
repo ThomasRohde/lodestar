@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
+from lodestar.mcp.utils import find_repo_root, validate_repo_root
 from lodestar.runtime.database import RuntimeDatabase
 from lodestar.spec.loader import load_spec
-from lodestar.util.paths import find_lodestar_root, get_runtime_db_path
+from lodestar.util.paths import get_runtime_db_path
 
 logger = logging.getLogger("lodestar.mcp")
 
@@ -59,7 +60,7 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
 
     # Resolve repository root
     if repo_root is None:
-        repo_root = find_lodestar_root()
+        repo_root = find_repo_root()
         if repo_root is None:
             raise FileNotFoundError(
                 "Could not find Lodestar repository. "
@@ -67,8 +68,9 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
             )
     else:
         # Verify the provided path is a valid Lodestar repository
-        if not (repo_root / ".lodestar" / "spec.yaml").exists():
-            raise ValueError(f"Not a valid Lodestar repository: {repo_root}")
+        is_valid, error_msg = validate_repo_root(repo_root)
+        if not is_valid:
+            raise ValueError(error_msg)
 
     # Initialize context
     context = LodestarContext(repo_root)
