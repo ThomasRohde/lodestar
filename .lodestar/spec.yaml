@@ -2293,9 +2293,9 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:06:00.336794+00:00'
-    updated_at: '2025-12-28T13:06:00.336797+00:00'
+    updated_at: '2025-12-28T15:56:15.385208+00:00'
   MCP-032:
     title: Implement lodestar.task.done tool
     description: 'Add to mcp/tools/task_mutations.py. Implement lodestar.task.done:
