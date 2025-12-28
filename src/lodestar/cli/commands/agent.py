@@ -378,7 +378,7 @@ def agent_find(
 
 @app.command(name="heartbeat")
 def agent_heartbeat(
-    agent_id: str = typer.Argument(..., help="Agent ID to update."),
+    agent_id: str | None = typer.Argument(None, help="Agent ID to update."),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -394,6 +394,10 @@ def agent_heartbeat(
     if explain:
         _show_explain_heartbeat(json_output)
         return
+
+    if agent_id is None:
+        console.print("[error]Missing argument 'AGENT_ID'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:

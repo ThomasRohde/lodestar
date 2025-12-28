@@ -497,7 +497,7 @@ def _show_explain_context(json_output: bool) -> None:
 
 @app.command(name="create")
 def task_create(
-    title: str = typer.Option(..., "--title", "-t", help="Task title."),
+    title: str | None = typer.Option(None, "--title", "-t", help="Task title."),
     task_id: str | None = typer.Option(
         None,
         "--id",
@@ -561,6 +561,10 @@ def task_create(
     if explain:
         _show_explain_create(json_output)
         return
+
+    if title is None:
+        console.print("[error]Missing option '--title'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
@@ -678,7 +682,7 @@ def task_create(
 
 @app.command(name="update")
 def task_update(
-    task_id: str = typer.Argument(..., help="Task ID to update."),
+    task_id: str | None = typer.Argument(None, help="Task ID to update."),
     title: str | None = typer.Option(None, "--title", "-t", help="New task title."),
     description: str | None = typer.Option(None, "--description", "-d", help="New description."),
     priority: int | None = typer.Option(None, "--priority", "-p", help="New priority."),
@@ -692,6 +696,10 @@ def task_update(
     if explain:
         _show_explain_update(json_output)
         return
+
+    if task_id is None:
+        console.print("[error]Missing argument 'TASK_ID'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
@@ -1088,9 +1096,9 @@ def task_claim(
 
 @app.command(name="renew")
 def task_renew(
-    task_id: str = typer.Argument(..., help="Task ID to renew."),
-    agent_id: str = typer.Option(
-        ...,
+    task_id: str | None = typer.Argument(None, help="Task ID to renew."),
+    agent_id: str | None = typer.Option(
+        None,
         "--agent",
         "-a",
         help="Your agent ID (REQUIRED). Same ID used when claiming.",
@@ -1118,6 +1126,14 @@ def task_renew(
     if explain:
         _show_explain_renew(json_output)
         return
+
+    if task_id is None:
+        console.print("[error]Missing argument 'TASK_ID'[/error]")
+        raise typer.Exit(1)
+
+    if agent_id is None:
+        console.print("[error]Missing option '--agent'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
@@ -1185,7 +1201,7 @@ def task_renew(
 
 @app.command(name="release")
 def task_release(
-    task_id: str = typer.Argument(..., help="Task ID to release."),
+    task_id: str | None = typer.Argument(None, help="Task ID to release."),
     agent_id: str | None = typer.Option(
         None,
         "--agent",
@@ -1218,6 +1234,10 @@ def task_release(
     if explain:
         _show_explain_release(json_output)
         return
+
+    if task_id is None:
+        console.print("[error]Missing argument 'TASK_ID'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
@@ -1257,7 +1277,7 @@ def task_release(
 
 @app.command(name="done")
 def task_done(
-    task_id: str = typer.Argument(..., help="Task ID to mark as done."),
+    task_id: str | None = typer.Argument(None, help="Task ID to mark as done."),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -1273,6 +1293,10 @@ def task_done(
     if explain:
         _show_explain_done(json_output)
         return
+
+    if task_id is None:
+        console.print("[error]Missing argument 'TASK_ID'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
@@ -1312,7 +1336,7 @@ def task_done(
 
 @app.command(name="verify")
 def task_verify(
-    task_id: str = typer.Argument(..., help="Task ID to verify."),
+    task_id: str | None = typer.Argument(None, help="Task ID to verify."),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -1328,6 +1352,10 @@ def task_verify(
     if explain:
         _show_explain_verify(json_output)
         return
+
+    if task_id is None:
+        console.print("[error]Missing argument 'TASK_ID'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
@@ -1394,7 +1422,7 @@ def task_verify(
 
 @app.command(name="delete")
 def task_delete(
-    task_id: str = typer.Argument(..., help="Task ID to delete."),
+    task_id: str | None = typer.Argument(None, help="Task ID to delete."),
     cascade: bool = typer.Option(
         False,
         "--cascade",
@@ -1427,6 +1455,10 @@ def task_delete(
     if explain:
         _show_explain_delete(json_output)
         return
+
+    if task_id is None:
+        console.print("[error]Missing argument 'TASK_ID'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
