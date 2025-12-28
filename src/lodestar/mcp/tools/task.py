@@ -9,7 +9,7 @@ from lodestar.mcp.output import error, format_summary, with_item, with_list
 from lodestar.mcp.server import LodestarContext
 from lodestar.mcp.validation import ValidationError, clamp_limit, validate_task_id
 from lodestar.models.spec import TaskStatus
-from lodestar.util.prd import check_prd_drift
+from lodestar.util.prd import check_prd_drift, extract_prd_section, truncate_to_budget
 
 
 def task_list(
@@ -395,6 +395,169 @@ def task_next(
     return with_item(summary, item=response_data)
 
 
+def task_context(
+    context: LodestarContext,
+    task_id: str,
+    max_chars: int | None = None,
+) -> CallToolResult:
+    """
+    Get PRD context for a task.
+
+    Returns the task's PRD references, frozen excerpt, and live PRD sections
+    (if available). Includes drift detection to warn if the PRD has changed
+    since task creation.
+
+    Args:
+        context: Lodestar server context
+        task_id: Task ID to get context for (required)
+        max_chars: Maximum characters for context output (default 1000)
+
+    Returns:
+        CallToolResult with PRD context bundle and drift warnings
+    """
+    # Validate task ID
+    try:
+        validated_task_id = validate_task_id(task_id)
+    except ValidationError as e:
+        return error(str(e), error_code="INVALID_TASK_ID")
+
+    # Reload spec to get latest state
+    context.reload_spec()
+
+    # Get task from spec
+    task = context.spec.get_task(validated_task_id)
+    if task is None:
+        return error(
+            f"Task {validated_task_id} not found",
+            error_code="TASK_NOT_FOUND",
+            details={"task_id": validated_task_id},
+        )
+
+    # Validate and set default for max_chars
+    if max_chars is None:
+        max_chars = 1000
+    elif max_chars <= 0:
+        raise ValidationError("max_chars must be positive", field="max_chars")
+
+    # Build context bundle
+    context_bundle: dict = {
+        "taskId": task.id,
+        "title": task.title,
+        "description": task.description,
+    }
+
+    warnings = []
+    prd_sections = []
+
+    if task.prd:
+        # Add PRD metadata
+        context_bundle["prdSource"] = task.prd.source
+        context_bundle["prdRefs"] = [
+            {
+                "anchor": ref.anchor,
+                "lines": ref.lines,
+            }
+            for ref in task.prd.refs
+        ]
+
+        # Include frozen excerpt if available
+        if task.prd.excerpt:
+            context_bundle["prdExcerpt"] = task.prd.excerpt
+
+        # Check for PRD drift
+        drift_info = {
+            "changed": False,
+            "details": None,
+        }
+
+        if task.prd.prd_hash:
+            prd_path = context.repo_root / task.prd.source
+            if prd_path.exists():
+                try:
+                    if check_prd_drift(task.prd.prd_hash, prd_path):
+                        drift_info["changed"] = True
+                        drift_info["details"] = (
+                            f"PRD has changed since task creation. "
+                            f"Review {task.prd.source} for updates."
+                        )
+                        warnings.append(
+                            {
+                                "type": "PRD_DRIFT_DETECTED",
+                                "message": drift_info["details"],
+                                "severity": "info",
+                            }
+                        )
+                except Exception:
+                    pass  # Ignore hash check errors
+
+        context_bundle["drift"] = drift_info
+
+        # Try to extract live PRD sections
+        prd_path = context.repo_root / task.prd.source
+        if prd_path.exists():
+            for ref in task.prd.refs:
+                try:
+                    lines_tuple: tuple[int, int] | None = None
+                    if ref.lines and len(ref.lines) == 2:
+                        lines_tuple = (ref.lines[0], ref.lines[1])
+                    section = extract_prd_section(
+                        prd_path,
+                        anchor=ref.anchor,
+                        lines=lines_tuple,
+                    )
+                    prd_sections.append(
+                        {
+                            "anchor": ref.anchor,
+                            "content": section,
+                        }
+                    )
+                except (ValueError, FileNotFoundError):
+                    pass  # Section not found
+        else:
+            warnings.append(
+                {
+                    "type": "MISSING_PRD_SOURCE",
+                    "message": f"PRD source file not found: {task.prd.source}",
+                    "severity": "warning",
+                }
+            )
+
+    else:
+        # No PRD context available
+        context_bundle["prdSource"] = None
+        context_bundle["prdRefs"] = []
+        context_bundle["prdExcerpt"] = None
+        context_bundle["drift"] = None
+
+    if prd_sections:
+        context_bundle["prdSections"] = prd_sections
+
+    # Build combined content and truncate to budget
+    total_content = task.description or ""
+    if task.prd and task.prd.excerpt:
+        total_content += "\n" + task.prd.excerpt
+    for sec in prd_sections:
+        total_content += "\n" + sec["content"]
+
+    truncated_content = truncate_to_budget(total_content, max_chars)
+    context_bundle["content"] = truncated_content
+    context_bundle["truncated"] = len(total_content) > max_chars
+
+    # Add warnings to bundle
+    context_bundle["warnings"] = warnings
+
+    # Build summary
+    has_prd = task.prd is not None
+    prd_status = "with PRD context" if has_prd else "no PRD context"
+    summary = format_summary(
+        "Context",
+        task.id,
+        f"- {prd_status}",
+    )
+
+    return with_item(summary, item=context_bundle)
+
+
 def register_task_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register task management tools with the FastMCP server.
@@ -474,3 +637,32 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
             and total number of claimable tasks available
         """
         return task_next(context=context, agent_id=agent_id, limit=limit)
+
+    @mcp.tool(name="lodestar.task.context")
+    def context_tool(
+        task_id: str,
+        max_chars: int | None = None,
+    ) -> CallToolResult:
+        """Get PRD context for a task.
+
+        Returns the task's PRD references, frozen excerpt, and live PRD sections
+        (if available). This delivers "just enough PRD context" for understanding
+        what needs to be done.
+
+        Includes drift detection to warn if the PRD file has changed since the
+        task was created.
+
+        Args:
+            task_id: Task ID to get context for (required)
+            max_chars: Maximum characters for context output (default 1000)
+
+        Returns:
+            Context bundle with:
+            - Task metadata (taskId, title, description)
+            - PRD information (prdSource, prdRefs, prdExcerpt)
+            - Live PRD sections extracted from the source file
+            - Drift detection (changed flag and details)
+            - Combined content truncated to max_chars
+            - Warnings (PRD drift, missing source file)
+        """
+        return task_context(context=context, task_id=task_id, max_chars=max_chars)
