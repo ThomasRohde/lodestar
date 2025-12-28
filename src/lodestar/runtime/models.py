@@ -118,9 +118,12 @@ class EventModel(Base):
     event_type: Mapped[str] = mapped_column(String, nullable=False)
     agent_id: Mapped[str | None] = mapped_column(String, nullable=True)
     task_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    target_agent_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    correlation_id: Mapped[str | None] = mapped_column(String, nullable=True)
     data: Mapped[dict[str, Any]] = mapped_column(JSONField, default=dict)
 
     __table_args__ = (
         Index("idx_events_created", "created_at"),
         Index("idx_events_type", "event_type"),
+        Index("idx_events_correlation", "correlation_id"),
     )
