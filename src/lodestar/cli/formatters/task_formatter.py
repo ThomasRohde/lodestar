@@ -243,7 +243,7 @@ def format_next_tasks(
         console.print()
 
 
-def format_graph_dot(nodes: list[dict], edges: list[dict]) -> str:
+def format_graph_dot(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> str:
     """Format dependency graph as Graphviz DOT.
 
     Args:
@@ -265,8 +265,8 @@ def format_graph_dot(nodes: list[dict], edges: list[dict]) -> str:
 
 
 def format_graph(
-    nodes: list[dict],
-    edges: list[dict],
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
     output_format: str = "json",
     json_output: bool = False,
 ) -> None:
@@ -296,7 +296,7 @@ def format_graph(
 
 
 def format_deleted_tasks(
-    deleted_tasks: list[dict],
+    deleted_tasks: list[dict[str, Any]],
     json_output: bool = False,
 ) -> None:
     """Format deleted tasks output.

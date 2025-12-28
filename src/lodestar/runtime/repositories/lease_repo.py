@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
 
@@ -188,7 +188,7 @@ class LeaseRepository:
         event_type: str,
         agent_id: str | None,
         task_id: str | None,
-        data: dict,
+        data: dict[str, Any],
     ) -> None:
         """Log an event to the events table."""
         event = EventModel(
