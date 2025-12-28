@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import contextlib
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from mcp.types import CallToolResult
+
+if TYPE_CHECKING:
+    from mcp.server.session import ServerSession
 
 from lodestar.core.task_service import detect_lock_conflicts
 from lodestar.mcp.output import error, format_summary, with_item
@@ -15,12 +19,13 @@ from lodestar.models.runtime import Lease
 from lodestar.models.spec import TaskStatus
 
 
-def task_claim(
+async def task_claim(
     context: LodestarContext,
     task_id: str,
     agent_id: str,
     ttl_seconds: int | None = None,
     force: bool = False,
+    ctx: ServerSession | None = None,
 ) -> CallToolResult:
     """
     Claim a task with a time-limited lease.
@@ -38,10 +43,16 @@ def task_claim(
     Returns:
         CallToolResult with lease object on success or conflict details on failure
     """
+    # Log the claim attempt
+    if ctx:
+        await ctx.info(f"Claiming task {task_id} for agent {agent_id}")
+
     # Validate inputs
     try:
         validated_task_id = validate_task_id(task_id)
     except ValidationError as e:
+        if ctx:
+            await ctx.error(f"Invalid task ID: {task_id}")
         return error(str(e), error_code="INVALID_TASK_ID")
 
     if not agent_id or not agent_id.strip():
@@ -119,6 +130,11 @@ def task_claim(
             remaining = existing.expires_at - datetime.now(UTC)
             conflict_details["expires_in_seconds"] = int(remaining.total_seconds())
 
+        if ctx:
+            await ctx.warning(
+                f"Task {validated_task_id} already claimed by {existing.agent_id if existing else 'unknown'}"
+            )
+
         return error(
             f"Task {validated_task_id} already claimed by {existing.agent_id if existing else 'unknown'}",
             error_code="TASK_ALREADY_CLAIMED",
@@ -135,6 +151,12 @@ def task_claim(
                 "lease_id": created_lease.lease_id,
                 "ttl_seconds": ttl_seconds,
             },
+        )
+
+    # Log successful claim
+    if ctx:
+        await ctx.info(
+            f"Successfully claimed task {validated_task_id} (lease: {created_lease.lease_id}, expires in {ttl_seconds}s)"
         )
 
     # Build lease object for response
@@ -164,11 +186,12 @@ def task_claim(
     return with_item(summary, item=response_data)
 
 
-def task_release(
+async def task_release(
     context: LodestarContext,
     task_id: str,
     agent_id: str,
     reason: str | None = None,
+    ctx: ServerSession | None = None,
 ) -> CallToolResult:
     """
     Release a claim on a task before TTL expiry.
@@ -185,10 +208,17 @@ def task_release(
     Returns:
         CallToolResult with success status and previous lease details
     """
+    # Log the release attempt
+    if ctx:
+        reason_msg = f" (reason: {reason})" if reason else ""
+        await ctx.info(f"Releasing task {task_id} for agent {agent_id}{reason_msg}")
+
     # Validate inputs
     try:
         validated_task_id = validate_task_id(task_id)
     except ValidationError as e:
+        if ctx:
+            await ctx.error(f"Invalid task ID: {task_id}")
         return error(str(e), error_code="INVALID_TASK_ID")
 
     if not agent_id or not agent_id.strip():
@@ -224,11 +254,17 @@ def task_release(
 
     if not success:
         # This shouldn't happen since we checked for active lease above
+        if ctx:
+            await ctx.error(f"Failed to release lease for task {validated_task_id}")
         return error(
             f"Failed to release lease for task {validated_task_id}",
             error_code="RELEASE_FAILED",
             details={"task_id": validated_task_id, "agent_id": agent_id},
         )
+
+    # Log successful release
+    if ctx:
+        await ctx.info(f"Successfully released task {validated_task_id}")
 
     # Log event (task.release)
     event_data = {
@@ -273,11 +309,12 @@ def task_release(
     return with_item(summary, item=response_data)
 
 
-def task_done(
+async def task_done(
     context: LodestarContext,
     task_id: str,
     agent_id: str,
     note: str | None = None,
+    ctx: ServerSession | None = None,
 ) -> CallToolResult:
     """
     Mark a task as done (pending verification).
@@ -294,10 +331,17 @@ def task_done(
     Returns:
         CallToolResult with success status and warnings
     """
+    # Log the done marking attempt
+    if ctx:
+        note_msg = f" ({note})" if note else ""
+        await ctx.info(f"Marking task {task_id} as done by agent {agent_id}{note_msg}")
+
     # Validate inputs
     try:
         validated_task_id = validate_task_id(task_id)
     except ValidationError as e:
+        if ctx:
+            await ctx.error(f"Invalid task ID: {task_id}")
         return error(str(e), error_code="INVALID_TASK_ID")
 
     if not agent_id or not agent_id.strip():
@@ -357,6 +401,10 @@ def task_done(
     if active_lease:
         context.db.release_lease(validated_task_id, active_lease.agent_id)
 
+    # Log successful marking as done
+    if ctx:
+        await ctx.info(f"Successfully marked task {validated_task_id} as done")
+
     # Log event (task.done)
     event_data = {
         "agent_id": agent_id,
@@ -393,11 +441,12 @@ def task_done(
     return with_item(summary, item=response_data)
 
 
-def task_verify(
+async def task_verify(
     context: LodestarContext,
     task_id: str,
     agent_id: str,
     note: str | None = None,
+    ctx: ServerSession | None = None,
 ) -> CallToolResult:
     """
     Mark a task as verified (unblocks dependents).
@@ -414,10 +463,17 @@ def task_verify(
     Returns:
         CallToolResult with success status and list of newly unblocked task IDs
     """
+    # Log the verify attempt
+    if ctx:
+        note_msg = f" ({note})" if note else ""
+        await ctx.info(f"Verifying task {task_id} by agent {agent_id}{note_msg}")
+
     # Validate inputs
     try:
         validated_task_id = validate_task_id(task_id)
     except ValidationError as e:
+        if ctx:
+            await ctx.error(f"Invalid task ID: {task_id}")
         return error(str(e), error_code="INVALID_TASK_ID")
 
     if not agent_id or not agent_id.strip():
@@ -489,6 +545,15 @@ def task_verify(
     newly_unblocked = [t for t in new_claimable if validated_task_id in t.depends_on]
     newly_ready_ids = [t.id for t in newly_unblocked]
 
+    # Log successful verification
+    if ctx:
+        if newly_ready_ids:
+            await ctx.info(
+                f"Successfully verified task {validated_task_id}, unblocked {len(newly_ready_ids)} task(s): {', '.join(newly_ready_ids)}"
+            )
+        else:
+            await ctx.info(f"Successfully verified task {validated_task_id}")
+
     # Build summary
     summary = format_summary(
         "Verified",
@@ -521,11 +586,12 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
     """
 
     @mcp.tool(name="lodestar.task.claim")
-    def claim_tool(
+    async def claim_tool(
         task_id: str,
         agent_id: str,
         ttl_seconds: int | None = None,
         force: bool = False,
+        ctx: ServerSession | None = None,
     ) -> CallToolResult:
         """Claim a task with a time-limited lease.
 
@@ -548,19 +614,21 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             or error with conflict details if task is already claimed or not claimable.
             May include lock conflict warnings if task locks overlap with other active leases.
         """
-        return task_claim(
+        return await task_claim(
             context=context,
             task_id=task_id,
             agent_id=agent_id,
             ttl_seconds=ttl_seconds,
             force=force,
+            ctx=ctx,
         )
 
     @mcp.tool(name="lodestar.task.release")
-    def release_tool(
+    async def release_tool(
         task_id: str,
         agent_id: str,
         reason: str | None = None,
+        ctx: ServerSession | None = None,
     ) -> CallToolResult:
         """Release a claim on a task before TTL expiry.
 
@@ -580,18 +648,20 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             Success response with previous lease details (leaseId, taskId, agentId, expiresAt)
             or error if no active lease exists or agent_id doesn't match the lease holder.
         """
-        return task_release(
+        return await task_release(
             context=context,
             task_id=task_id,
             agent_id=agent_id,
             reason=reason,
+            ctx=ctx,
         )
 
     @mcp.tool(name="lodestar.task.done")
-    def done_tool(
+    async def done_tool(
         task_id: str,
         agent_id: str,
         note: str | None = None,
+        ctx: ServerSession | None = None,
     ) -> CallToolResult:
         """Mark a task as done (pending verification).
 
@@ -612,18 +682,20 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             - Task already done or verified
             - Task claimed by different agent (still marks as done)
         """
-        return task_done(
+        return await task_done(
             context=context,
             task_id=task_id,
             agent_id=agent_id,
             note=note,
+            ctx=ctx,
         )
 
     @mcp.tool(name="lodestar.task.verify")
-    def verify_tool(
+    async def verify_tool(
         task_id: str,
         agent_id: str,
         note: str | None = None,
+        ctx: ServerSession | None = None,
     ) -> CallToolResult:
         """Mark a task as verified (unblocks dependents).
 
@@ -643,9 +715,10 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             Returns error if task is not in 'done' status.
             Returns warning if task is already verified.
         """
-        return task_verify(
+        return await task_verify(
             context=context,
             task_id=task_id,
             agent_id=agent_id,
             note=note,
+            ctx=ctx,
         )
