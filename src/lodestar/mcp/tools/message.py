@@ -151,6 +151,132 @@ def message_send(
     return with_item(summary, item=response_data)
 
 
+def message_list(
+    context: LodestarContext,
+    agent_id: str,
+    unread_only: bool = True,
+    limit: int = 50,
+    since_id: str | None = None,
+) -> CallToolResult:
+    """
+    List messages for an agent.
+
+    Retrieves messages from an agent's inbox with optional filtering.
+    Supports pagination via cursor-based pagination using message IDs.
+
+    Args:
+        context: Lodestar server context
+        agent_id: Agent ID to retrieve messages for (required)
+        unread_only: If True, only return unread messages (default: True)
+        limit: Maximum number of messages to return (default: 50, max: 200)
+        since_id: Message ID cursor for incremental fetching (optional)
+
+    Returns:
+        CallToolResult with messages array and nextCursor for pagination
+    """
+    # Validate agent_id
+    if not agent_id or not agent_id.strip():
+        return error(
+            "agent_id is required and cannot be empty",
+            error_code="INVALID_AGENT_ID",
+        )
+
+    # Validate and constrain limit
+    if limit < 1:
+        return error(
+            "limit must be at least 1",
+            error_code="INVALID_LIMIT",
+            details={"limit": limit, "min": 1},
+        )
+
+    if limit > 200:
+        return error(
+            "limit exceeds maximum of 200",
+            error_code="LIMIT_TOO_LARGE",
+            details={"limit": limit, "max": 200},
+        )
+
+    # Fetch messages from database
+    # Note: We fetch limit + 1 to determine if there are more messages (for cursor)
+    messages = context.db._messages.get_inbox(
+        agent_id=agent_id,
+        unread_only=unread_only,
+        limit=limit + 1,
+    )
+
+    # Filter by since_id if provided (cursor-based pagination)
+    if since_id:
+        # Find the position of since_id in results and keep only messages after it
+        filtered_messages = []
+        found_cursor = False
+        for msg in messages:
+            if found_cursor:
+                filtered_messages.append(msg)
+            elif msg.message_id == since_id:
+                found_cursor = True
+        messages = filtered_messages
+
+    # Determine if there are more messages (for pagination)
+    has_more = len(messages) > limit
+    if has_more:
+        # Remove the extra message we fetched for pagination check
+        messages = messages[:limit]
+
+    # Determine next cursor
+    next_cursor = messages[-1].message_id if has_more and messages else None
+
+    # Format messages for response
+    formatted_messages = []
+    for msg in messages:
+        formatted_msg = {
+            "id": msg.message_id,
+            "createdAt": msg.created_at.isoformat(),
+            "from": msg.from_agent_id,
+            "to": msg.to_id,
+            "body": msg.text,
+        }
+
+        # Add optional fields if present
+        if msg.to_type == MessageType.TASK:
+            formatted_msg["taskId"] = msg.to_id
+
+        # Extract subject and severity from meta if present
+        if msg.meta:
+            if "subject" in msg.meta:
+                formatted_msg["subject"] = msg.meta["subject"]
+            if "severity" in msg.meta:
+                formatted_msg["severity"] = msg.meta["severity"]
+
+        # Add read status
+        if msg.read_at:
+            formatted_msg["readAt"] = msg.read_at.isoformat()
+
+        formatted_messages.append(formatted_msg)
+
+    # Build summary
+    count_str = f"{len(formatted_messages)} message{'s' if len(formatted_messages) != 1 else ''}"
+    filter_parts = []
+    if unread_only:
+        filter_parts.append("unread")
+    summary = format_summary(
+        "Listed",
+        count_str,
+        " ".join(filter_parts) if filter_parts else None,
+    )
+
+    # Build response
+    response_data = {
+        "ok": True,
+        "messages": formatted_messages,
+        "count": len(formatted_messages),
+    }
+
+    if next_cursor:
+        response_data["nextCursor"] = next_cursor
+
+    return with_item(summary, item=response_data)
+
+
 def register_message_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register message tools with the FastMCP server.
@@ -197,4 +323,38 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
             task_id=task_id,
             subject=subject,
             severity=severity,
+        )
+
+    @mcp.tool(name="lodestar.message.list")
+    def list_tool(
+        agent_id: str,
+        unread_only: bool = True,
+        limit: int = 50,
+        since_id: str | None = None,
+    ) -> CallToolResult:
+        """List messages for an agent.
+
+        Retrieves messages from an agent's inbox with optional filtering.
+        Supports cursor-based pagination using message IDs.
+
+        Args:
+            agent_id: Agent ID to retrieve messages for (required)
+            unread_only: If True, only return unread messages (default: True)
+            limit: Maximum number of messages to return (default: 50, max: 200)
+            since_id: Message ID cursor for incremental fetching - returns messages after this ID (optional)
+
+        Returns:
+            Success response with:
+            - messages: Array of message objects with fields (id, createdAt, from, to, body, taskId, subject, severity, readAt)
+            - count: Number of messages returned
+            - nextCursor: Message ID to use for next page (if more messages available)
+
+            Returns error if agent_id is missing or limit is invalid.
+        """
+        return message_list(
+            context=context,
+            agent_id=agent_id,
+            unread_only=unread_only,
+            limit=limit,
+            since_id=since_id,
         )
