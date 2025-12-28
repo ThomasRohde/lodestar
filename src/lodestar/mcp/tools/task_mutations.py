@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from mcp.types import CallToolResult
 
 if TYPE_CHECKING:
+    from mcp.server.fastmcp import Context
     from mcp.server.session import ServerSession
 
 from lodestar.core.task_service import detect_lock_conflicts
@@ -446,7 +447,7 @@ async def task_verify(
     task_id: str,
     agent_id: str,
     note: str | None = None,
-    ctx: ServerSession | None = None,
+    ctx: Context | ServerSession | None = None,
 ) -> CallToolResult:
     """
     Mark a task as verified (unblocks dependents).
@@ -454,11 +455,15 @@ async def task_verify(
     Verifies that the task is complete. This changes the status from 'done'
     to 'verified' and unblocks any dependent tasks that are waiting on this one.
 
+    If the client provides a progressToken in the request metadata, this operation
+    will emit progress notifications at key stages.
+
     Args:
         context: Lodestar server context
         task_id: Task ID to verify (required)
         agent_id: Agent ID verifying the task (required)
         note: Optional note about verification (for logging/audit)
+        ctx: Optional MCP context for logging and progress notifications
 
     Returns:
         CallToolResult with success status and list of newly unblocked task IDs
@@ -467,6 +472,10 @@ async def task_verify(
     if ctx:
         note_msg = f" ({note})" if note else ""
         await ctx.info(f"Verifying task {task_id} by agent {agent_id}{note_msg}")
+
+    # Report progress: validating inputs (10%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(10.0, 100.0, "Validating inputs...")
 
     # Validate inputs
     try:
@@ -482,8 +491,16 @@ async def task_verify(
             error_code="INVALID_AGENT_ID",
         )
 
+    # Report progress: reloading spec (25%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(25.0, 100.0, "Reloading spec from disk...")
+
     # Reload spec to get latest state
     context.reload_spec()
+
+    # Report progress: checking task status (40%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(40.0, 100.0, "Checking task status...")
 
     # Get task from spec
     task = context.spec.get_task(validated_task_id)
@@ -514,15 +531,27 @@ async def task_verify(
             },
         )
 
+    # Report progress: updating task status (55%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(55.0, 100.0, "Updating task status to verified...")
+
     # Update task status
     task.status = TaskStatus.VERIFIED
     task.updated_at = datetime.now(UTC)
     context.save_spec()
 
+    # Report progress: releasing lease (70%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(70.0, 100.0, "Releasing active lease...")
+
     # Auto-release any active lease
     active_lease = context.db.get_active_lease(validated_task_id)
     if active_lease:
         context.db.release_lease(validated_task_id, active_lease.agent_id)
+
+    # Report progress: logging event (80%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(80.0, 100.0, "Logging verification event...")
 
     # Log event (task.verify)
     event_data = {
@@ -539,11 +568,26 @@ async def task_verify(
             data=event_data,
         )
 
+    # Report progress: finding unblocked tasks (90%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(90.0, 100.0, "Finding newly unblocked tasks...")
+
     # Check what tasks are now unblocked
     context.reload_spec()  # Reload to get updated state
     new_claimable = context.spec.get_claimable_tasks()
     newly_unblocked = [t for t in new_claimable if validated_task_id in t.depends_on]
     newly_ready_ids = [t.id for t in newly_unblocked]
+
+    # Report progress: complete (100%)
+    if ctx and hasattr(ctx, "report_progress"):
+        if newly_ready_ids:
+            await ctx.report_progress(
+                100.0,
+                100.0,
+                f"Verified - unblocked {len(newly_ready_ids)} task(s)",
+            )
+        else:
+            await ctx.report_progress(100.0, 100.0, "Verified - no tasks unblocked")
 
     # Log successful verification
     if ctx:
@@ -695,7 +739,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
         task_id: str,
         agent_id: str,
         note: str | None = None,
-        ctx: ServerSession | None = None,
+        ctx: Context | ServerSession | None = None,
     ) -> CallToolResult:
         """Mark a task as verified (unblocks dependents).
 
@@ -705,10 +749,14 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
         Task must be in 'done' status before it can be verified.
         Automatically releases the lease if the task is currently claimed.
 
+        If the client provides a progressToken in request metadata, this operation
+        emits progress notifications at key stages (10%, 25%, 40%, 55%, 70%, 80%, 90%, 100%).
+
         Args:
             task_id: Task ID to verify (required)
             agent_id: Agent ID verifying the task (required)
             note: Optional note about verification (for logging/audit purposes)
+            ctx: Optional MCP context for logging and progress notifications
 
         Returns:
             Success response with status='verified' and list of newly unblocked task IDs.

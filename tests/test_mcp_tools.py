@@ -889,3 +889,178 @@ class TestMessageList:
         # Should have 1 read message and 2 unread messages
         assert read_count == 1
         assert unread_count == 2
+
+
+class TestProgressNotifications:
+    """Tests for MCP progress notification support."""
+
+    @pytest.fixture
+    def progress_context(self, tmp_path):
+        """Create a test MCP context with a task ready for verification."""
+        # Create repository structure
+        lodestar_dir = tmp_path / ".lodestar"
+        lodestar_dir.mkdir()
+
+        # Create sample spec with a task in DONE status
+        from lodestar.models.spec import Project, Spec
+
+        spec = Spec(
+            project=Project(name="test-project"),
+            tasks={
+                "T001": Task(
+                    id="T001",
+                    title="Task to verify",
+                    description="Task in done status ready for verification",
+                    status=TaskStatus.DONE,
+                    priority=1,
+                    labels=["feature"],
+                ),
+            },
+        )
+
+        save_spec(spec, tmp_path)
+
+        # Create context
+        context = LodestarContext(tmp_path)
+
+        # Register an agent
+        agent = Agent(display_name="Test Agent", role="tester", capabilities=["testing"])
+        context.db.register_agent(agent)
+
+        return context
+
+    @pytest.mark.anyio
+    async def test_task_verify_with_progress_notifications(self, progress_context):
+        """Test that task_verify emits progress notifications when context supports it."""
+        from lodestar.mcp.tools.task_mutations import task_verify
+
+        # Create a mock context that tracks progress calls
+        progress_calls = []
+
+        class MockContext:
+            """Mock context that captures progress and logging calls."""
+
+            async def info(self, message: str):
+                """Mock info logging."""
+                pass
+
+            async def error(self, message: str):
+                """Mock error logging."""
+                pass
+
+            async def report_progress(
+                self, progress: float, total: float | None = None, message: str | None = None
+            ):
+                """Capture progress calls."""
+                progress_calls.append({"progress": progress, "total": total, "message": message})
+
+        mock_ctx = MockContext()
+
+        # Call task_verify with mock context
+        result = await task_verify(
+            context=progress_context,
+            task_id="T001",
+            agent_id="test-agent",
+            note="Verifying with progress",
+            ctx=mock_ctx,
+        )
+
+        # Verify the call succeeded
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        assert data["ok"] is True
+        assert data["status"] == "verified"
+
+        # Verify progress notifications were emitted
+        assert len(progress_calls) == 8, f"Expected 8 progress calls, got {len(progress_calls)}"
+
+        # Verify the sequence of progress values
+        expected_progress = [10.0, 25.0, 40.0, 55.0, 70.0, 80.0, 90.0, 100.0]
+        actual_progress = [call["progress"] for call in progress_calls]
+        assert actual_progress == expected_progress
+
+        # Verify all have total=100.0
+        for call in progress_calls:
+            assert call["total"] == 100.0
+
+        # Verify messages are present and descriptive
+        for call in progress_calls:
+            assert call["message"] is not None
+            assert len(call["message"]) > 0
+
+        # Verify specific milestone messages
+        assert "Validating inputs" in progress_calls[0]["message"]
+        assert "Reloading spec" in progress_calls[1]["message"]
+        assert "Checking task status" in progress_calls[2]["message"]
+        assert "Updating task status" in progress_calls[3]["message"]
+        assert "Releasing active lease" in progress_calls[4]["message"]
+        assert "Logging verification event" in progress_calls[5]["message"]
+        assert "Finding newly unblocked tasks" in progress_calls[6]["message"]
+        assert "Verified" in progress_calls[7]["message"]
+
+    @pytest.mark.anyio
+    async def test_task_verify_without_progress_context(self, progress_context):
+        """Test that task_verify works without progress support in context."""
+        from lodestar.mcp.tools.task_mutations import task_verify
+
+        # Create a mock context WITHOUT report_progress method
+        class MockBasicContext:
+            """Mock context without progress support."""
+
+            async def info(self, message: str):
+                """Mock info logging."""
+                pass
+
+            async def error(self, message: str):
+                """Mock error logging."""
+                pass
+
+        mock_ctx = MockBasicContext()
+
+        # Call task_verify - should not fail even without progress support
+        result = await task_verify(
+            context=progress_context,
+            task_id="T001",
+            agent_id="test-agent",
+            note="Verifying without progress",
+            ctx=mock_ctx,
+        )
+
+        # Verify the call succeeded
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        assert data["ok"] is True
+        assert data["status"] == "verified"
+
+    @pytest.mark.anyio
+    async def test_task_verify_without_context(self, progress_context):
+        """Test that task_verify works without any context (ctx=None)."""
+        from lodestar.mcp.tools.task_mutations import task_verify
+
+        # Create a fresh task in DONE status (since previous tests verified T001)
+        from lodestar.models.spec import Task
+
+        progress_context.spec.tasks["T002"] = Task(
+            id="T002",
+            title="Another task",
+            description="Task for verification",
+            status=TaskStatus.DONE,
+            priority=2,
+            labels=["feature"],
+        )
+        progress_context.save_spec()
+
+        # Call task_verify with ctx=None
+        result = await task_verify(
+            context=progress_context,
+            task_id="T002",
+            agent_id="test-agent",
+            note="Verifying without context",
+            ctx=None,
+        )
+
+        # Verify the call succeeded
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        assert data["ok"] is True
+        assert data["status"] == "verified"

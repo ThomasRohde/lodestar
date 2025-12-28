@@ -2404,9 +2404,9 @@ tasks:
     - feature
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:06:56.548405+00:00'
-    updated_at: '2025-12-28T13:06:56.548408+00:00'
+    updated_at: '2025-12-28T16:29:41.512979+00:00'
   MCP-061:
     title: Add progress support for long operations
     description: Implement MCP notifications/progress. If client provides progress
@@ -2419,9 +2419,9 @@ tasks:
     - feature
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:06:58.586545+00:00'
-    updated_at: '2025-12-28T13:06:58.586548+00:00'
+    updated_at: '2025-12-28T16:50:11.117700+00:00'
   MCP-062:
     title: Add background event watcher for push notifications
     description: Create optional background watcher loop that tails the DB-backed

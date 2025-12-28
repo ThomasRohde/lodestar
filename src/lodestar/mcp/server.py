@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 from lodestar.mcp.utils import find_repo_root, validate_repo_root
 from lodestar.runtime.database import RuntimeDatabase
-from lodestar.spec.loader import load_spec
+from lodestar.spec.loader import load_spec, save_spec
 from lodestar.util.paths import get_runtime_db_path
 
 logger = logging.getLogger("lodestar.mcp")
@@ -40,6 +40,11 @@ class LodestarContext:
         """Reload the spec from disk."""
         self.spec = load_spec(self.repo_root)
         logger.debug("Reloaded spec from disk")
+
+    def save_spec(self) -> None:
+        """Save the current spec to disk."""
+        save_spec(self.spec, self.repo_root)
+        logger.debug("Saved spec to disk")
 
     def emit_event(
         self,
