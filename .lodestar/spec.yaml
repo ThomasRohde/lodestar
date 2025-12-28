@@ -2195,9 +2195,9 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:04:44.761750+00:00'
-    updated_at: '2025-12-28T13:04:44.761753+00:00'
+    updated_at: '2025-12-28T15:27:16.428783+00:00'
   MCP-020:
     title: Implement lodestar.task.list tool
     description: 'Create mcp/tools/task.py. Implement lodestar.task.list: inputs -
@@ -2212,9 +2212,9 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:05:13.034182+00:00'
-    updated_at: '2025-12-28T13:05:13.034185+00:00'
+    updated_at: '2025-12-28T15:36:01.638974+00:00'
   MCP-021:
     title: Implement lodestar.task.get tool
     description: 'Add to mcp/tools/task.py. Implement lodestar.task.get: input - taskId
@@ -2228,9 +2228,9 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:05:14.919762+00:00'
-    updated_at: '2025-12-28T13:05:14.919765+00:00'
+    updated_at: '2025-12-28T15:41:01.061867+00:00'
   MCP-022:
     title: Implement lodestar.task.next tool
     description: 'Add to mcp/tools/task.py. Implement lodestar.task.next: inputs -
@@ -2244,9 +2244,9 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:05:16.806230+00:00'
-    updated_at: '2025-12-28T13:05:16.806234+00:00'
+    updated_at: '2025-12-28T15:45:20.656446+00:00'
   MCP-023:
     title: Implement lodestar.task.context tool
     description: 'Add to mcp/tools/task.py. Implement lodestar.task.context: input
