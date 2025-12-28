@@ -41,6 +41,39 @@ class LodestarContext:
         self.spec = load_spec(self.repo_root)
         logger.debug("Reloaded spec from disk")
 
+    def emit_event(
+        self,
+        event_type: str,
+        agent_id: str | None = None,
+        task_id: str | None = None,
+        target_agent_id: str | None = None,
+        correlation_id: str | None = None,
+        data: dict | None = None,
+    ) -> None:
+        """Emit an event to the event log.
+
+        Args:
+            event_type: Type of event (e.g., 'message.send', 'task.claim')
+            agent_id: ID of the agent performing the action (optional)
+            task_id: ID of the task involved (optional)
+            target_agent_id: ID of the target agent (optional)
+            correlation_id: Correlation ID for related events (optional)
+            data: Additional event data as JSON (optional)
+        """
+        from lodestar.runtime.engine import get_session
+        from lodestar.runtime.repositories.event_repo import log_event
+
+        with get_session(self.db._session_factory) as session:
+            log_event(
+                session=session,
+                event_type=event_type,
+                agent_id=agent_id,
+                task_id=task_id,
+                target_agent_id=target_agent_id,
+                correlation_id=correlation_id,
+                data=data,
+            )
+
 
 def create_server(repo_root: Path | None = None) -> FastMCP:
     """
@@ -88,6 +121,7 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
 
     # Register tools
     from lodestar.mcp.tools.agent import register_agent_tools
+    from lodestar.mcp.tools.events import register_event_tools
     from lodestar.mcp.tools.message import register_message_tools
     from lodestar.mcp.tools.repo import register_repo_tools
     from lodestar.mcp.tools.task import register_task_tools
@@ -98,7 +132,8 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
     register_task_tools(mcp, context)
     register_task_mutation_tools(mcp, context)
     register_message_tools(mcp, context)
-    logger.info("Registered repository, agent, task, task mutation, and message tools")
+    register_event_tools(mcp, context)
+    logger.info("Registered repository, agent, task, task mutation, message, and event tools")
 
     # TODO: Register resources
 

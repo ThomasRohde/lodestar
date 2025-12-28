@@ -84,6 +84,34 @@ def get_events_since(
     return list(results)
 
 
+def get_events_since_filtered(
+    session: Session,
+    since_event_id: int,
+    limit: int = 100,
+    filter_types: list[str] | None = None,
+) -> list[EventModel]:
+    """
+    Get events since a given event ID with optional type filtering.
+
+    Args:
+        session: Active SQLAlchemy session.
+        since_event_id: Get events with event_id > this value.
+        limit: Maximum number of events to return.
+        filter_types: Optional list of event types to filter by.
+
+    Returns:
+        List of EventModel instances ordered by event_id.
+    """
+    stmt = select(EventModel).where(EventModel.event_id > since_event_id)
+
+    if filter_types:
+        stmt = stmt.where(EventModel.event_type.in_(filter_types))
+
+    stmt = stmt.order_by(EventModel.event_id.asc()).limit(limit)
+    results = session.execute(stmt).scalars().all()
+    return list(results)
+
+
 def get_latest_event_id(session: Session) -> int:
     """
     Get the latest event ID in the events table.
