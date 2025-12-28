@@ -393,6 +393,124 @@ def task_done(
     return with_item(summary, item=response_data)
 
 
+def task_verify(
+    context: LodestarContext,
+    task_id: str,
+    agent_id: str,
+    note: str | None = None,
+) -> CallToolResult:
+    """
+    Mark a task as verified (unblocks dependents).
+
+    Verifies that the task is complete. This changes the status from 'done'
+    to 'verified' and unblocks any dependent tasks that are waiting on this one.
+
+    Args:
+        context: Lodestar server context
+        task_id: Task ID to verify (required)
+        agent_id: Agent ID verifying the task (required)
+        note: Optional note about verification (for logging/audit)
+
+    Returns:
+        CallToolResult with success status and list of newly unblocked task IDs
+    """
+    # Validate inputs
+    try:
+        validated_task_id = validate_task_id(task_id)
+    except ValidationError as e:
+        return error(str(e), error_code="INVALID_TASK_ID")
+
+    if not agent_id or not agent_id.strip():
+        return error(
+            "agent_id is required and cannot be empty",
+            error_code="INVALID_AGENT_ID",
+        )
+
+    # Reload spec to get latest state
+    context.reload_spec()
+
+    # Get task from spec
+    task = context.spec.get_task(validated_task_id)
+    if task is None:
+        return error(
+            f"Task {validated_task_id} not found",
+            error_code="TASK_NOT_FOUND",
+            details={"task_id": validated_task_id},
+        )
+
+    # Check if task is in DONE status
+    warnings = []
+    if task.status == TaskStatus.VERIFIED:
+        warnings.append(
+            {
+                "type": "ALREADY_VERIFIED",
+                "message": f"Task {validated_task_id} is already verified",
+                "severity": "info",
+            }
+        )
+    elif task.status != TaskStatus.DONE:
+        return error(
+            f"Task {validated_task_id} must be done before verifying (current status: {task.status.value})",
+            error_code="TASK_NOT_DONE",
+            details={
+                "task_id": validated_task_id,
+                "current_status": task.status.value,
+            },
+        )
+
+    # Update task status
+    task.status = TaskStatus.VERIFIED
+    task.updated_at = datetime.now(UTC)
+    context.save_spec()
+
+    # Auto-release any active lease
+    active_lease = context.db.get_active_lease(validated_task_id)
+    if active_lease:
+        context.db.release_lease(validated_task_id, active_lease.agent_id)
+
+    # Log event (task.verify)
+    event_data = {
+        "agent_id": agent_id,
+    }
+    if note:
+        event_data["note"] = note
+
+    with contextlib.suppress(Exception):
+        context.emit_event(
+            event_type="task.verify",
+            task_id=validated_task_id,
+            agent_id=agent_id,
+            data=event_data,
+        )
+
+    # Check what tasks are now unblocked
+    context.reload_spec()  # Reload to get updated state
+    new_claimable = context.spec.get_claimable_tasks()
+    newly_unblocked = [t for t in new_claimable if validated_task_id in t.depends_on]
+    newly_ready_ids = [t.id for t in newly_unblocked]
+
+    # Build summary
+    summary = format_summary(
+        "Verified",
+        validated_task_id,
+        f"- unblocked {len(newly_ready_ids)} task(s)" if newly_ready_ids else "",
+    )
+
+    # Build response
+    response_data = {
+        "ok": True,
+        "taskId": validated_task_id,
+        "status": "verified",
+        "newlyReadyTaskIds": newly_ready_ids,
+        "warnings": warnings,
+    }
+
+    if note:
+        response_data["note"] = note
+
+    return with_item(summary, item=response_data)
+
+
 def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register task mutation tools with the FastMCP server.
@@ -495,6 +613,37 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             - Task claimed by different agent (still marks as done)
         """
         return task_done(
+            context=context,
+            task_id=task_id,
+            agent_id=agent_id,
+            note=note,
+        )
+
+    @mcp.tool(name="lodestar.task.verify")
+    def verify_tool(
+        task_id: str,
+        agent_id: str,
+        note: str | None = None,
+    ) -> CallToolResult:
+        """Mark a task as verified (unblocks dependents).
+
+        Verifies that the task is complete. This changes the status from 'done'
+        to 'verified' and unblocks any dependent tasks that were waiting on this one.
+
+        Task must be in 'done' status before it can be verified.
+        Automatically releases the lease if the task is currently claimed.
+
+        Args:
+            task_id: Task ID to verify (required)
+            agent_id: Agent ID verifying the task (required)
+            note: Optional note about verification (for logging/audit purposes)
+
+        Returns:
+            Success response with status='verified' and list of newly unblocked task IDs.
+            Returns error if task is not in 'done' status.
+            Returns warning if task is already verified.
+        """
+        return task_verify(
             context=context,
             task_id=task_id,
             agent_id=agent_id,
