@@ -7,6 +7,18 @@ from typing import Any
 
 import typer
 
+from lodestar.cli.formatters.task_formatter import (
+    format_deleted_tasks,
+    format_graph,
+    format_next_tasks,
+    format_task_detail,
+    format_task_list,
+)
+from lodestar.core.task_service import (
+    compute_cascade_delete,
+    detect_lock_conflicts,
+    get_unclaimed_claimable_tasks,
+)
 from lodestar.models.envelope import Envelope, NextAction
 from lodestar.models.runtime import Lease
 from lodestar.models.spec import PrdContext, PrdRef, Task, TaskStatus
@@ -151,55 +163,7 @@ def task_list(
             if lease:
                 leases[task.id] = lease
 
-    result = {
-        "tasks": [
-            {
-                "id": t.id,
-                "title": t.title,
-                "status": t.status.value,
-                "priority": t.priority,
-                "labels": t.labels,
-                "depends_on": t.depends_on,
-                "claimed_by": leases[t.id].agent_id if t.id in leases else None,
-            }
-            for t in tasks
-        ],
-        "count": len(tasks),
-    }
-
-    if json_output:
-        print_json(Envelope.success(result).model_dump())
-    else:
-        console.print()
-        if not tasks:
-            console.print("[muted]No tasks found.[/muted]")
-        else:
-            console.print(f"[bold]Tasks ({len(tasks)})[/bold]")
-            console.print()
-
-            status_colors = {
-                TaskStatus.TODO: "white",
-                TaskStatus.READY: "cyan",
-                TaskStatus.BLOCKED: "yellow",
-                TaskStatus.DONE: "blue",
-                TaskStatus.VERIFIED: "green",
-                TaskStatus.DELETED: "red dim",
-            }
-
-            for task in tasks:
-                color = status_colors.get(task.status, "white")
-                claimed = (
-                    f" [muted](claimed by {leases[task.id].agent_id})[/muted]"
-                    if task.id in leases
-                    else ""
-                )
-                labels = f" [{', '.join(task.labels)}]" if task.labels else ""
-                console.print(
-                    f"  [task_id]{task.id}[/task_id] [{color}]{task.status.value}[/{color}]"
-                    f" P{task.priority}{labels}{claimed}"
-                )
-                console.print(f"    {task.title}")
-        console.print()
+    format_task_list(tasks, leases, json_output)
 
 
 @app.command(name="show")
@@ -257,76 +221,11 @@ def task_show(
         message_count = db.get_task_message_count(task_id)
         message_agents = db.get_task_message_agents(task_id)
 
-    result = task.model_dump()
-    result["status"] = task.status.value
-    result["created_at"] = task.created_at.isoformat()
-    result["updated_at"] = task.updated_at.isoformat()
-    if lease:
-        result["claimed_by"] = {
-            "agent_id": lease.agent_id,
-            "expires_at": lease.expires_at.isoformat(),
-        }
-
-    # Add communication context
-    result["communication"] = {
-        "message_count": message_count,
-        "participating_agents": message_agents,
-    }
-
     # Determine claimability
     verified = spec.get_verified_tasks()
-    result["claimable"] = task.is_claimable(verified) and lease is None
+    claimable = task.is_claimable(verified) and lease is None
 
-    if json_output:
-        print_json(Envelope.success(result).model_dump())
-    else:
-        console.print()
-        status_display = task.status.value
-        if task.status == TaskStatus.DELETED:
-            status_display = f"[red dim]{task.status.value} (soft-deleted)[/red dim]"
-        console.print(f"[bold][task_id]{task.id}[/task_id][/bold] - {task.title}")
-        console.print()
-        console.print(f"[muted]Status:[/muted] {status_display}")
-        console.print(f"[muted]Priority:[/muted] {task.priority}")
-        if task.labels:
-            console.print(f"[muted]Labels:[/muted] {', '.join(task.labels)}")
-        if task.depends_on:
-            console.print(f"[muted]Depends on:[/muted] {', '.join(task.depends_on)}")
-        if task.locks:
-            console.print(f"[muted]Locks:[/muted] {', '.join(task.locks)}")
-
-        console.print()
-        if task.description:
-            console.print("[info]Description:[/info]")
-            console.print(f"  {task.description}")
-            console.print()
-
-        if task.acceptance_criteria:
-            console.print("[info]Acceptance Criteria:[/info]")
-            for criterion in task.acceptance_criteria:
-                console.print(f"  - {criterion}")
-            console.print()
-
-        if lease:
-            remaining = lease.expires_at - datetime.now(UTC)
-            console.print(f"[warning]Claimed by {lease.agent_id}[/warning]")
-            console.print(f"  Expires in: {format_duration(remaining)}")
-        elif result["claimable"]:
-            console.print(
-                f"[success]Claimable[/success] - run [command]lodestar task claim {task.id}[/command]"
-            )
-
-        # Show communication context if there are messages or participating agents
-        if message_count > 0 or message_agents:
-            console.print()
-            console.print("[info]Communication:[/info]")
-            if message_count > 0:
-                console.print(f"  Messages in thread: {message_count}")
-                console.print(f"  View with: [command]lodestar msg thread {task.id}[/command]")
-            if message_agents:
-                console.print(f"  Participating agents: {', '.join(message_agents)}")
-
-        console.print()
+    format_task_detail(task, lease, message_count, message_agents, claimable, json_output)
 
 
 @app.command(name="context")
@@ -828,65 +727,14 @@ def task_next(
             console.print("[error]Spec not found[/error]")
         raise typer.Exit(1)
 
-    # Get claimable tasks
-    claimable = spec.get_claimable_tasks()
-
-    # Filter out already claimed tasks
-    runtime_path = get_runtime_db_path(root)
-    if runtime_path.exists():
-        db = RuntimeDatabase(runtime_path)
-        claimable = [t for t in claimable if db.get_active_lease(t.id) is None]
+    # Get unclaimed claimable tasks using service
+    db = RuntimeDatabase(get_runtime_db_path(root))
+    claimable = get_unclaimed_claimable_tasks(spec, db)
 
     # Take requested count
     tasks = claimable[:count]
 
-    result = {
-        "tasks": [
-            {
-                "id": t.id,
-                "title": t.title,
-                "priority": t.priority,
-                "labels": t.labels,
-            }
-            for t in tasks
-        ],
-        "total_claimable": len(claimable),
-    }
-
-    next_actions = []
-    if tasks:
-        next_actions.append(
-            NextAction(
-                intent="task.claim",
-                cmd=f"lodestar task claim {tasks[0].id}",
-                description=f"Claim {tasks[0].id}",
-            )
-        )
-        next_actions.append(
-            NextAction(
-                intent="task.show",
-                cmd=f"lodestar task show {tasks[0].id}",
-                description=f"View {tasks[0].id} details",
-            )
-        )
-
-    if json_output:
-        print_json(Envelope.success(result, next_actions=next_actions).model_dump())
-    else:
-        console.print()
-        if not tasks:
-            console.print("[muted]No claimable tasks available.[/muted]")
-            console.print("All tasks are either claimed, blocked, or completed.")
-        else:
-            console.print(f"[bold]Next Claimable Tasks ({len(claimable)} available)[/bold]")
-            console.print()
-            for task in tasks:
-                labels = f" [{', '.join(task.labels)}]" if task.labels else ""
-                console.print(f"  [task_id]{task.id}[/task_id] P{task.priority}{labels}")
-                console.print(f"    {task.title}")
-            console.print()
-            console.print(f"Run [command]lodestar task claim {tasks[0].id}[/command] to claim")
-        console.print()
+    format_next_tasks(tasks, len(claimable), json_output)
 
 
 @app.command(name="claim")
@@ -998,23 +846,10 @@ def task_claim(
     # Create lease
     db = RuntimeDatabase(get_runtime_db_path(root))
 
-    # Check for lock conflicts with actively-leased tasks
+    # Check for lock conflicts with actively-leased tasks using service
     lock_warnings: list[str] = []
     if task.locks and not force:
-        from lodestar.util.locks import find_overlapping_patterns
-
-        active_leases = db.get_all_active_leases()
-        for active_lease in active_leases:
-            if active_lease.task_id == task_id:
-                continue  # Skip self (shouldn't happen since task not claimed yet)
-            leased_task = spec.get_task(active_lease.task_id)
-            if leased_task and leased_task.locks:
-                overlaps = find_overlapping_patterns(task.locks, leased_task.locks)
-                for our_pattern, their_pattern in overlaps:
-                    lock_warnings.append(
-                        f"Lock '{our_pattern}' overlaps with '{their_pattern}' "
-                        f"(task {active_lease.task_id}, claimed by {active_lease.agent_id})"
-                    )
+        lock_warnings = detect_lock_conflicts(task, spec, db)
 
     lease = Lease(
         task_id=task_id,
@@ -1559,23 +1394,20 @@ def task_delete(
             console.print(f"[warning]Task {task_id} is already deleted[/warning]")
         raise typer.Exit(1)
 
-    # Find tasks that depend on this one
-    dependency_graph = spec.get_dependency_graph()
-    dependents = dependency_graph.get(task_id, [])
-    # Filter out already deleted tasks
-    active_dependents = [d for d in dependents if spec.tasks[d].status != TaskStatus.DELETED]
+    # Use service to compute cascade delete targets
+    result = compute_cascade_delete(task_id, spec, cascade)
 
-    if active_dependents and not cascade:
+    if result.blocked_by:
         if json_output:
             print_json(
                 Envelope.error(
-                    f"Task {task_id} has {len(active_dependents)} dependent(s). Use --cascade to delete all."
+                    f"Task {task_id} has {len(result.blocked_by)} dependent(s). Use --cascade to delete all."
                 ).model_dump()
             )
         else:
             console.print(f"[error]Cannot delete {task_id}[/error]")
-            console.print(f"  {len(active_dependents)} task(s) depend on this task:")
-            for dep in active_dependents:
+            console.print(f"  {len(result.blocked_by)} task(s) depend on this task:")
+            for dep in result.blocked_by:
                 console.print(f"    - {dep}: {spec.tasks[dep].title}")
             console.print()
             console.print(
@@ -1583,24 +1415,9 @@ def task_delete(
             )
         raise typer.Exit(1)
 
-    # Collect tasks to delete
-    tasks_to_delete = [task_id]
-    if cascade and active_dependents:
-        # Recursively collect all downstream dependents
-        to_process = active_dependents[:]
-        while to_process:
-            current = to_process.pop(0)
-            if current not in tasks_to_delete:
-                tasks_to_delete.append(current)
-                current_deps = dependency_graph.get(current, [])
-                active_current_deps = [
-                    d for d in current_deps if spec.tasks[d].status != TaskStatus.DELETED
-                ]
-                to_process.extend(active_current_deps)
-
     # Mark all tasks as deleted
     deleted_tasks = []
-    for tid in tasks_to_delete:
+    for tid in result.tasks_to_delete:
         t = spec.tasks[tid]
         t.status = TaskStatus.DELETED
         t.updated_at = datetime.now(UTC)
@@ -1608,24 +1425,7 @@ def task_delete(
 
     save_spec(spec, root)
 
-    result = {
-        "deleted": deleted_tasks,
-        "count": len(deleted_tasks),
-    }
-
-    if json_output:
-        print_json(Envelope.success(result).model_dump())
-    else:
-        console.print()
-        console.print(f"[success]Deleted {len(deleted_tasks)} task(s)[/success]")
-        for dt in deleted_tasks:
-            console.print(f"  - {dt['id']}: {dt['title']}")
-        console.print()
-        if len(deleted_tasks) > 1:
-            console.print(
-                "[muted]Tip: Use 'lodestar task list --include-deleted' to see deleted tasks[/muted]"
-            )
-        console.print()
+    format_deleted_tasks(deleted_tasks, json_output)
 
 
 @app.command(name="graph")
@@ -1693,29 +1493,7 @@ def task_graph(
         {"from": dep, "to": task.id} for task in spec.tasks.values() for dep in task.depends_on
     ]
 
-    result = {"nodes": nodes, "edges": edges}
-
-    if output_format == "dot":
-        dot_lines = ["digraph tasks {"]
-        dot_lines.append("  rankdir=LR;")
-        for node in nodes:
-            label = f"{node['id']}\\n{node['title'][:20]}"
-            dot_lines.append(f'  "{node["id"]}" [label="{label}"];')
-        for edge in edges:
-            dot_lines.append(f'  "{edge["from"]}" -> "{edge["to"]}";')
-        dot_lines.append("}")
-        console.print("\n".join(dot_lines))
-    elif json_output or output_format == "json":
-        print_json(Envelope.success(result).model_dump())
-    else:
-        console.print()
-        console.print("[bold]Task Graph[/bold]")
-        console.print(f"  Nodes: {len(nodes)}")
-        console.print(f"  Edges: {len(edges)}")
-        console.print()
-        for edge in edges:
-            console.print(f"  {edge['from']} -> {edge['to']}")
-        console.print()
+    format_graph(nodes, edges, output_format, json_output)
 
 
 def _show_explain_list(json_output: bool) -> None:

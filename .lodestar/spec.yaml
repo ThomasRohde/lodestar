@@ -1821,6 +1821,216 @@ tasks:
     status: verified
     created_at: '2025-12-28T06:43:15.836372+00:00'
     updated_at: '2025-12-28T07:01:36.612174+00:00'
+  R001:
+    title: Extract task_service.py from task.py
+    description: Extract business logic (claimable tasks, lease validation, cascade
+      delete, dependency traversal) from task.py into core/task_service.py
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - refactor
+    - phase1
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T07:47:32.555848+00:00'
+    updated_at: '2025-12-28T07:51:11.507256+00:00'
+  R002:
+    title: Extract task_formatter.py
+    description: Extract Rich table formatting, JSON envelope generation, and graph
+      output from task.py into cli/formatters/task_formatter.py
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - refactor
+    - phase1
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T07:47:34.612115+00:00'
+    updated_at: '2025-12-28T07:53:20.121868+00:00'
+  R003:
+    title: Extract PRD utilities to util/prd.py
+    description: Extract PRD context extraction and drift detection logic from task.py
+      into util/prd.py
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - refactor
+    - phase1
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T07:47:36.705423+00:00'
+    updated_at: '2025-12-28T07:51:26.433430+00:00'
+  R004:
+    title: Slim down task.py CLI commands
+    description: 'Refactor task.py to use extracted services/formatters. Target: ~400
+      lines. Each command: parse args, call service, format output'
+    acceptance_criteria: []
+    depends_on:
+    - R001
+    - R002
+    - R003
+    labels:
+    - refactor
+    - phase1
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T07:47:50.606771+00:00'
+    updated_at: '2025-12-28T07:58:06.146964+00:00'
+  R005:
+    title: Extract agent_repo.py from RuntimeDatabase
+    description: Create runtime/repositories/agent_repo.py with agent registration,
+      queries, and heartbeat methods
+    acceptance_criteria: []
+    depends_on:
+    - R004
+    labels:
+    - refactor
+    - phase2
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T07:47:52.769960+00:00'
+    updated_at: '2025-12-28T07:47:52.769964+00:00'
+  R006:
+    title: Extract lease_repo.py from RuntimeDatabase
+    description: Create runtime/repositories/lease_repo.py with lease create, renew,
+      release, and query methods
+    acceptance_criteria: []
+    depends_on:
+    - R004
+    labels:
+    - refactor
+    - phase2
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T07:47:54.850288+00:00'
+    updated_at: '2025-12-28T07:47:54.850291+00:00'
+  R007:
+    title: Extract message_repo.py from RuntimeDatabase
+    description: Create runtime/repositories/message_repo.py with send, inbox, thread,
+      search, and wait methods
+    acceptance_criteria: []
+    depends_on:
+    - R004
+    labels:
+    - refactor
+    - phase2
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T07:47:57.003594+00:00'
+    updated_at: '2025-12-28T07:47:57.003598+00:00'
+  R008:
+    title: Convert database.py to facade
+    description: 'Refactor RuntimeDatabase to thin facade delegating to repositories.
+      Target: ~100 lines. Maintain backward compatibility'
+    acceptance_criteria: []
+    depends_on:
+    - R005
+    - R006
+    - R007
+    labels:
+    - refactor
+    - phase2
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T07:48:10.766240+00:00'
+    updated_at: '2025-12-28T07:48:10.766244+00:00'
+  R009:
+    title: Extract timestamps.py utility
+    description: Create util/timestamps.py with parse_iso_timestamp() and format_relative_time()
+      - consolidate 3 duplicated implementations
+    acceptance_criteria: []
+    depends_on:
+    - R008
+    labels:
+    - refactor
+    - phase3
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-28T07:48:12.924101+00:00'
+    updated_at: '2025-12-28T07:48:12.924104+00:00'
+  R010:
+    title: Extract message_service.py
+    description: Create core/message_service.py with inbox query building, search
+      logic, and thread assembly
+    acceptance_criteria: []
+    depends_on:
+    - R009
+    labels:
+    - refactor
+    - phase3
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-28T07:48:14.999851+00:00'
+    updated_at: '2025-12-28T07:48:14.999855+00:00'
+  R011:
+    title: Slim down msg.py CLI commands
+    description: 'Refactor msg.py to use extracted services. Target: ~300 lines'
+    acceptance_criteria: []
+    depends_on:
+    - R010
+    labels:
+    - refactor
+    - phase3
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-28T07:48:17.119747+00:00'
+    updated_at: '2025-12-28T07:48:17.119751+00:00'
+  R012:
+    title: Extract agent_service.py
+    description: Create core/agent_service.py with agent registration, discovery,
+      and brief generation logic
+    acceptance_criteria: []
+    depends_on:
+    - R011
+    labels:
+    - refactor
+    - phase4
+    locks: []
+    priority: 4
+    status: ready
+    created_at: '2025-12-28T07:48:27.674622+00:00'
+    updated_at: '2025-12-28T07:48:27.674625+00:00'
+  R013:
+    title: Extract brief_formatter.py with strategy pattern
+    description: Create cli/formatters/brief_formatter.py with BriefFormatter base
+      class and Claude/Copilot/Generic implementations
+    acceptance_criteria: []
+    depends_on:
+    - R012
+    labels:
+    - refactor
+    - phase4
+    locks: []
+    priority: 4
+    status: ready
+    created_at: '2025-12-28T07:48:29.807095+00:00'
+    updated_at: '2025-12-28T07:48:29.807098+00:00'
+  R014:
+    title: Slim down agent.py CLI commands
+    description: 'Refactor agent.py to use extracted services/formatters. Target:
+      ~400 lines'
+    acceptance_criteria: []
+    depends_on:
+    - R013
+    labels:
+    - refactor
+    - phase4
+    locks: []
+    priority: 4
+    status: ready
+    created_at: '2025-12-28T07:48:31.933929+00:00'
+    updated_at: '2025-12-28T07:48:31.933932+00:00'
 features:
   m0-skeleton:
   - F001
