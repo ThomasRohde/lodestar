@@ -1998,9 +1998,9 @@ tasks:
     - phase4
     locks: []
     priority: 4
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:48:27.674622+00:00'
-    updated_at: '2025-12-28T07:48:27.674625+00:00'
+    updated_at: '2025-12-28T10:12:46.197721+00:00'
   R013:
     title: Extract brief_formatter.py with strategy pattern
     description: Create cli/formatters/brief_formatter.py with BriefFormatter base
@@ -2013,9 +2013,9 @@ tasks:
     - phase4
     locks: []
     priority: 4
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:48:29.807095+00:00'
-    updated_at: '2025-12-28T07:48:29.807098+00:00'
+    updated_at: '2025-12-28T10:12:50.257155+00:00'
   R014:
     title: Slim down agent.py CLI commands
     description: 'Refactor agent.py to use extracted services/formatters. Target:
@@ -2028,9 +2028,9 @@ tasks:
     - phase4
     locks: []
     priority: 4
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:48:31.933929+00:00'
-    updated_at: '2025-12-28T07:48:31.933932+00:00'
+    updated_at: '2025-12-28T10:12:54.316816+00:00'
 features:
   m0-skeleton:
   - F001

@@ -15,6 +15,7 @@ class TimestampParseError(ValueError):
 
     pass
 
+
 # Pattern for duration strings like "15m", "1h30m", "2h", "30s"
 DURATION_PATTERN = re.compile(
     r"^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$",
