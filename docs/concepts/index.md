@@ -75,6 +75,15 @@ How task claiming works with time-limited leases:
 - TTL-based expiry without daemons
 - Renew/release patterns for coordination
 
+### [PRD Context Delivery](prd-context.md)
+
+How tasks carry product intent from PRDs:
+
+- PRD = encyclopedia, task = mission card
+- Frozen excerpts for stable context
+- Drift detection when PRDs change
+- Automatic context bundle on claim
+
 ## Design Principles
 
 ### 1. No Daemon Required

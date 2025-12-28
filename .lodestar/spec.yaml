@@ -1337,6 +1337,202 @@ tasks:
     status: verified
     created_at: '2025-12-27T19:54:10.431185'
     updated_at: '2025-12-27T20:08:07.952636'
+  D020:
+    title: Document PRD context feature in task.md
+    description: "WHAT: Document the new PRD context feature in the CLI task reference.\n\
+      WHERE: docs/cli/task.md\nWHY: PRD_REFS.md feature is implemented but not documented\
+      \ - agents need to know how to use prd_refs, prd_excerpt, and prd_hash on tasks.\n\
+      \nACCEPT:\n1) Add 'task context' command section with full documentation\n2)\
+      \ Update 'task create' section to show --prd-source, --prd-ref, --prd-excerpt\
+      \ options  \n3) Update 'task claim' section to document context bundle and --no-context\
+      \ flag\n4) Include examples of creating tasks with PRD context attached\n5)\
+      \ Explain drift detection warnings\n\nCONTEXT:\n- See src/lodestar/models/spec.py\
+      \ for PrdContext and PrdRef models\n- See src/lodestar/cli/commands/task.py\
+      \ for task_context and task_claim implementations\n- See src/lodestar/util/prd.py\
+      \ for hash and extraction utilities\n- PRD_REFS.md explains the motivation for\
+      \ this feature"
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - docs
+    - prd-context
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T01:05:42.370433+00:00'
+    updated_at: '2025-12-28T01:11:54.496369+00:00'
+  D021:
+    title: Document PRD context concepts
+    description: "WHAT: Add new concepts documentation explaining PRD context integration.\n\
+      WHERE: docs/concepts/ (new file: prd-context.md)\nWHY: PRD_REFS.md describes\
+      \ a major feature - 'PRD section pointers + context delivery' - that needs conceptual\
+      \ documentation for users to understand WHY this exists and HOW it works.\n\n\
+      ACCEPT:\n1) Create docs/concepts/prd-context.md with:\n   - Overview: PRD =\
+      \ encyclopedia, task = mission card\n   - prd_refs field explanation (anchors,\
+      \ line ranges)\n   - prd_excerpt frozen snapshot concept\n   - prd_hash drift\
+      \ detection mechanism\n2) Update docs/concepts/index.md to link to new page\n\
+      3) Explain the claim-time context delivery workflow\n4) Include diagrams/examples\
+      \ showing task creation with PRD context\n\nCONTEXT:\n- PRD_REFS.md section\
+      \ 'A concrete shape that combines the strongest ideas' is the design doc\n-\
+      \ src/lodestar/models/spec.py has PrdContext and PrdRef models  \n- Feature\
+      \ solves: 'future sessions never need the PRD at all for most tasks'"
+    acceptance_criteria: []
+    depends_on:
+    - D020
+    labels:
+    - docs
+    - prd-context
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-28T01:06:00.114359+00:00'
+    updated_at: '2025-12-28T01:19:11.418461+00:00'
+  D022:
+    title: Update README.md with PRD context feature
+    description: 'WHAT: Add PRD context feature to README.md Quick Start and Key Features.
+
+      WHERE: README.md
+
+      WHY: README is the first thing users see - it should mention this major differentiating
+      feature.
+
+
+      ACCEPT:
+
+      1) Add ''PRD Context Delivery'' to Key Features list with brief description
+
+      2) Update Quick Start to show creating a task WITH prd context (optional advanced
+      example)
+
+      3) Add example of ''lodestar task context <id>'' in How It Works section
+
+      4) Mention drift detection as a feature
+
+
+      CONTEXT:
+
+      - Current README has no mention of PRD context features
+
+      - Keep changes minimal - README should stay concise
+
+      - Focus on: what the feature does, one-line CLI example
+
+      - See PRD_REFS.md for feature motivation'
+    acceptance_criteria: []
+    depends_on:
+    - D020
+    labels:
+    - docs
+    - prd-context
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-28T01:06:10.692893+00:00'
+    updated_at: '2025-12-28T01:19:12.330430+00:00'
+  D023:
+    title: Update agent-workflow guide for PRD context
+    description: "WHAT: Update agent workflow guide to incorporate PRD context best\
+      \ practices.\nWHERE: docs/guides/agent-workflow.md\nWHY: Agents need guidance\
+      \ on how to leverage PRD context when claiming and working on tasks.\n\nACCEPT:\n\
+      1) Add section: 'Understanding Task Context' explaining prd_refs/excerpt\n2)\
+      \ Update 'Claiming a Task' section to mention context bundle delivery\n3) Add\
+      \ best practice: 'Always check for PRD drift warnings'\n4) Show example workflow:\
+      \ claim task -> review context -> work -> done\n5) Add tip about using 'task\
+      \ context' to get full PRD snippets\n\nCONTEXT:\n- docs/guides/agent-workflow.md\
+      \ exists but doesn't mention PRD context\n- task claim now automatically includes\
+      \ context (unless --no-context)\n- This is key for planning\u2192executing agent\
+      \ handoffs"
+    acceptance_criteria: []
+    depends_on:
+    - D021
+    labels:
+    - docs
+    - prd-context
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-28T01:06:22.321870+00:00'
+    updated_at: '2025-12-28T01:20:17.642496+00:00'
+  D024:
+    title: Update docs/index.md with PRD context overview
+    description: 'WHAT: Update the docs landing page to mention PRD context feature.
+
+      WHERE: docs/index.md
+
+      WHY: The docs landing page lists features but is missing this key capability.
+
+
+      ACCEPT:
+
+      1) Add ''PRD Context Delivery'' to Features list
+
+      2) Update Quick Start section if it references task claiming
+
+      3) Ensure consistency with README.md feature list
+
+
+      CONTEXT:
+
+      - Current docs/index.md has minimal content
+
+      - Keep changes proportional to existing content
+
+      - Link to concepts/prd-context.md if it exists'
+    acceptance_criteria: []
+    depends_on:
+    - D021
+    labels:
+    - docs
+    - prd-context
+    locks: []
+    priority: 3
+    status: verified
+    created_at: '2025-12-28T01:06:32.734638+00:00'
+    updated_at: '2025-12-28T01:20:18.468885+00:00'
+  D025:
+    title: Update getting-started.md with task context example
+    description: "WHAT: Add PRD context examples to getting started guide.\nWHERE:\
+      \ docs/getting-started.md\nWHY: New users should see the task context workflow\
+      \ early.\n\nACCEPT:\n1) Add optional 'Advanced: Creating Tasks with PRD Context'\
+      \ section\n2) Show example of 'lodestar task context <id>'  \n3) Explain when/why\
+      \ to use PRD context (planning agent \u2192 executing agent handoff)\n4) Keep\
+      \ core quick start flow unchanged (don't bloat the happy path)\n\nCONTEXT:\n\
+      - getting-started.md is for first-time users\n- PRD context is optional - don't\
+      \ make it required to understand\n- Place advanced content at end or in collapsible\
+      \ section"
+    acceptance_criteria: []
+    depends_on:
+    - D020
+    labels:
+    - docs
+    - prd-context
+    locks: []
+    priority: 3
+    status: verified
+    created_at: '2025-12-28T01:06:46.575592+00:00'
+    updated_at: '2025-12-28T01:19:13.144378+00:00'
+  D026:
+    title: Add PRD context reference schema documentation
+    description: "WHAT: Document the PrdContext and PrdRef schema in reference docs.\n\
+      WHERE: docs/reference/index.md (or new docs/reference/schemas.md)\nWHY: Programmatic\
+      \ users need schema reference for spec.yaml prd fields.\n\nACCEPT:\n1) Document\
+      \ PrdContext fields: source, refs, excerpt, prd_hash\n2) Document PrdRef fields:\
+      \ anchor, lines  \n3) Show example spec.yaml task with full prd context\n4)\
+      \ Document JSON output format from 'task context --json'\n5) Include schema\
+      \ export example using --schema flag\n\nCONTEXT:\n- Reference docs should be\
+      \ complete and precise\n- See src/lodestar/models/spec.py for canonical schema\n\
+      - PRD_REFS.md 'Example (illustrative YAML)' section shows target format"
+    acceptance_criteria: []
+    depends_on:
+    - D021
+    labels:
+    - docs
+    - prd-context
+    locks: []
+    priority: 3
+    status: verified
+    created_at: '2025-12-28T01:06:57.736880+00:00'
+    updated_at: '2025-12-28T01:20:19.248872+00:00'
 features:
   m0-skeleton:
   - F001

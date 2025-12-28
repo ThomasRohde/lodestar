@@ -187,8 +187,77 @@ Now that you've completed your first task, explore these resources:
 
 - **[Two-Plane Model](concepts/two-plane-model.md)** - Understand how Lodestar separates task definitions from execution state
 - **[Task Lifecycle](concepts/task-lifecycle.md)** - Learn about task states and transitions
+- **[PRD Context Delivery](concepts/prd-context.md)** - How tasks carry product intent from PRDs
 - **[CLI Reference](cli/index.md)** - Complete documentation of all commands
 - **[Agent Workflow Guide](guides/agent-workflow.md)** - Best practices for working as an agent
+
+## Advanced: Tasks with PRD Context
+
+For planning→executing agent workflows (e.g., Opus creates tasks, Sonnet executes), you can attach PRD context to tasks:
+
+### Creating Tasks with Context
+
+```bash
+$ lodestar task create \
+    --id "TASK-002" \
+    --title "Implement password reset" \
+    --description "Email-based password reset flow" \
+    --prd-source PRD.md \
+    --prd-ref "#password-reset" \
+    --prd-excerpt "Reset tokens must expire after 15 minutes and be single-use."
+
+Created task TASK-002
+```
+
+This attaches:
+
+- **PRD source file** — Where the context came from
+- **Section references** — Anchors like `#password-reset`
+- **Frozen excerpt** — Key paragraphs copied verbatim
+- **PRD hash** — For drift detection
+
+### Getting Task Context
+
+Retrieve the context for any task:
+
+```bash
+$ lodestar task context TASK-002
+Context for TASK-002
+
+PRD Source: PRD.md
+References: #password-reset
+
+Content:
+  Implement password reset
+  Email-based password reset flow
+
+  Reset tokens must expire after 15 minutes and be single-use.
+```
+
+### Context on Claim
+
+When you claim a task, context is delivered automatically:
+
+```bash
+$ lodestar task claim TASK-002 --agent A1234ABCD
+Claimed task TASK-002
+  Lease: L5678EFGH
+  Expires in: 15m
+
+Task Context:
+  Implement password reset
+  Email-based password reset flow
+  PRD: PRD.md
+```
+
+If the PRD has changed since the task was created, you'll see a drift warning.
+
+!!! tip "When to use PRD context"
+    PRD context is optional but valuable when:
+    
+    - Multiple agents work on the same project
+    - Planning and executing are done by different agents
+    - Tasks need stable product intent that survives PRD edits
 
 ## Quick Reference
 

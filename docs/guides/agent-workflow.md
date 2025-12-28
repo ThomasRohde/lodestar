@@ -151,6 +151,65 @@ Thread for F002 (2 messages)
   Released: need API keys from DevOps
 ```
 
+## Understanding Task Context
+
+Tasks can carry PRD context—frozen excerpts and section references from the product requirements document. This ensures you receive the "why" behind your work without re-reading the full PRD.
+
+### Context on Claim
+
+When you claim a task, context is delivered automatically:
+
+```bash
+$ lodestar task claim F002 --agent A1234ABCD
+Claimed task F002
+  Lease: L5678EFGH
+  Expires in: 15m
+
+Task Context:
+  Add password reset
+  Email-based password reset flow with secure token generation.
+  PRD: PRD.md
+
+Remember to:
+  - Renew with lodestar task renew F002 before expiry
+  - Mark done with lodestar task done F002 when complete
+```
+
+Use `--no-context` if you don't need the context bundle (e.g., for scripts).
+
+### Getting Deeper Context
+
+For the full context including live PRD sections:
+
+```bash
+$ lodestar task context F002
+Context for F002
+
+PRD Source: PRD.md
+References: #password-reset, #security-requirements
+
+Content:
+  Add password reset
+  Email-based password reset flow with secure token generation.
+
+  Reset tokens must expire after 15 minutes and be single-use.
+  ...
+```
+
+### Check for Drift Warnings
+
+If the PRD has changed since the task was created, you'll see a warning:
+
+```bash
+$ lodestar task claim F002 --agent A1234ABCD
+Claimed task F002
+  ...
+
+⚠ PRD has changed since task creation. Review PRD.md for updates.
+```
+
+**Best practice**: Always check for drift warnings and review the PRD if intent may have changed.
+
 ### Monitor Your Lease
 
 Leases expire after 15 minutes by default. Renew before expiry:
@@ -336,6 +395,7 @@ Files to review:
 - **Leave context**: Help the next agent
 - **Verify thoroughly**: Test before marking verified
 - **Commit often**: Make progress visible
+- **Check for drift**: Review drift warnings when claiming tasks with PRD context
 
 ### Don't
 
@@ -344,6 +404,7 @@ Files to review:
 - **Don't skip verification**: It unblocks dependent work
 - **Don't work unclaimed**: Others might be working too
 - **Don't batch completions**: Mark done immediately
+- **Don't ignore drift warnings**: PRD changes may affect intent
 
 ## Quick Reference
 
@@ -357,6 +418,7 @@ lodestar agent join
 lodestar task next
 lodestar task list
 lodestar task show <id>
+lodestar task context <id>  # Get PRD context
 
 # Working
 lodestar task claim <id> --agent <agent-id>

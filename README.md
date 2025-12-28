@@ -25,6 +25,7 @@ When multiple agents work in the same repository, chaos ensues: duplicate work, 
 - **Lease-Based Claims**: Tasks are claimed with time-limited leases that auto-expire, preventing stuck locks
 - **Two-Plane State Model**: Clean separation between task definitions (spec) and execution state (runtime)
 - **Dependency Tracking**: DAG-based task scheduling with automatic readiness detection
+- **PRD Context Delivery**: Tasks carry just-enough product intent from PRDs—frozen excerpts, section refs, and drift detection
 - **Self-Documenting CLI**: Every command supports `--json`, `--schema`, and `--explain` flags for programmatic access
 - **Progressive Discovery**: No-args commands suggest next actions to guide workflows
 - **Agent Messaging**: Built-in inter-agent communication for handoffs and coordination
@@ -142,6 +143,25 @@ This separation provides:
 
 Tasks flow through states: `ready` → `done` → `verified`. A task becomes claimable when it's `ready` and all its dependencies are `verified`. Tasks can also be soft-deleted (status set to `deleted`) to hide them from normal views while preserving history.
 
+### PRD Context Delivery
+
+Tasks can carry product intent from a PRD, so executing agents don't need to re-read the full document:
+
+```bash
+# Get PRD context for a task
+lodestar task context TASK-001
+
+# Create a task with PRD context attached
+lodestar task create \
+    --id "TASK-002" \
+    --title "Implement password reset" \
+    --prd-source PRD.md \
+    --prd-ref "#password-reset" \
+    --prd-excerpt "Reset tokens must expire after 15 minutes..."
+```
+
+When claiming a task, context is delivered automatically. If the PRD has changed since task creation, you'll get a drift warning.
+
 ## Documentation
 
 Full documentation is available in the [`docs/`](docs/) directory:
@@ -151,6 +171,7 @@ Full documentation is available in the [`docs/`](docs/) directory:
   - [Two-Plane Model](docs/concepts/two-plane-model.md)
   - [Task Lifecycle](docs/concepts/task-lifecycle.md)
   - [Lease Mechanics](docs/concepts/lease-mechanics.md)
+  - [PRD Context Delivery](docs/concepts/prd-context.md)
 - **[CLI Reference](docs/cli/)** - Complete command documentation
 - **[Guides](docs/guides/)** - How-to guides for common workflows
   - [Agent Workflow](docs/guides/agent-workflow.md)
