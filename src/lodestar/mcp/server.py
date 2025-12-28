@@ -86,7 +86,12 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
     logger.info(f"Runtime database: {context.db_path}")
     logger.info(f"Project: {context.spec.project.name}")
 
-    # TODO: Register tools
+    # Register tools
+    from lodestar.mcp.tools.repo import register_repo_tools
+
+    register_repo_tools(mcp, context)
+    logger.info("Registered repository tools")
+
     # TODO: Register resources
 
     return mcp
