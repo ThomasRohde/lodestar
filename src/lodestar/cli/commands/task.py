@@ -891,9 +891,9 @@ def task_next(
 
 @app.command(name="claim")
 def task_claim(
-    task_id: str = typer.Argument(..., help="Task ID to claim."),
-    agent_id: str = typer.Option(
-        ...,
+    task_id: str | None = typer.Argument(None, help="Task ID to claim."),
+    agent_id: str | None = typer.Option(
+        None,
         "--agent",
         "-a",
         help="(REQUIRED) Your agent ID. Get it from 'lodestar agent join'.",
@@ -926,6 +926,14 @@ def task_claim(
     if explain:
         _show_explain_claim(json_output)
         return
+
+    if task_id is None:
+        console.print("[error]Missing argument 'TASK_ID'[/error]")
+        raise typer.Exit(1)
+
+    if agent_id is None:
+        console.print("[error]Missing option '--agent'[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
