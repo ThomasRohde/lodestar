@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from mcp.types import CallToolResult
 
+from lodestar.core.task_service import get_unclaimed_claimable_tasks
 from lodestar.mcp.output import error, format_summary, with_item, with_list
 from lodestar.mcp.server import LodestarContext
 from lodestar.mcp.validation import ValidationError, clamp_limit, validate_task_id
@@ -310,6 +311,90 @@ def task_get(
     return with_item(summary, item=task_detail)
 
 
+def task_next(
+    context: LodestarContext,
+    agent_id: str | None = None,
+    limit: int | None = None,
+) -> CallToolResult:
+    """
+    Get next claimable tasks for an agent.
+
+    Returns tasks that are ready and have all dependencies satisfied,
+    filtered to exclude tasks that are already claimed.
+
+    Args:
+        context: Lodestar server context
+        agent_id: Agent ID for personalization (optional, currently unused)
+        limit: Maximum number of tasks to return (default 5, max 20)
+
+    Returns:
+        CallToolResult with claimable tasks and rationale
+    """
+    # Reload spec to get latest state
+    context.reload_spec()
+
+    # Validate and clamp limit (max 20 for task next)
+    validated_limit = clamp_limit(limit, default=5)
+    if validated_limit > 20:
+        validated_limit = 20
+
+    # Get unclaimed claimable tasks
+    claimable_tasks = get_unclaimed_claimable_tasks(context.spec, context.db)
+
+    # Take only the requested limit
+    tasks = claimable_tasks[:validated_limit]
+
+    # Get lease information for all tasks
+    lease_map = {}
+    all_active_leases = context.db.get_all_active_leases()
+    for lease in all_active_leases:
+        lease_map[lease.task_id] = lease
+
+    # Build task summaries
+    task_summaries = []
+    for task in tasks:
+        summary = {
+            "id": task.id,
+            "title": task.title,
+            "status": task.status.value,
+            "priority": task.priority,
+            "labels": task.labels,
+            "dependencies": task.depends_on,
+        }
+        task_summaries.append(summary)
+
+    # Build rationale
+    total_claimable = len(claimable_tasks)
+    rationale_parts = []
+
+    if total_claimable == 0:
+        rationale_parts.append("No claimable tasks available.")
+        rationale_parts.append("Tasks must be in 'ready' status with all dependencies verified.")
+    else:
+        rationale_parts.append(
+            f"Found {total_claimable} claimable task(s), showing top {len(tasks)} by priority."
+        )
+        rationale_parts.append("Tasks are ready for work with all dependencies satisfied.")
+
+    rationale = " ".join(rationale_parts)
+
+    # Build summary
+    summary = format_summary(
+        "Next",
+        f"{len(tasks)} task(s)",
+        f"({total_claimable} total claimable)" if total_claimable > 0 else "",
+    )
+
+    # Build response data
+    response_data = {
+        "candidates": task_summaries,
+        "rationale": rationale,
+        "totalClaimable": total_claimable,
+    }
+
+    return with_item(summary, item=response_data)
+
+
 def register_task_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register task management tools with the FastMCP server.
@@ -367,3 +452,25 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
             - Warnings (PRD drift, missing dependencies)
         """
         return task_get(context=context, task_id=task_id)
+
+    @mcp.tool(name="lodestar.task.next")
+    def next_tool(
+        agent_id: str | None = None,
+        limit: int | None = None,
+    ) -> CallToolResult:
+        """Get next claimable tasks.
+
+        Returns tasks that are ready for work with all dependencies satisfied.
+        Tasks are filtered to exclude already-claimed tasks and sorted by priority.
+
+        This is the dependency-aware "what should I do next" tool.
+
+        Args:
+            agent_id: Agent ID for personalization (optional, currently unused for filtering but may be used for future prioritization)
+            limit: Maximum number of tasks to return (default 5, max 20)
+
+        Returns:
+            Candidates (claimable task summaries), rationale explaining selection,
+            and total number of claimable tasks available
+        """
+        return task_next(context=context, agent_id=agent_id, limit=limit)
