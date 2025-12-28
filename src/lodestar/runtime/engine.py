@@ -17,7 +17,7 @@ def _enable_wal_mode(dbapi_connection: object, connection_record: object) -> Non
     WAL (Write-Ahead Logging) mode allows concurrent reads and writes,
     which is essential for a CLI tool that may have multiple processes.
     """
-    cursor = dbapi_connection.cursor()  # type: ignore[union-attr]
+    cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA busy_timeout=5000")
     cursor.close()
@@ -62,7 +62,7 @@ def create_session_factory(engine: Engine) -> sessionmaker[Session]:
 
 
 @contextmanager
-def get_session(session_factory: sessionmaker[Session]) -> Generator[Session, None, None]:
+def get_session(session_factory: sessionmaker[Session]) -> Generator[Session]:
     """Get a session with automatic commit/rollback.
 
     This context manager provides the same transaction semantics as the

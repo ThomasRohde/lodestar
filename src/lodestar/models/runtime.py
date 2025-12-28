@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 from uuid import uuid4
@@ -19,7 +19,7 @@ DEFAULT_OFFLINE_THRESHOLD_MINUTES = 60
 
 def _utc_now() -> datetime:
     """Return current UTC datetime (timezone-aware)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class AgentStatus(str, Enum):

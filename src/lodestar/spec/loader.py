@@ -9,7 +9,7 @@ import portalocker
 import yaml
 from pydantic import ValidationError
 
-from lodestar.models.spec import PrdContext, PrdRef, Project, Spec, Task, TaskStatus
+from lodestar.models.spec import Project, Spec, Task, TaskStatus
 from lodestar.util.paths import get_spec_path
 
 

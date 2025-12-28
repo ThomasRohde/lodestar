@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import typer
 
 from lodestar.models.envelope import Envelope, NextAction
@@ -32,7 +34,7 @@ def doctor_command(
         _show_explain(json_output)
         return
 
-    checks: list[dict] = []
+    checks: list[dict[str, Any]] = []
     all_passed = True
 
     # Check 1: Repository initialized
@@ -193,7 +195,7 @@ def doctor_command(
     _output_results(checks, all_passed, json_output)
 
 
-def _output_results(checks: list[dict], all_passed: bool, json_output: bool) -> None:
+def _output_results(checks: list[dict[str, Any]], all_passed: bool, json_output: bool) -> None:
     """Output doctor results."""
     next_actions = []
     if not all_passed:

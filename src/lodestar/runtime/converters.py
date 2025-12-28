@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from lodestar.models.runtime import Agent, Lease, Message, MessageType
 from lodestar.runtime.models import AgentModel, LeaseModel, MessageModel
@@ -20,7 +20,7 @@ def _ensure_utc(dt: datetime) -> datetime:
         A timezone-aware datetime in UTC.
     """
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 

@@ -75,7 +75,11 @@ def extract_prd_section(
         for i in range(start_line + 1, len(all_lines)):
             line = all_lines[i]
             next_heading = re.match(r"^(#{1,6})\s+", line)
-            if next_heading and len(next_heading.group(1)) <= heading_level:
+            if (
+                next_heading
+                and heading_level is not None
+                and len(next_heading.group(1)) <= heading_level
+            ):
                 end_line = i
                 break
 

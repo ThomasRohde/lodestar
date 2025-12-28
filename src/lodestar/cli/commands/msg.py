@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 import typer
 
@@ -247,7 +248,7 @@ def msg_inbox(
 
     runtime_path = get_runtime_db_path(root)
     if not runtime_path.exists():
-        messages = []
+        messages: list[Message] = []
         count = 0
     else:
         db = RuntimeDatabase(runtime_path)
@@ -292,7 +293,7 @@ def msg_inbox(
             )
             count = len(messages)
 
-    result = {
+    result: dict[str, Any] = {
         "count": count,
     }
 

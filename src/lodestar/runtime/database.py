@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +26,7 @@ from lodestar.util.paths import get_runtime_db_path
 
 def _utc_now() -> datetime:
     """Return current UTC datetime (timezone-aware)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class RuntimeDatabase:
@@ -161,7 +161,7 @@ class RuntimeDatabase:
                 .values(last_seen_at=_utc_now().isoformat())
             )
             result = session.execute(stmt)
-            return result.rowcount > 0
+            return bool(result.rowcount > 0)  # type: ignore[attr-defined]
 
     # Lease operations
 
@@ -258,7 +258,7 @@ class RuntimeDatabase:
             )
             result = session.execute(stmt)
 
-            if result.rowcount > 0:
+            if result.rowcount > 0:  # type: ignore[attr-defined]
                 # Get task_id for logging
                 lease_stmt = select(LeaseModel.task_id).where(LeaseModel.lease_id == lease_id)
                 task_id = session.execute(lease_stmt).scalar_one_or_none()
@@ -290,7 +290,7 @@ class RuntimeDatabase:
             )
             result = session.execute(stmt)
 
-            if result.rowcount > 0:
+            if result.rowcount > 0:  # type: ignore[attr-defined]
                 self._log_event(session, "task.release", agent_id, task_id, {})
                 return True
 
@@ -557,7 +557,7 @@ class RuntimeDatabase:
                 .group_by(MessageModel.to_id)
             )
             results = session.execute(stmt).all()
-            return {row.to_id: row.count for row in results}
+            return {row.to_id: row[1] for row in results}  # row[1] is the count
 
     def _log_event(
         self,

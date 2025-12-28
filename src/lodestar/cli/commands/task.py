@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import typer
 
@@ -383,7 +384,7 @@ def task_context(
         raise typer.Exit(1)
 
     # Build context bundle
-    context_bundle: dict = {
+    context_bundle: dict[str, Any] = {
         "task_id": task_id,
         "title": task.title,
         "description": task.description,
@@ -418,16 +419,20 @@ def task_context(
         if prd_path.exists():
             for ref in task.prd.refs:
                 try:
-                    lines_tuple = tuple(ref.lines) if ref.lines and len(ref.lines) == 2 else None
+                    lines_tuple: tuple[int, int] | None = None
+                    if ref.lines and len(ref.lines) == 2:
+                        lines_tuple = (ref.lines[0], ref.lines[1])
                     section = extract_prd_section(
                         prd_path,
                         anchor=ref.anchor,
                         lines=lines_tuple,
                     )
-                    prd_sections.append({
-                        "anchor": ref.anchor,
-                        "content": section,
-                    })
+                    prd_sections.append(
+                        {
+                            "anchor": ref.anchor,
+                            "content": section,
+                        }
+                    )
                 except (ValueError, FileNotFoundError):
                     pass  # Section not found
 
@@ -435,11 +440,11 @@ def task_context(
         context_bundle["prd_sections"] = prd_sections
 
     # Truncate to budget
-    total_content = task.description
+    total_content = task.description or ""
     if task.prd and task.prd.excerpt:
         total_content += "\n" + task.prd.excerpt
-    for section in prd_sections:
-        total_content += "\n" + section["content"]
+    for sec in prd_sections:
+        total_content += "\n" + sec["content"]
 
     truncated_content = truncate_to_budget(total_content, max_chars)
     context_bundle["content"] = truncated_content
@@ -1004,7 +1009,7 @@ def task_claim(
                 console.print(f"  Expires in: {format_duration(remaining)}")
         raise typer.Exit(1)
 
-    result = {
+    result: dict[str, Any] = {
         "lease_id": created_lease.lease_id,
         "task_id": task_id,
         "agent_id": agent_id,
@@ -1013,16 +1018,16 @@ def task_claim(
     }
 
     # Build context bundle unless --no-context specified
-    warnings = []
+    warnings: list[str] = []
     if not no_context:
-        result["context"] = {
+        context: dict[str, Any] = {
             "title": task.title,
             "description": task.description,
         }
         if task.prd:
-            result["context"]["prd_source"] = task.prd.source
+            context["prd_source"] = task.prd.source
             if task.prd.excerpt:
-                result["context"]["prd_excerpt"] = truncate_to_budget(task.prd.excerpt, 1000)
+                context["prd_excerpt"] = truncate_to_budget(task.prd.excerpt, 1000)
 
             # Check for PRD drift
             if task.prd.prd_hash:
@@ -1036,6 +1041,7 @@ def task_claim(
                             )
                     except Exception:
                         pass  # Ignore hash check errors
+        result["context"] = context
 
     next_actions = [
         NextAction(
@@ -1061,7 +1067,9 @@ def task_claim(
     ]
 
     if json_output:
-        print_json(Envelope.success(result, next_actions=next_actions, warnings=warnings).model_dump())
+        print_json(
+            Envelope.success(result, next_actions=next_actions, warnings=warnings).model_dump()
+        )
     else:
         console.print()
         console.print(f"[success]Claimed task[/success] [task_id]{task_id}[/task_id]")
@@ -1078,7 +1086,11 @@ def task_claim(
             console.print("[info]Task Context:[/info]")
             console.print(f"  {task.title}")
             if task.description:
-                desc_preview = task.description[:200] + "..." if len(task.description) > 200 else task.description
+                desc_preview = (
+                    task.description[:200] + "..."
+                    if len(task.description) > 200
+                    else task.description
+                )
                 console.print(f"  {desc_preview}")
             if task.prd and task.prd.source:
                 console.print(f"  [muted]PRD: {task.prd.source}[/muted]")
@@ -1632,7 +1644,7 @@ def task_graph(
             console.print("[error]Spec not found[/error]")
         raise typer.Exit(1)
 
-    nodes = [
+    nodes: list[dict[str, Any]] = [
         {
             "id": t.id,
             "title": t.title,
@@ -1753,8 +1765,12 @@ def _show_explain_create(json_output: bool) -> None:
         console.print("\n[info]lodestar task create[/info]\n")
         console.print("Create a new task with detailed context for executing agents.\n")
         console.print("[info]Examples:[/info]")
-        console.print("  [command]lodestar task create --title 'Add login' --description 'WHAT: ...'[/command]")
-        console.print("  [command]lodestar task create --id F001 --title 'Feature' --depends-on F000[/command]")
+        console.print(
+            "  [command]lodestar task create --title 'Add login' --description 'WHAT: ...'[/command]"
+        )
+        console.print(
+            "  [command]lodestar task create --id F001 --title 'Feature' --depends-on F000[/command]"
+        )
         console.print()
 
 
@@ -1780,7 +1796,9 @@ def _show_explain_update(json_output: bool) -> None:
         console.print("Update an existing task's properties.\n")
         console.print("[info]Examples:[/info]")
         console.print("  [command]lodestar task update F001 --title 'New title'[/command]")
-        console.print("  [command]lodestar task update F001 --priority 1 --add-label urgent[/command]")
+        console.print(
+            "  [command]lodestar task update F001 --priority 1 --add-label urgent[/command]"
+        )
         console.print()
 
 

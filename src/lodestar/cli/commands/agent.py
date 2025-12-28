@@ -444,7 +444,14 @@ class BriefFormat:
         return [cls.CLAUDE, cls.COPILOT, cls.GENERIC]
 
 
-def _format_brief_claude(task_id: str, title: str, description: str, acceptance_criteria: list[str], locks: list[str], labels: list[str]) -> str:
+def _format_brief_claude(
+    task_id: str,
+    title: str,
+    description: str,
+    acceptance_criteria: list[str],
+    locks: list[str],
+    labels: list[str],
+) -> str:
     """Format brief in Claude XML style with system prompt structure."""
     lines = []
     lines.append("<task>")
@@ -471,13 +478,22 @@ def _format_brief_claude(task_id: str, title: str, description: str, acceptance_
         lines.append("")
     lines.append("<instructions>")
     lines.append(f"  1. Claim task: lodestar task claim {task_id} --agent YOUR_AGENT_ID")
-    lines.append(f"  2. Report progress: lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Update'")
+    lines.append(
+        f"  2. Report progress: lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Update'"
+    )
     lines.append(f"  3. Mark complete: lodestar task done {task_id}")
     lines.append("</instructions>")
     return "\n".join(lines)
 
 
-def _format_brief_copilot(task_id: str, title: str, description: str, acceptance_criteria: list[str], locks: list[str], labels: list[str]) -> str:
+def _format_brief_copilot(
+    task_id: str,
+    title: str,
+    description: str,
+    acceptance_criteria: list[str],
+    locks: list[str],
+    labels: list[str],
+) -> str:
     """Format brief in GitHub Copilot style with markdown headers."""
     lines = []
     lines.append(f"## Task: {task_id}")
@@ -508,19 +524,28 @@ def _format_brief_copilot(task_id: str, title: str, description: str, acceptance
     lines.append("### Commands")
     lines.append("")
     lines.append("```bash")
-    lines.append(f"# Claim this task")
+    lines.append("# Claim this task")
     lines.append(f"lodestar task claim {task_id} --agent YOUR_AGENT_ID")
     lines.append("")
-    lines.append(f"# Report progress")
-    lines.append(f"lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Progress update'")
+    lines.append("# Report progress")
+    lines.append(
+        f"lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Progress update'"
+    )
     lines.append("")
-    lines.append(f"# Mark complete")
+    lines.append("# Mark complete")
     lines.append(f"lodestar task done {task_id}")
     lines.append("```")
     return "\n".join(lines)
 
 
-def _format_brief_generic(task_id: str, title: str, description: str, acceptance_criteria: list[str], locks: list[str], labels: list[str]) -> str:
+def _format_brief_generic(
+    task_id: str,
+    title: str,
+    description: str,
+    acceptance_criteria: list[str],
+    locks: list[str],
+    labels: list[str],
+) -> str:
     """Format brief in plain text with labeled sections."""
     lines = []
     lines.append(f"TASK: {task_id} - {title}")
@@ -542,7 +567,9 @@ def _format_brief_generic(task_id: str, title: str, description: str, acceptance
         lines.append("")
     lines.append("COMMANDS:")
     lines.append(f"  Claim:    lodestar task claim {task_id} --agent YOUR_AGENT_ID")
-    lines.append(f"  Progress: lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Update'")
+    lines.append(
+        f"  Progress: lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Update'"
+    )
     lines.append(f"  Done:     lodestar task done {task_id}")
     return "\n".join(lines)
 
@@ -586,7 +613,9 @@ def agent_brief(
     if format_type not in BriefFormat.all():
         valid = ", ".join(BriefFormat.all())
         if json_output:
-            print_json(Envelope.error(f"Invalid format '{format_type}'. Valid: {valid}").model_dump())
+            print_json(
+                Envelope.error(f"Invalid format '{format_type}'. Valid: {valid}").model_dump()
+            )
         else:
             console.print(f"[error]Invalid format '{format_type}'. Valid: {valid}[/error]")
         raise typer.Exit(1)
@@ -619,18 +648,30 @@ def agent_brief(
     # Format the brief based on format_type
     if format_type == BriefFormat.CLAUDE:
         formatted_brief = _format_brief_claude(
-            task.id, task.title, task.description or "",
-            task.acceptance_criteria, task.locks, task.labels
+            task.id,
+            task.title,
+            task.description or "",
+            task.acceptance_criteria,
+            task.locks,
+            task.labels,
         )
     elif format_type == BriefFormat.COPILOT:
         formatted_brief = _format_brief_copilot(
-            task.id, task.title, task.description or "",
-            task.acceptance_criteria, task.locks, task.labels
+            task.id,
+            task.title,
+            task.description or "",
+            task.acceptance_criteria,
+            task.locks,
+            task.labels,
         )
     else:
         formatted_brief = _format_brief_generic(
-            task.id, task.title, task.description or "",
-            task.acceptance_criteria, task.locks, task.labels
+            task.id,
+            task.title,
+            task.description or "",
+            task.acceptance_criteria,
+            task.locks,
+            task.labels,
         )
 
     # Build structured brief for JSON output

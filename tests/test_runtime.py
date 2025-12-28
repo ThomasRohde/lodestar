@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -142,7 +142,7 @@ class TestLeaseOperations:
         agent = Agent()
         db.register_agent(agent)
 
-        expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expires = datetime.now(UTC) + timedelta(minutes=15)
         lease = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
         created = db.create_lease(lease)
 
@@ -153,7 +153,7 @@ class TestLeaseOperations:
         agent = Agent()
         db.register_agent(agent)
 
-        expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expires = datetime.now(UTC) + timedelta(minutes=15)
         lease1 = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
         db.create_lease(lease1)
 
@@ -165,7 +165,7 @@ class TestLeaseOperations:
         agent = Agent()
         db.register_agent(agent)
 
-        expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expires = datetime.now(UTC) + timedelta(minutes=15)
         lease = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
         db.create_lease(lease)
 
@@ -178,7 +178,7 @@ class TestLeaseOperations:
         db.register_agent(agent)
 
         # Create an already expired lease
-        expires = datetime.now(timezone.utc) - timedelta(minutes=1)
+        expires = datetime.now(UTC) - timedelta(minutes=1)
         lease = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
         # Directly insert the lease bypassing the check using SQLAlchemy session
 
@@ -196,11 +196,11 @@ class TestLeaseOperations:
         agent = Agent()
         db.register_agent(agent)
 
-        expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expires = datetime.now(UTC) + timedelta(minutes=15)
         lease = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
         created = db.create_lease(lease)
 
-        new_expires = datetime.now(timezone.utc) + timedelta(minutes=30)
+        new_expires = datetime.now(UTC) + timedelta(minutes=30)
         success = db.renew_lease(created.lease_id, new_expires, agent.agent_id)
         assert success is True
 
@@ -211,7 +211,7 @@ class TestLeaseOperations:
         agent = Agent()
         db.register_agent(agent)
 
-        expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expires = datetime.now(UTC) + timedelta(minutes=15)
         lease = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
         db.create_lease(lease)
 
@@ -327,7 +327,7 @@ class TestMessageOperations:
 
         # Wait a bit
         time.sleep(0.1)
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         time.sleep(0.1)
 
         # Send second message
@@ -421,7 +421,7 @@ class TestMessageOperations:
         db.send_message(msg1)
 
         time.sleep(0.1)
-        since_time = datetime.now(timezone.utc)
+        since_time = datetime.now(UTC)
         time.sleep(0.1)
 
         msg2 = Message(
@@ -433,7 +433,7 @@ class TestMessageOperations:
         db.send_message(msg2)
 
         time.sleep(0.1)
-        until_time = datetime.now(timezone.utc)
+        until_time = datetime.now(UTC)
 
         # Search with since
         results = db.search_messages(since=since_time)
@@ -577,7 +577,7 @@ class TestStats:
         agent = Agent()
         db.register_agent(agent)
 
-        expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expires = datetime.now(UTC) + timedelta(minutes=15)
         lease = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
         db.create_lease(lease)
 

@@ -11,7 +11,7 @@ import pytest
 from typer.testing import CliRunner
 
 from lodestar.cli.app import app
-from lodestar.models.spec import PrdContext, PrdRef, Task, TaskStatus
+from lodestar.models.spec import PrdContext, PrdRef, Task
 from lodestar.util.prd import (
     check_prd_drift,
     compute_prd_hash,

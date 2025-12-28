@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 import typer
 
@@ -65,8 +66,8 @@ def export_snapshot(
         raise typer.Exit(1)
 
     # Build spec snapshot
-    snapshot = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+    snapshot: dict[str, Any] = {
+        "timestamp": datetime.now(UTC).isoformat(),
         "spec": {
             "project": spec.project.model_dump(),
             "tasks": {

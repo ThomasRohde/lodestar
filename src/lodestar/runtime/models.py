@@ -10,7 +10,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
 
-class JSONField(TypeDecorator):
+class JSONField(TypeDecorator[Any]):
     """Store JSON as TEXT in SQLite."""
 
     impl = Text

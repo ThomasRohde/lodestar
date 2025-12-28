@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -121,14 +121,14 @@ class TestLease:
     """Test Lease model."""
 
     def test_lease_creation(self):
-        expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expires = datetime.now(UTC) + timedelta(minutes=15)
         lease = Lease(task_id="T001", agent_id="A12345678", expires_at=expires)
         assert lease.task_id == "T001"
         assert not lease.is_expired()
         assert lease.is_active()
 
     def test_lease_expired(self):
-        expires = datetime.now(timezone.utc) - timedelta(minutes=1)
+        expires = datetime.now(UTC) - timedelta(minutes=1)
         lease = Lease(task_id="T001", agent_id="A12345678", expires_at=expires)
         assert lease.is_expired()
         assert not lease.is_active()
