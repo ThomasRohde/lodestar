@@ -1,0 +1,133 @@
+"""Agent management tools for MCP."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from mcp.types import CallToolResult
+
+from lodestar.mcp.output import format_summary, success
+from lodestar.mcp.server import LodestarContext
+from lodestar.mcp.validation import validate_ttl
+from lodestar.models.runtime import Agent
+
+
+def agent_join(
+    context: LodestarContext,
+    name: str | None = None,
+    client: str | None = None,
+    model: str | None = None,
+    capabilities: list[str] | None = None,
+    ttl_seconds: int | None = None,
+) -> CallToolResult:
+    """
+    Register as an agent and get identity.
+
+    This is the canonical entrypoint for agents. This is the only mutating
+    tool that doesn't require an agentId parameter.
+
+    Args:
+        context: Lodestar server context
+        name: Display name for this agent (optional)
+        client: Client name (e.g., 'claude-desktop', 'vscode') (optional)
+        model: Model name (e.g., 'claude-3.5-sonnet') (optional)
+        capabilities: List of agent capabilities (optional)
+        ttl_seconds: Default TTL for leases in seconds (optional)
+
+    Returns:
+        CallToolResult with agent ID and registration details
+    """
+    # Build session metadata
+    session_meta = {}
+    if model:
+        session_meta["model"] = model
+    if client:
+        session_meta["client"] = client
+
+    # Validate and set TTL
+    validated_ttl = validate_ttl(ttl_seconds)
+
+    # Create and register agent
+    agent = Agent(
+        display_name=name or "",
+        role="",  # Role not exposed in MCP interface
+        capabilities=capabilities or [],
+        session_meta=session_meta,
+    )
+    context.db.register_agent(agent)
+
+    # Get claimable task count for context
+    context.reload_spec()
+    claimable_count = len(context.spec.get_claimable_tasks())
+
+    # Get current server time
+    server_time = datetime.now(UTC).isoformat()
+
+    # Build structured data
+    data = {
+        "agentId": agent.agent_id,
+        "displayName": agent.display_name,
+        "capabilities": agent.capabilities,
+        "registeredAt": agent.created_at.isoformat(),
+        "sessionMeta": session_meta,
+        "leaseDefaults": {
+            "ttlSeconds": validated_ttl,
+        },
+        "serverTime": server_time,
+        "notes": [
+            f"{claimable_count} tasks available to claim",
+            "Use task.next to find claimable tasks",
+            "Remember to renew leases before they expire",
+        ],
+    }
+
+    # Build summary
+    summary = format_summary(
+        "Registered as agent",
+        agent.agent_id,
+        f"({claimable_count} tasks available)",
+    )
+
+    return success(summary, data=data)
+
+
+def register_agent_tools(mcp: object, context: LodestarContext) -> None:
+    """
+    Register agent management tools with the FastMCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        context: Lodestar context to use for all tools
+    """
+
+    @mcp.tool(name="lodestar.agent.join")
+    def join_tool(
+        name: str | None = None,
+        client: str | None = None,
+        model: str | None = None,
+        capabilities: list[str] | None = None,
+        ttl_seconds: int | None = None,
+    ) -> CallToolResult:
+        """Register as an agent and get your identity.
+
+        This is the canonical entrypoint for agents. Call this first to register
+        and get your agent ID, then use that ID for all subsequent operations.
+
+        Args:
+            name: Optional display name for this agent
+            client: Optional client name (e.g., 'claude-desktop', 'vscode')
+            model: Optional model name (e.g., 'claude-3.5-sonnet')
+            capabilities: Optional list of agent capabilities
+            ttl_seconds: Optional default TTL for leases in seconds (60-7200)
+
+        Returns:
+            Agent ID and registration details including lease defaults
+        """
+        return agent_join(
+            context=context,
+            name=name,
+            client=client,
+            model=model,
+            capabilities=capabilities,
+            ttl_seconds=ttl_seconds,
+        )
