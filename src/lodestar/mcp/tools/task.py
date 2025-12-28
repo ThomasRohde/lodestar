@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from mcp.types import CallToolResult
 
-from lodestar.mcp.output import format_summary, with_list
+from lodestar.mcp.output import error, format_summary, with_item, with_list
 from lodestar.mcp.server import LodestarContext
-from lodestar.mcp.validation import ValidationError, clamp_limit
+from lodestar.mcp.validation import ValidationError, clamp_limit, validate_task_id
 from lodestar.models.spec import TaskStatus
+from lodestar.util.prd import check_prd_drift
 
 
 def task_list(
@@ -150,6 +151,165 @@ def task_list(
     )
 
 
+def task_get(
+    context: LodestarContext,
+    task_id: str,
+) -> CallToolResult:
+    """
+    Get detailed information about a specific task.
+
+    Returns comprehensive task details including spec information, runtime state,
+    PRD context, dependency graph, and warnings.
+
+    Args:
+        context: Lodestar server context
+        task_id: Task ID to retrieve (required)
+
+    Returns:
+        CallToolResult with detailed task information
+    """
+    # Validate task ID
+    try:
+        validated_task_id = validate_task_id(task_id)
+    except ValidationError as e:
+        return error(str(e), error_code="INVALID_TASK_ID")
+
+    # Reload spec to get latest state
+    context.reload_spec()
+
+    # Get task from spec
+    task = context.spec.get_task(validated_task_id)
+    if task is None:
+        return error(
+            f"Task {validated_task_id} not found",
+            error_code="TASK_NOT_FOUND",
+            details={"task_id": validated_task_id},
+        )
+
+    # Get dependency graph info
+    dep_graph = context.spec.get_dependency_graph()
+    dependents = dep_graph.get(validated_task_id, [])
+
+    # Get active lease if any
+    lease = context.db.get_active_lease(validated_task_id)
+
+    # Check for claimability
+    verified_tasks = context.spec.get_verified_tasks()
+    is_claimable = task.is_claimable(verified_tasks)
+
+    # Build task detail structure
+    task_detail = {
+        "id": task.id,
+        "title": task.title,
+        "description": task.description,
+        "acceptanceCriteria": task.acceptance_criteria,
+        "status": task.status.value,
+        "priority": task.priority,
+        "labels": task.labels,
+        "locks": task.locks,
+        "createdAt": task.created_at.isoformat(),
+        "updatedAt": task.updated_at.isoformat(),
+    }
+
+    # Add dependency information
+    task_detail["dependencies"] = {
+        "dependsOn": task.depends_on,
+        "dependents": dependents,
+        "isClaimable": is_claimable,
+    }
+
+    # Add PRD context if available
+    if task.prd:
+        prd_data = {
+            "source": task.prd.source,
+            "refs": [
+                {
+                    "anchor": ref.anchor,
+                    "lines": ref.lines,
+                }
+                for ref in task.prd.refs
+            ],
+            "excerpt": task.prd.excerpt,
+            "prdHash": task.prd.prd_hash,
+        }
+        task_detail["prd"] = prd_data
+    else:
+        task_detail["prd"] = None
+
+    # Add runtime information
+    runtime_info = {
+        "claimed": lease is not None,
+    }
+
+    if lease:
+        runtime_info["claimedBy"] = {
+            "agentId": lease.agent_id,
+            "leaseId": lease.lease_id,
+            "expiresAt": lease.expires_at.isoformat(),
+            "createdAt": lease.created_at.isoformat(),
+        }
+    else:
+        runtime_info["claimedBy"] = None
+
+    task_detail["runtime"] = runtime_info
+
+    # Generate warnings
+    warnings = []
+
+    # Check for PRD drift
+    if task.prd and task.prd.prd_hash:
+        prd_path = context.repo_root / task.prd.source
+        if not prd_path.exists():
+            warnings.append(
+                {
+                    "type": "MISSING_PRD_SOURCE",
+                    "message": f"PRD source file not found: {task.prd.source}",
+                    "severity": "warning",
+                }
+            )
+        else:
+            try:
+                if check_prd_drift(task.prd.prd_hash, prd_path):
+                    warnings.append(
+                        {
+                            "type": "PRD_DRIFT_DETECTED",
+                            "message": f"PRD file {task.prd.source} has changed since task creation",
+                            "severity": "info",
+                        }
+                    )
+            except Exception:
+                # If we can't check drift, add a warning
+                warnings.append(
+                    {
+                        "type": "PRD_DRIFT_CHECK_FAILED",
+                        "message": f"Could not verify PRD drift for {task.prd.source}",
+                        "severity": "warning",
+                    }
+                )
+
+    # Check for missing dependencies
+    missing_deps = [dep for dep in task.depends_on if dep not in context.spec.tasks]
+    if missing_deps:
+        warnings.append(
+            {
+                "type": "MISSING_DEPENDENCIES",
+                "message": f"Task has dependencies that don't exist: {', '.join(missing_deps)}",
+                "severity": "error",
+            }
+        )
+
+    task_detail["warnings"] = warnings
+
+    # Build summary
+    summary = format_summary(
+        "Task",
+        task.id,
+        f"- {task.title} ({task.status.value})",
+    )
+
+    return with_item(summary, item=task_detail)
+
+
 def register_task_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register task management tools with the FastMCP server.
@@ -187,3 +347,23 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
             limit=limit,
             cursor=cursor,
         )
+
+    @mcp.tool(name="lodestar.task.get")
+    def get_tool(task_id: str) -> CallToolResult:
+        """Get detailed information about a specific task.
+
+        Returns comprehensive task details including description, acceptance criteria,
+        PRD context, dependency graph, runtime state, and warnings.
+
+        Args:
+            task_id: Task ID to retrieve (required)
+
+        Returns:
+            Detailed task information with:
+            - Task details (description, acceptance criteria, labels, locks, etc.)
+            - Dependency information (dependsOn, dependents, isClaimable)
+            - PRD context (source, refs, excerpt, prdHash) if available
+            - Runtime state (claimed status, lease info)
+            - Warnings (PRD drift, missing dependencies)
+        """
+        return task_get(context=context, task_id=task_id)
