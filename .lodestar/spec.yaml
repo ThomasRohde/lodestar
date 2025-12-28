@@ -1954,9 +1954,9 @@ tasks:
     - phase3
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:48:12.924101+00:00'
-    updated_at: '2025-12-28T07:48:12.924104+00:00'
+    updated_at: '2025-12-28T10:08:24.537880+00:00'
   R010:
     title: Extract message_service.py
     description: Create core/message_service.py with inbox query building, search
@@ -1969,9 +1969,9 @@ tasks:
     - phase3
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:48:14.999851+00:00'
-    updated_at: '2025-12-28T07:48:14.999855+00:00'
+    updated_at: '2025-12-28T10:08:54.729446+00:00'
   R011:
     title: Slim down msg.py CLI commands
     description: 'Refactor msg.py to use extracted services. Target: ~300 lines'
@@ -1983,9 +1983,9 @@ tasks:
     - phase3
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:48:17.119747+00:00'
-    updated_at: '2025-12-28T07:48:17.119751+00:00'
+    updated_at: '2025-12-28T10:08:58.562217+00:00'
   R012:
     title: Extract agent_service.py
     description: Create core/agent_service.py with agent registration, discovery,
