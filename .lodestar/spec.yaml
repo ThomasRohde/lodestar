@@ -1533,6 +1533,181 @@ tasks:
     status: verified
     created_at: '2025-12-28T01:06:57.736880+00:00'
     updated_at: '2025-12-28T01:20:19.248872+00:00'
+  H001:
+    title: Add --explain with examples to 9 commands
+    description: 'WHAT: Add --explain flag with usage examples to 9 commands that
+      currently lack it: task create, task update, task renew, task release, task
+      done, task verify, task delete, task graph (in task.py), and agent heartbeat
+      (in agent.py).
+
+
+      WHERE: src/lodestar/cli/commands/task.py, src/lodestar/cli/commands/agent.py
+
+
+      WHY: PRD requires all commands support --explain for progressive discovery.
+      Currently 9 commands are missing this flag, making it harder for agents to understand
+      command purpose and usage.
+
+
+      ACCEPT:
+
+      1) All 9 commands accept --explain flag
+
+      2) Each --explain output includes: command purpose, 1-2 usage examples
+
+      3) Examples follow existing pattern from task claim (see _show_explain functions)
+
+      4) Both --json and human-readable --explain work
+
+      5) uv run pytest passes
+
+
+      CONTEXT: See task claim''s _show_explain() in task.py as canonical pattern.
+      Each explain should include ''command'', ''purpose'', ''examples'' keys for
+      JSON output. Human output uses Rich console.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - cli
+    - help
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T01:30:03.414256+00:00'
+    updated_at: '2025-12-28T01:30:03.414259+00:00'
+  H002:
+    title: Differentiate agent brief --format outputs
+    description: 'WHAT: Implement distinct output formats for ''lodestar agent brief
+      --format'' option. Currently all three formats (claude, copilot, generic) produce
+      identical output.
+
+
+      WHERE: src/lodestar/cli/commands/agent.py (brief_command function), tests/test_cli.py
+
+
+      WHY: The --format option promises different output tailored to each agent type,
+      but delivers the same output. This breaks user expectations and wastes the option.
+
+
+      ACCEPT:
+
+      1) claude format: XML-style tags (<task>, <context>, <acceptance_criteria>),
+      system prompt structure
+
+      2) copilot format: GitHub-flavored markdown with ## headers, instructions block,
+      code fences
+
+      3) generic format: Plain structured text with labeled sections (TASK:, CONTEXT:,
+      CRITERIA:)
+
+      4) Tests in test_cli.py verify each format contains expected structure markers
+
+      5) --json output includes ''format'' field indicating which was used
+
+      6) uv run pytest passes
+
+
+      CONTEXT: See brief_command in agent.py around line 200-280. The BriefFormat
+      enum already exists. Each format should be optimized for how that agent type
+      processes prompts.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - cli
+    - agent
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T01:30:13.902206+00:00'
+    updated_at: '2025-12-28T01:30:13.902209+00:00'
+  H003:
+    title: Standardize REQUIRED markers and add docstring examples
+    description: 'WHAT: Audit all CLI option definitions and standardize help text.
+      Add ''(REQUIRED)'' marker to required options. Add inline examples to command
+      docstrings that lack them.
+
+
+      WHERE: src/lodestar/cli/commands/task.py, src/lodestar/cli/commands/msg.py,
+      src/lodestar/cli/commands/export.py
+
+
+      WHY: Inconsistent help text confuses agents. Some options say ''REQUIRED'',
+      others don''t. Some commands have docstring examples, others don''t. Agents
+      need clear, consistent guidance.
+
+
+      ACCEPT:
+
+      1) These options explicitly say ''(REQUIRED)'' in help: task claim --agent,
+      task renew --agent, msg send --from, msg send --to, msg send --text
+
+      2) Docstring examples added to: task renew, task release, task done, task verify,
+      task delete, task graph, export snapshot
+
+      3) Examples use realistic values (not placeholder text)
+
+      4) Examples appear in --help output (use Typer''s backslash-b formatting)
+
+      5) uv run pytest passes
+
+
+      CONTEXT: See task claim docstring for example format using backslash-b. Typer
+      preserves formatting after backslash-b. Use realistic task IDs like F001, agent
+      IDs like A1234567.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - cli
+    - help
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T01:30:24.867188+00:00'
+    updated_at: '2025-12-28T01:30:24.867191+00:00'
+  H004:
+    title: Update CLI documentation with missing commands
+    description: 'WHAT: Update CLI documentation index to include all commands. Add
+      missing commands to summary tables and ensure cross-references are complete.
+
+
+      WHERE: docs/cli/index.md, docs/cli/task.md, docs/cli/msg.md, docs/cli/agent.md
+
+
+      WHY: CLI docs index tables are missing several commands that exist in the codebase:
+      task context, msg search, msg wait, agent find, agent brief. Agents consulting
+      docs won''t discover these commands.
+
+
+      ACCEPT:
+
+      1) docs/cli/index.md summary tables include ALL commands from the codebase
+
+      2) task context documented in docs/cli/task.md with examples
+
+      3) msg search, msg wait documented in docs/cli/msg.md with examples
+
+      4) agent find, agent brief documented in docs/cli/agent.md with examples
+
+      5) All new sections include --json examples for programmatic usage
+
+      6) uv run mkdocs build succeeds without warnings
+
+
+      CONTEXT: Run ''uv run lodestar --help'', ''uv run lodestar task --help'', etc.
+      to get authoritative command lists. Each command doc should match the --help
+      output and add practical examples.'
+    acceptance_criteria: []
+    depends_on:
+    - H001
+    - H002
+    - H003
+    labels:
+    - docs
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-28T01:30:36.406697+00:00'
+    updated_at: '2025-12-28T01:30:36.406701+00:00'
 features:
   m0-skeleton:
   - F001

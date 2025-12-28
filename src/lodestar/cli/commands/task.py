@@ -542,6 +542,11 @@ def task_create(
         "--json",
         help="Output in JSON format.",
     ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
 ) -> None:
     """Create a new task.
 
@@ -553,6 +558,10 @@ def task_create(
             --description "WHAT: Add X. WHERE: src/x/. ACCEPT: tests pass" \\
             --depends-on F000 --label feature
     """
+    if explain:
+        _show_explain_create(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -677,8 +686,13 @@ def task_update(
     add_label: list[str] | None = typer.Option(None, "--add-label", help="Add a label."),
     remove_label: list[str] | None = typer.Option(None, "--remove-label", help="Remove a label."),
     json_output: bool = typer.Option(False, "--json", help="Output in JSON format."),
+    explain: bool = typer.Option(False, "--explain", help="Show what this command does."),
 ) -> None:
     """Update an existing task's properties."""
+    if explain:
+        _show_explain_update(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -1087,6 +1101,11 @@ def task_renew(
         "--json",
         help="Output in JSON format.",
     ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
 ) -> None:
     """Renew your claim on a task.
 
@@ -1096,6 +1115,10 @@ def task_renew(
     Example:
         lodestar task renew F001 --agent A1234ABCD
     """
+    if explain:
+        _show_explain_renew(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -1174,6 +1197,11 @@ def task_release(
         "--json",
         help="Output in JSON format.",
     ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
 ) -> None:
     """Release your claim on a task.
 
@@ -1187,6 +1215,10 @@ def task_release(
         lodestar task release F001
         lodestar msg send --to task:F001 --from A1234ABCD --text 'Blocked on X'
     """
+    if explain:
+        _show_explain_release(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -1231,8 +1263,17 @@ def task_done(
         "--json",
         help="Output in JSON format.",
     ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
 ) -> None:
     """Mark a task as done."""
+    if explain:
+        _show_explain_done(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -1277,8 +1318,17 @@ def task_verify(
         "--json",
         help="Output in JSON format.",
     ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
 ) -> None:
     """Mark a task as verified (unblocks dependents)."""
+    if explain:
+        _show_explain_verify(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -1355,6 +1405,11 @@ def task_delete(
         "--json",
         help="Output in JSON format.",
     ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
 ) -> None:
     """Soft-delete a task (status=deleted).
 
@@ -1369,6 +1424,10 @@ def task_delete(
         lodestar task delete F001              # Delete if no dependents
         lodestar task delete F001 --cascade    # Delete and cascade to dependents
     """
+    if explain:
+        _show_explain_delete(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -1483,8 +1542,17 @@ def task_graph(
         "--json",
         help="Output in JSON format.",
     ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
 ) -> None:
     """Export the task dependency graph."""
+    if explain:
+        _show_explain_graph(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -1582,6 +1650,10 @@ def _show_explain_claim(json_output: bool) -> None:
     explanation = {
         "command": "lodestar task claim",
         "purpose": "Claim a task with a time-limited lease.",
+        "examples": [
+            "lodestar task claim F001 --agent A1234ABCD",
+            "lodestar task claim F001 --agent A1234ABCD --ttl 30m",
+        ],
         "notes": [
             "Leases auto-expire (default 15m)",
             "Only one agent can claim a task at a time",
@@ -1593,3 +1665,205 @@ def _show_explain_claim(json_output: bool) -> None:
     else:
         console.print("\n[info]lodestar task claim[/info]\n")
         console.print("Claim a task with a time-limited lease.\n")
+        console.print("[info]Examples:[/info]")
+        console.print("  [command]lodestar task claim F001 --agent A1234ABCD[/command]")
+        console.print("  [command]lodestar task claim F001 --agent A1234ABCD --ttl 30m[/command]")
+        console.print()
+
+
+def _show_explain_create(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task create",
+        "purpose": "Create a new task with detailed context for executing agents.",
+        "examples": [
+            "lodestar task create --title 'Add login' --description 'WHAT: Add login form...'",
+            "lodestar task create --id F001 --title 'Feature' --depends-on F000 --label feature",
+        ],
+        "notes": [
+            "Write detailed descriptions with WHAT, WHERE, WHY, ACCEPT, CONTEXT",
+            "Task ID is auto-generated if not provided",
+            "Use --depends-on to set task dependencies",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task create[/info]\n")
+        console.print("Create a new task with detailed context for executing agents.\n")
+        console.print("[info]Examples:[/info]")
+        console.print("  [command]lodestar task create --title 'Add login' --description 'WHAT: ...'[/command]")
+        console.print("  [command]lodestar task create --id F001 --title 'Feature' --depends-on F000[/command]")
+        console.print()
+
+
+def _show_explain_update(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task update",
+        "purpose": "Update an existing task's properties.",
+        "examples": [
+            "lodestar task update F001 --title 'New title'",
+            "lodestar task update F001 --priority 1 --add-label urgent",
+            "lodestar task update F001 --status blocked",
+        ],
+        "notes": [
+            "Only specified fields are updated",
+            "Use --add-label and --remove-label to modify labels",
+            "Updates the task's updated_at timestamp",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task update[/info]\n")
+        console.print("Update an existing task's properties.\n")
+        console.print("[info]Examples:[/info]")
+        console.print("  [command]lodestar task update F001 --title 'New title'[/command]")
+        console.print("  [command]lodestar task update F001 --priority 1 --add-label urgent[/command]")
+        console.print()
+
+
+def _show_explain_renew(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task renew",
+        "purpose": "Extend your lease on a claimed task.",
+        "examples": [
+            "lodestar task renew F001 --agent A1234ABCD",
+            "lodestar task renew F001 --agent A1234ABCD --ttl 30m",
+        ],
+        "notes": [
+            "Only the agent who claimed the task can renew it",
+            "Default extension is 15 minutes",
+            "Renew before your lease expires to keep working",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task renew[/info]\n")
+        console.print("Extend your lease on a claimed task.\n")
+        console.print("[info]Examples:[/info]")
+        console.print("  [command]lodestar task renew F001 --agent A1234ABCD[/command]")
+        console.print("  [command]lodestar task renew F001 --agent A1234ABCD --ttl 30m[/command]")
+        console.print()
+
+
+def _show_explain_release(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task release",
+        "purpose": "Release your claim on a task so others can work on it.",
+        "examples": [
+            "lodestar task release F001",
+            "lodestar task release F001 --agent A1234ABCD",
+        ],
+        "notes": [
+            "Use when you're blocked or can't complete the task",
+            "Consider leaving a message with context for the next agent",
+            "Not needed after 'task done' or 'task verify' (auto-releases)",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task release[/info]\n")
+        console.print("Release your claim on a task so others can work on it.\n")
+        console.print("[info]Examples:[/info]")
+        console.print("  [command]lodestar task release F001[/command]")
+        console.print("  [command]lodestar task release F001 --agent A1234ABCD[/command]")
+        console.print()
+
+
+def _show_explain_done(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task done",
+        "purpose": "Mark a task as done (implementation complete).",
+        "examples": [
+            "lodestar task done F001",
+        ],
+        "notes": [
+            "Sets task status to 'done'",
+            "Next step is 'task verify' after review",
+            "Does not auto-release lease (verify does)",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task done[/info]\n")
+        console.print("Mark a task as done (implementation complete).\n")
+        console.print("[info]Example:[/info]")
+        console.print("  [command]lodestar task done F001[/command]")
+        console.print()
+
+
+def _show_explain_verify(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task verify",
+        "purpose": "Mark a task as verified, unblocking dependent tasks.",
+        "examples": [
+            "lodestar task verify F001",
+        ],
+        "notes": [
+            "Task must be in 'done' status first",
+            "Unblocks tasks that depend on this one",
+            "Auto-releases any active lease",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task verify[/info]\n")
+        console.print("Mark a task as verified, unblocking dependent tasks.\n")
+        console.print("[info]Example:[/info]")
+        console.print("  [command]lodestar task verify F001[/command]")
+        console.print()
+
+
+def _show_explain_delete(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task delete",
+        "purpose": "Soft-delete a task (sets status to 'deleted').",
+        "examples": [
+            "lodestar task delete F001",
+            "lodestar task delete F001 --cascade",
+        ],
+        "notes": [
+            "Tasks are soft-deleted, not physically removed",
+            "Deleted tasks hidden from list (use --include-deleted)",
+            "Use --cascade to delete tasks that depend on this one",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task delete[/info]\n")
+        console.print("Soft-delete a task (sets status to 'deleted').\n")
+        console.print("[info]Examples:[/info]")
+        console.print("  [command]lodestar task delete F001[/command]")
+        console.print("  [command]lodestar task delete F001 --cascade[/command]")
+        console.print()
+
+
+def _show_explain_graph(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task graph",
+        "purpose": "Export the task dependency graph.",
+        "examples": [
+            "lodestar task graph",
+            "lodestar task graph --format dot",
+            "lodestar task graph --json",
+        ],
+        "notes": [
+            "Default format is JSON with nodes and edges",
+            "Use --format dot for Graphviz DOT output",
+            "Useful for visualizing task dependencies",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task graph[/info]\n")
+        console.print("Export the task dependency graph.\n")
+        console.print("[info]Examples:[/info]")
+        console.print("  [command]lodestar task graph[/command]")
+        console.print("  [command]lodestar task graph --format dot[/command]")
+        console.print()

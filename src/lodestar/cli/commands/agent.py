@@ -384,8 +384,17 @@ def agent_heartbeat(
         "--json",
         help="Output in JSON format.",
     ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
 ) -> None:
     """Update agent heartbeat timestamp."""
+    if explain:
+        _show_explain_heartbeat(json_output)
+        return
+
     root = find_lodestar_root()
     if root is None:
         if json_output:
@@ -605,4 +614,32 @@ def _show_explain_find(json_output: bool) -> None:
         console.print("Examples:")
         console.print("  [command]lodestar agent find --capability python[/command]")
         console.print("  [command]lodestar agent find --role code-review[/command]")
+        console.print()
+
+
+def _show_explain_heartbeat(json_output: bool) -> None:
+    """Show heartbeat command explanation."""
+    explanation = {
+        "command": "lodestar agent heartbeat",
+        "purpose": "Update agent heartbeat timestamp to show activity.",
+        "examples": [
+            "lodestar agent heartbeat A1234ABCD",
+        ],
+        "notes": [
+            "Updates last_seen_at timestamp for the agent",
+            "Keeps agent status as 'active' instead of 'idle' or 'offline'",
+            "Call periodically during long-running work",
+        ],
+    }
+
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print()
+        console.print("[info]lodestar agent heartbeat[/info]")
+        console.print()
+        console.print("Update agent heartbeat timestamp to show activity.")
+        console.print()
+        console.print("[info]Example:[/info]")
+        console.print("  [command]lodestar agent heartbeat A1234ABCD[/command]")
         console.print()
