@@ -140,6 +140,10 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
     register_event_tools(mcp, context)
     logger.info("Registered repository, agent, task, task mutation, message, and event tools")
 
-    # TODO: Register resources
+    # Register resources
+    from lodestar.mcp.resources import register_resources
+
+    register_resources(mcp, repo_root)
+    logger.info("Registered resources")
 
     return mcp

@@ -2435,9 +2435,9 @@ tasks:
     - feature
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:07:00.565574+00:00'
-    updated_at: '2025-12-28T13:07:00.565578+00:00'
+    updated_at: '2025-12-28T17:10:49.814006+00:00'
   MCP-070:
     title: Implement lodestar://spec resource
     description: Create mcp/resources.py. Implement lodestar://spec resource that
