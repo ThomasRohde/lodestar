@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from lodestar import __version__
-from lodestar.cli.commands import agent, doctor, export, init, msg, status, task
+from lodestar.cli.commands import agent, doctor, export, init, mcp, msg, status, task
 
 # Main app
 app = typer.Typer(
@@ -19,6 +19,7 @@ app = typer.Typer(
 app.add_typer(agent.app, name="agent", help="Agent identity and management")
 app.add_typer(task.app, name="task", help="Task management and scheduling")
 app.add_typer(msg.app, name="msg", help="Agent messaging")
+app.add_typer(mcp.app, name="mcp", help="MCP server management")
 app.add_typer(export.app, name="export", help="Export repository state")
 
 # Register top-level commands
