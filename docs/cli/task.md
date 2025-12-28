@@ -86,6 +86,100 @@ Claimable - run lodestar task claim F002 to claim
 
 ---
 
+## task context
+
+Get PRD context for a task.
+
+```bash
+lodestar task context TASK_ID [OPTIONS]
+```
+
+Returns the task's PRD references, frozen excerpt, and live PRD sections. Respects a character budget for context window management.
+
+!!! tip "PRD Context Feature"
+    This command surfaces intent from the PRD without requiring agents to re-read
+    the entire document. It's the "just enough context" delivery mechanism.
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `TASK_ID` | Task ID to get context for (required) |
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--max-chars INTEGER` | `-m` | Maximum characters for context output (default: 1000) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
+
+### What It Returns
+
+- **Task description** from the spec
+- **PRD source** file path (if linked)
+- **PRD references** (section anchors)
+- **Frozen excerpt** (snapshot from task creation)
+- **Live PRD sections** (extracted from current PRD)
+- **Drift warnings** if the PRD has changed since task creation
+
+### Example
+
+```bash
+$ lodestar task context F002
+Context for F002
+
+PRD Source: PRD.md
+References: #password-reset, #security-requirements
+
+Content:
+  Implement email-based password reset with secure token generation.
+  Tokens must expire after 15 minutes and be single-use.
+  ...
+```
+
+### JSON Output
+
+```bash
+$ lodestar task context F002 --json
+{
+  "ok": true,
+  "data": {
+    "task_id": "F002",
+    "title": "Add password reset",
+    "description": "Email-based password reset flow...",
+    "prd_source": "PRD.md",
+    "prd_refs": [
+      {"anchor": "#password-reset", "lines": null}
+    ],
+    "prd_excerpt": "Tokens must expire after 15 minutes...",
+    "prd_sections": [
+      {"anchor": "#password-reset", "content": "..."}
+    ],
+    "content": "...",
+    "truncated": false
+  },
+  "warnings": []
+}
+```
+
+### Drift Detection
+
+If the PRD file has changed since the task was created (based on stored hash), you'll see a warning:
+
+```bash
+$ lodestar task context F002
+Context for F002
+
+⚠ PRD has changed since task creation. Review PRD.md for updates.
+
+...
+```
+
+This helps agents know when task context may be stale.
+
+---
+
 ## task create
 
 Create a new task.
@@ -109,6 +203,9 @@ lodestar task create [OPTIONS]
 | `--status TEXT` | `-s` | Initial status (default: ready) |
 | `--depends-on TEXT` | | Task IDs this depends on (repeatable) |
 | `--label TEXT` | `-l` | Labels for the task (repeatable) |
+| `--prd-source TEXT` | | Path to PRD file (e.g., PRD.md) |
+| `--prd-ref TEXT` | | PRD section anchors (e.g., #task-claiming). Repeatable |
+| `--prd-excerpt TEXT` | | Frozen PRD excerpt to attach to task |
 | `--json` | | Output in JSON format |
 
 ### Writing Good Descriptions
@@ -137,6 +234,31 @@ CONTEXT: See notify() in src/alerts.py for pattern" \
     --depends-on F001
 Created task F010
 ```
+
+### Creating Tasks with PRD Context
+
+Link tasks to PRD sections so executing agents receive context automatically:
+
+```bash
+$ lodestar task create \
+    --id F011 \
+    --title "Implement lease expiry" \
+    --description "Add automatic lease expiration handling." \
+    --prd-source PRD.md \
+    --prd-ref "#lease-semantics" \
+    --prd-ref "#task-claiming" \
+    --prd-excerpt "Leases auto-expire without manual intervention. Commands that read active claims filter out expired leases automatically." \
+    --label feature
+Created task F011
+```
+
+The PRD hash is automatically computed and stored for drift detection.
+
+When other agents claim this task, they receive:
+
+- The frozen excerpt (stable context even if PRD changes)
+- Links to live PRD sections (can be re-extracted)
+- Warnings if the PRD has drifted since task creation
 
 ---
 
@@ -234,6 +356,7 @@ Claims are time-limited and auto-expire. Renew with `task renew` if you need mor
 |--------|-------|-------------|
 | `--agent TEXT` | `-a` | Your agent ID (required) |
 | `--ttl TEXT` | `-t` | Lease duration, e.g., 15m, 1h (default: 15m) |
+| `--no-context` | | Don't include PRD context in output |
 | `--json` | | Output in JSON format |
 | `--explain` | | Show what this command does |
 
@@ -245,10 +368,66 @@ Claimed task F002
   Lease: L5678EFGH
   Expires in: 15m
 
+Task Context:
+  Add password reset
+  Email-based password reset flow with secure token generation...
+  PRD: PRD.md
+
 Remember to:
   - Renew with lodestar task renew F002 before expiry
   - Mark done with lodestar task done F002 when complete
 ```
+
+### Context Bundle
+
+By default, `task claim` includes a context bundle with the task description and PRD context. This ensures agents receive "just enough" product intent without needing to read the full PRD.
+
+The context bundle includes:
+
+- Task title and description
+- PRD source file path
+- Frozen PRD excerpt (if attached to task)
+- Drift warnings if the PRD has changed since task creation
+
+Use `--no-context` to skip the context bundle (useful for scripts).
+
+### JSON Output with Context
+
+```bash
+$ lodestar task claim F002 --agent A1234ABCD --json
+{
+  "ok": true,
+  "data": {
+    "lease_id": "L5678EFGH",
+    "task_id": "F002",
+    "agent_id": "A1234ABCD",
+    "expires_at": "2025-01-15T10:30:00Z",
+    "ttl_seconds": 900,
+    "context": {
+      "title": "Add password reset",
+      "description": "Email-based password reset flow...",
+      "prd_source": "PRD.md",
+      "prd_excerpt": "Tokens must expire after 15 minutes..."
+    }
+  },
+  "warnings": ["PRD has changed since task creation. Review PRD.md for updates."],
+  "next": [...]
+}
+```
+
+### Drift Detection Warnings
+
+If the PRD file has changed since the task was created, `task claim` will emit a warning:
+
+```bash
+$ lodestar task claim F002 --agent A1234ABCD
+Claimed task F002
+  ...
+
+⚠ PRD has changed since task creation. Review PRD.md for updates.
+```
+
+This helps agents notice when the original intent may have evolved. Use `lodestar task context F002` for the full context with live PRD sections.
 
 ### Custom TTL
 
