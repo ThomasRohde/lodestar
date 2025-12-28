@@ -1708,6 +1708,119 @@ tasks:
     status: verified
     created_at: '2025-12-28T01:30:36.406697+00:00'
     updated_at: '2025-12-28T01:55:29.472712+00:00'
+  LOCK-001:
+    title: Create glob pattern overlap utility module
+    description: 'Create src/lodestar/util/locks.py with functions for detecting glob
+      pattern overlaps: normalize_glob_pattern(), globs_overlap(), and find_overlapping_patterns().
+      Use fnmatch for pattern matching, handle cross-platform paths.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    - lock-conflict
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T06:40:23.446108+00:00'
+    updated_at: '2025-12-28T06:47:35.742779+00:00'
+  LOCK-002:
+    title: Add unit tests for glob overlap utilities
+    description: 'Create tests/test_locks.py with test cases for: normalize_glob_pattern
+      (backslash conversion, leading ./ removal), globs_overlap (exact match, parent/child,
+      siblings, empty patterns), find_overlapping_patterns (multiple overlaps, no
+      overlaps).'
+    acceptance_criteria: []
+    depends_on:
+    - LOCK-001
+    labels:
+    - test
+    - lock-conflict
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T06:40:24.920757+00:00'
+    updated_at: '2025-12-28T06:50:56.555150+00:00'
+  LOCK-003:
+    title: Add get_all_active_leases() to RuntimeDatabase
+    description: Add method to src/lodestar/runtime/database.py that returns all non-expired
+      leases. Used for lock conflict detection during task claim.
+    acceptance_criteria: []
+    depends_on:
+    - LOCK-001
+    labels:
+    - feature
+    - lock-conflict
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T06:40:26.283301+00:00'
+    updated_at: '2025-12-28T06:52:49.067778+00:00'
+  LOCK-004:
+    title: Add --force flag and lock conflict detection to task claim
+    description: 'Modify task_claim() in src/lodestar/cli/commands/task.py: Add --force/-f
+      option. After TTL parsing, query active leases and check for lock overlaps.
+      Display warnings in human output (skip if --force). Include warnings in JSON
+      output.'
+    acceptance_criteria: []
+    depends_on:
+    - LOCK-002
+    - LOCK-003
+    labels:
+    - feature
+    - lock-conflict
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-28T06:40:38.855410+00:00'
+    updated_at: '2025-12-28T06:55:00.328641+00:00'
+  LOCK-005:
+    title: Add CLI integration tests for lock conflict detection
+    description: 'Add tests to tests/test_cli.py: claiming with lock conflict shows
+      warning, --force bypasses warning, JSON output includes warnings in warnings
+      array.'
+    acceptance_criteria: []
+    depends_on:
+    - LOCK-004
+    labels:
+    - test
+    - lock-conflict
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-28T06:40:40.222858+00:00'
+    updated_at: '2025-12-28T06:57:17.693844+00:00'
+  LOCK-006:
+    title: Update documentation for lock conflict detection
+    description: Update docs/cli/task.md with --force flag documentation and lock
+      conflict behavior. Update CLAUDE.md CLI reference.
+    acceptance_criteria: []
+    depends_on:
+    - LOCK-004
+    labels:
+    - docs
+    - lock-conflict
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-28T06:40:41.605997+00:00'
+    updated_at: '2025-12-28T06:59:15.604591+00:00'
+  LOCK-007:
+    title: Update AGENTS.md and help text for lock conflict awareness
+    description: 1. Update _agents_md_content() in src/lodestar/cli/commands/init.py
+      to mention the locks field and --force flag for handling file conflicts when
+      multiple agents work concurrently. 2. Update --help and --explain output for
+      task claim to mention lock conflict warnings and --force override.
+    acceptance_criteria: []
+    depends_on:
+    - LOCK-004
+    labels:
+    - docs
+    - lock-conflict
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-28T06:43:15.836372+00:00'
+    updated_at: '2025-12-28T07:01:36.612174+00:00'
 features:
   m0-skeleton:
   - F001

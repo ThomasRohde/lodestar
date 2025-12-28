@@ -223,6 +223,31 @@ lodestar task create --id "F001" --title "Add feature X" \\
 
 Include: goal, relevant files, acceptance criteria, and pointers to related code.
 
+## Multi-Agent File Coordination
+
+When multiple agents work concurrently, use the `locks` field to declare file ownership:
+
+```yaml
+# In spec.yaml
+F001:
+  title: Implement auth
+  locks:
+    - src/auth/**
+    - tests/auth/**
+```
+
+When claiming a task, you'll see warnings if locks overlap with other claimed tasks:
+
+```bash
+$ lodestar task claim F002 --agent A1234ABCD
+Claimed task F002
+WARNING: Lock 'src/auth/**' overlaps with 'src/**' (task F001, claimed by A9876WXYZ)
+
+Use --force to bypass lock conflict warnings
+```
+
+Use `--force` when you intentionally coordinate with another agent.
+
 ## Get Help
 
 ```bash

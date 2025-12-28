@@ -357,6 +357,7 @@ Claims are time-limited and auto-expire. Renew with `task renew` if you need mor
 | `--agent TEXT` | `-a` | Your agent ID (required) |
 | `--ttl TEXT` | `-t` | Lease duration, e.g., 15m, 1h (default: 15m) |
 | `--no-context` | | Don't include PRD context in output |
+| `--force` | `-f` | Bypass lock conflict warnings |
 | `--json` | | Output in JSON format |
 | `--explain` | | Show what this command does |
 
@@ -436,6 +437,45 @@ $ lodestar task claim F002 --agent A1234ABCD --ttl 1h
 Claimed task F002
   Lease: L5678EFGH
   Expires in: 1h
+```
+
+### Lock Conflict Detection
+
+When multiple agents work in the same repository, they might edit overlapping files. Tasks can declare file ownership through the `locks` field (glob patterns like `src/auth/**`).
+
+When claiming a task, Lodestar checks if your task's locks overlap with any currently-claimed tasks. If they do, you'll see a warning:
+
+```bash
+$ lodestar task claim F003 --agent A1234ABCD
+Claimed task F003
+  Lease: L9876IJKL
+  Expires in: 15m
+
+⚠ Lock 'src/auth/**' overlaps with 'src/**' (task F002, claimed by A9876WXYZ)
+
+Use --force to bypass lock conflict warnings
+```
+
+!!! warning "Advisory Warnings"
+    Lock conflict warnings are **advisory only** - they don't block the claim. This allows intentional coordination between agents working on related files.
+
+Use `--force` to bypass warnings when you know what you're doing:
+
+```bash
+$ lodestar task claim F003 --agent A1234ABCD --force
+Claimed task F003
+  Lease: L9876IJKL
+  Expires in: 15m
+```
+
+In JSON output, lock conflicts appear in the `warnings` array:
+
+```json
+{
+  "ok": true,
+  "data": {...},
+  "warnings": ["Lock 'src/auth/**' overlaps with 'src/**' (task F002, claimed by A9876WXYZ)"]
+}
 ```
 
 ---

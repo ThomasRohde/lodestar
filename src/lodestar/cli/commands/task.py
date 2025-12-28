@@ -904,6 +904,12 @@ def task_claim(
         "--no-context",
         help="Don't include PRD context in output.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Bypass lock conflict warnings.",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -992,6 +998,24 @@ def task_claim(
     # Create lease
     db = RuntimeDatabase(get_runtime_db_path(root))
 
+    # Check for lock conflicts with actively-leased tasks
+    lock_warnings: list[str] = []
+    if task.locks and not force:
+        from lodestar.util.locks import find_overlapping_patterns
+
+        active_leases = db.get_all_active_leases()
+        for active_lease in active_leases:
+            if active_lease.task_id == task_id:
+                continue  # Skip self (shouldn't happen since task not claimed yet)
+            leased_task = spec.get_task(active_lease.task_id)
+            if leased_task and leased_task.locks:
+                overlaps = find_overlapping_patterns(task.locks, leased_task.locks)
+                for our_pattern, their_pattern in overlaps:
+                    lock_warnings.append(
+                        f"Lock '{our_pattern}' overlaps with '{their_pattern}' "
+                        f"(task {active_lease.task_id}, claimed by {active_lease.agent_id})"
+                    )
+
     lease = Lease(
         task_id=task_id,
         agent_id=agent_id,
@@ -1026,7 +1050,7 @@ def task_claim(
     }
 
     # Build context bundle unless --no-context specified
-    warnings: list[str] = []
+    warnings: list[str] = lock_warnings.copy()  # Start with lock conflict warnings
     if not no_context:
         context: dict[str, Any] = {
             "title": task.title,
@@ -1088,6 +1112,9 @@ def task_claim(
             console.print()
             for warning in warnings:
                 console.print(f"[warning]⚠ {warning}[/warning]")
+            if lock_warnings:
+                console.print()
+                console.print("[muted]Use --force to bypass lock conflict warnings[/muted]")
 
         if not no_context:
             console.print()
@@ -1735,11 +1762,14 @@ def _show_explain_claim(json_output: bool) -> None:
         "examples": [
             "lodestar task claim F001 --agent A1234ABCD",
             "lodestar task claim F001 --agent A1234ABCD --ttl 30m",
+            "lodestar task claim F001 --agent A1234ABCD --force",
         ],
         "notes": [
             "Leases auto-expire (default 15m)",
             "Only one agent can claim a task at a time",
             "Renew with 'task renew' before expiry",
+            "Shows warnings if task locks overlap with other claimed tasks",
+            "Use --force to bypass lock conflict warnings",
         ],
     }
     if json_output:
@@ -1750,6 +1780,11 @@ def _show_explain_claim(json_output: bool) -> None:
         console.print("[info]Examples:[/info]")
         console.print("  [command]lodestar task claim F001 --agent A1234ABCD[/command]")
         console.print("  [command]lodestar task claim F001 --agent A1234ABCD --ttl 30m[/command]")
+        console.print("  [command]lodestar task claim F001 --agent A1234ABCD --force[/command]")
+        console.print()
+        console.print("[info]Lock Conflicts:[/info]")
+        console.print("  If another agent has claimed a task with overlapping file locks,")
+        console.print("  you'll see a warning. Use --force to proceed anyway.")
         console.print()
 
 

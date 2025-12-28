@@ -169,7 +169,7 @@ lodestar task show <id>          # Show task details
 lodestar task next               # Find claimable tasks
 lodestar task create             # Create new task
 lodestar task update <id>        # Update task
-lodestar task claim <id>         # Claim a task (lease)
+lodestar task claim <id>         # Claim a task (lease, --force bypasses lock warnings)
 lodestar task renew <id>         # Renew lease
 lodestar task release <id>       # Release lease
 lodestar task done <id>          # Mark done

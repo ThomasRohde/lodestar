@@ -379,6 +379,164 @@ class TestTaskClaim:
         assert result.exit_code == 1
 
 
+class TestLockConflictDetection:
+    """Test lock conflict warnings during task claim."""
+
+    def test_claim_with_lock_conflict_shows_warning(self, temp_repo):
+        """Claiming a task with overlapping locks shows a warning."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+
+        # Create two tasks with overlapping locks by editing spec directly
+        from lodestar.spec.loader import load_spec, save_spec
+
+        spec = load_spec(Path.cwd())
+
+        from lodestar.models.spec import Task, TaskStatus
+
+        task1 = Task(
+            id="T001",
+            title="Task 1",
+            status=TaskStatus.READY,
+            locks=["src/**"],
+        )
+        task2 = Task(
+            id="T002",
+            title="Task 2",
+            status=TaskStatus.READY,
+            locks=["src/auth/**"],
+        )
+        spec.tasks["T001"] = task1
+        spec.tasks["T002"] = task2
+        save_spec(spec, Path.cwd())
+
+        # Claim first task
+        result1 = runner.invoke(app, ["task", "claim", "T001", "--agent", agent_id])
+        assert result1.exit_code == 0
+
+        # Claim second task - should show warning about overlapping locks
+        result2 = runner.invoke(app, ["task", "claim", "T002", "--agent", agent_id])
+        assert result2.exit_code == 0
+        assert "overlap" in result2.stdout.lower()
+        assert "src/auth/**" in result2.stdout
+        assert "--force" in result2.stdout
+
+    def test_claim_with_force_bypasses_warning(self, temp_repo):
+        """--force flag bypasses lock conflict warnings."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+
+        # Create two tasks with overlapping locks
+        from lodestar.spec.loader import load_spec, save_spec
+
+        spec = load_spec(Path.cwd())
+
+        from lodestar.models.spec import Task, TaskStatus
+
+        task1 = Task(
+            id="T001",
+            title="Task 1",
+            status=TaskStatus.READY,
+            locks=["src/**"],
+        )
+        task2 = Task(
+            id="T002",
+            title="Task 2",
+            status=TaskStatus.READY,
+            locks=["src/auth/**"],
+        )
+        spec.tasks["T001"] = task1
+        spec.tasks["T002"] = task2
+        save_spec(spec, Path.cwd())
+
+        # Claim first task
+        runner.invoke(app, ["task", "claim", "T001", "--agent", agent_id])
+
+        # Claim second task with --force - should not show warning
+        result = runner.invoke(app, ["task", "claim", "T002", "--agent", agent_id, "--force"])
+        assert result.exit_code == 0
+        assert "overlap" not in result.stdout.lower()
+
+    def test_claim_json_includes_lock_warnings(self, temp_repo):
+        """JSON output includes lock conflict warnings."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+
+        # Create two tasks with overlapping locks
+        from lodestar.spec.loader import load_spec, save_spec
+
+        spec = load_spec(Path.cwd())
+
+        from lodestar.models.spec import Task, TaskStatus
+
+        task1 = Task(
+            id="T001",
+            title="Task 1",
+            status=TaskStatus.READY,
+            locks=["src/**"],
+        )
+        task2 = Task(
+            id="T002",
+            title="Task 2",
+            status=TaskStatus.READY,
+            locks=["src/auth/**"],
+        )
+        spec.tasks["T001"] = task1
+        spec.tasks["T002"] = task2
+        save_spec(spec, Path.cwd())
+
+        # Claim first task
+        runner.invoke(app, ["task", "claim", "T001", "--agent", agent_id])
+
+        # Claim second task with --json
+        result = runner.invoke(app, ["task", "claim", "T002", "--agent", agent_id, "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert len(data["warnings"]) > 0
+        assert any("overlap" in w.lower() for w in data["warnings"])
+
+    def test_no_warning_without_lock_overlap(self, temp_repo):
+        """No warning when locks don't overlap."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+
+        # Create two tasks with non-overlapping locks
+        from lodestar.spec.loader import load_spec, save_spec
+
+        spec = load_spec(Path.cwd())
+
+        from lodestar.models.spec import Task, TaskStatus
+
+        task1 = Task(
+            id="T001",
+            title="Task 1",
+            status=TaskStatus.READY,
+            locks=["src/**"],
+        )
+        task2 = Task(
+            id="T002",
+            title="Task 2",
+            status=TaskStatus.READY,
+            locks=["tests/**"],
+        )
+        spec.tasks["T001"] = task1
+        spec.tasks["T002"] = task2
+        save_spec(spec, Path.cwd())
+
+        # Claim first task
+        runner.invoke(app, ["task", "claim", "T001", "--agent", agent_id])
+
+        # Claim second task - should not show any overlap warning
+        result = runner.invoke(app, ["task", "claim", "T002", "--agent", agent_id])
+        assert result.exit_code == 0
+        assert "overlap" not in result.stdout.lower()
+
+
 class TestTaskWorkflow:
     """Test complete task workflow."""
 

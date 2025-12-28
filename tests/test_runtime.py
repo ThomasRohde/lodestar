@@ -221,6 +221,52 @@ class TestLeaseOperations:
         active = db.get_active_lease("T001")
         assert active is None
 
+    def test_get_all_active_leases(self, db):
+        """Test getting all active leases."""
+        agent = Agent()
+        db.register_agent(agent)
+
+        # Create multiple active leases
+        expires = datetime.now(UTC) + timedelta(minutes=15)
+        lease1 = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=expires)
+        lease2 = Lease(task_id="T002", agent_id=agent.agent_id, expires_at=expires)
+        db.create_lease(lease1)
+        db.create_lease(lease2)
+
+        active = db.get_all_active_leases()
+        assert len(active) == 2
+        task_ids = {lease.task_id for lease in active}
+        assert task_ids == {"T001", "T002"}
+
+    def test_get_all_active_leases_excludes_expired(self, db):
+        """Test that expired leases are not returned."""
+        agent = Agent()
+        db.register_agent(agent)
+
+        # Create one active and one expired lease
+        active_expires = datetime.now(UTC) + timedelta(minutes=15)
+        expired_expires = datetime.now(UTC) - timedelta(minutes=1)
+
+        active_lease = Lease(task_id="T001", agent_id=agent.agent_id, expires_at=active_expires)
+        db.create_lease(active_lease)
+
+        # Directly insert expired lease bypassing check
+        from lodestar.runtime.converters import lease_to_orm
+        from lodestar.runtime.engine import get_session
+
+        expired_lease = Lease(task_id="T002", agent_id=agent.agent_id, expires_at=expired_expires)
+        with get_session(db._session_factory) as session:
+            session.add(lease_to_orm(expired_lease))
+
+        active = db.get_all_active_leases()
+        assert len(active) == 1
+        assert active[0].task_id == "T001"
+
+    def test_get_all_active_leases_empty(self, db):
+        """Test that empty list is returned when no leases exist."""
+        active = db.get_all_active_leases()
+        assert active == []
+
 
 class TestMessageOperations:
     """Test message database operations."""

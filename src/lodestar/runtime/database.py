@@ -242,6 +242,25 @@ class RuntimeDatabase:
             results = session.execute(stmt).scalars().all()
             return [orm_to_lease(r) for r in results]
 
+    def get_all_active_leases(self) -> list[Lease]:
+        """Get all currently active (non-expired) leases.
+
+        Used for lock conflict detection during task claim.
+
+        Returns:
+            List of all active leases.
+        """
+        now = _utc_now()
+
+        with get_session(self._session_factory) as session:
+            stmt = (
+                select(LeaseModel)
+                .where(LeaseModel.expires_at > now.isoformat())
+                .order_by(LeaseModel.created_at.desc())
+            )
+            results = session.execute(stmt).scalars().all()
+            return [orm_to_lease(r) for r in results]
+
     def renew_lease(self, lease_id: str, new_expires_at: datetime, agent_id: str) -> bool:
         """Renew a lease (only if owned by agent and still active)."""
         now = _utc_now()
