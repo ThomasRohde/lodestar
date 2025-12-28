@@ -1892,9 +1892,9 @@ tasks:
     - phase2
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:47:52.769960+00:00'
-    updated_at: '2025-12-28T07:47:52.769964+00:00'
+    updated_at: '2025-12-28T10:04:35.272203+00:00'
   R006:
     title: Extract lease_repo.py from RuntimeDatabase
     description: Create runtime/repositories/lease_repo.py with lease create, renew,
@@ -1907,9 +1907,9 @@ tasks:
     - phase2
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:47:54.850288+00:00'
-    updated_at: '2025-12-28T07:47:54.850291+00:00'
+    updated_at: '2025-12-28T10:04:38.803860+00:00'
   R007:
     title: Extract message_repo.py from RuntimeDatabase
     description: Create runtime/repositories/message_repo.py with send, inbox, thread,
@@ -1922,9 +1922,9 @@ tasks:
     - phase2
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:47:57.003594+00:00'
-    updated_at: '2025-12-28T07:47:57.003598+00:00'
+    updated_at: '2025-12-28T10:04:42.590252+00:00'
   R008:
     title: Convert database.py to facade
     description: 'Refactor RuntimeDatabase to thin facade delegating to repositories.
@@ -1939,9 +1939,9 @@ tasks:
     - phase2
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T07:48:10.766240+00:00'
-    updated_at: '2025-12-28T07:48:10.766244+00:00'
+    updated_at: '2025-12-28T10:06:10.463757+00:00'
   R009:
     title: Extract timestamps.py utility
     description: Create util/timestamps.py with parse_iso_timestamp() and format_relative_time()
