@@ -134,6 +134,42 @@ class TestAgentOperations:
         designers = db.find_agents_by_role("design")
         assert len(designers) == 0
 
+    def test_mark_agent_offline(self, db):
+        """Test marking an agent as offline."""
+        from datetime import timedelta
+
+        from lodestar.models.runtime import DEFAULT_OFFLINE_THRESHOLD_MINUTES, AgentStatus
+
+        # Register an agent
+        agent = Agent(display_name="TestBot")
+        db.register_agent(agent)
+
+        # Verify agent is initially active (or will be based on recent registration)
+        retrieved = db.get_agent(agent.agent_id)
+        assert retrieved is not None
+
+        # Mark agent offline
+        success = db.mark_agent_offline(agent.agent_id, reason="Testing offline status")
+        assert success is True
+
+        # Retrieve agent and verify last_seen_at is beyond offline threshold
+        offline_agent = db.get_agent(agent.agent_id)
+        assert offline_agent is not None
+
+        # Check that last_seen_at is old enough to trigger offline status
+        from datetime import UTC, datetime
+
+        time_since_seen = datetime.now(UTC) - offline_agent.last_seen_at
+        assert time_since_seen > timedelta(minutes=DEFAULT_OFFLINE_THRESHOLD_MINUTES)
+
+        # Verify status is offline
+        assert offline_agent.get_status() == AgentStatus.OFFLINE
+
+    def test_mark_nonexistent_agent_offline(self, db):
+        """Test marking a non-existent agent offline returns False."""
+        success = db.mark_agent_offline("nonexistent", reason="Testing")
+        assert success is False
+
 
 class TestLeaseOperations:
     """Test lease database operations."""

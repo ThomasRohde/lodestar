@@ -138,3 +138,44 @@ class AgentRepository:
             )
             result = session.execute(stmt)
             return bool(result.rowcount > 0)  # type: ignore[attr-defined]
+
+    def mark_offline(self, agent_id: str, reason: str | None = None) -> bool:
+        """Mark an agent as offline gracefully.
+
+        Sets the agent's last_seen_at to a timestamp that triggers offline status
+        and logs an AGENT_LEAVE event.
+
+        Args:
+            agent_id: Agent ID to mark offline.
+            reason: Optional reason for leaving.
+
+        Returns:
+            True if the agent was found and marked offline, False otherwise.
+        """
+        from datetime import timedelta
+
+        from lodestar.models.runtime import DEFAULT_OFFLINE_THRESHOLD_MINUTES
+
+        # Set last_seen_at to a time beyond the offline threshold
+        offline_time = _utc_now() - timedelta(minutes=DEFAULT_OFFLINE_THRESHOLD_MINUTES + 1)
+
+        with get_session(self._session_factory) as session:
+            stmt = (
+                update(AgentModel)
+                .where(AgentModel.agent_id == agent_id)
+                .values(last_seen_at=offline_time.isoformat())
+            )
+            result = session.execute(stmt)
+
+            if result.rowcount > 0:  # type: ignore[attr-defined]
+                # Log the leave event
+                event_data = {"reason": reason} if reason else None
+                log_event(
+                    session,
+                    EventType.AGENT_LEAVE,
+                    agent_id=agent_id,
+                    data=event_data,
+                )
+                return True
+
+            return False

@@ -79,6 +79,10 @@ class RuntimeDatabase:
         """Update an agent's heartbeat timestamp."""
         return self._agents.update_heartbeat(agent_id)
 
+    def mark_agent_offline(self, agent_id: str, reason: str | None = None) -> bool:
+        """Mark an agent as offline gracefully."""
+        return self._agents.mark_offline(agent_id, reason)
+
     # Lease operations (delegate to LeaseRepository)
 
     def create_lease(self, lease: Lease) -> Lease | None:

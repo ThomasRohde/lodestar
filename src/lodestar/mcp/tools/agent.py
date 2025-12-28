@@ -149,6 +149,70 @@ def agent_heartbeat(
     return success(summary, data=data)
 
 
+def agent_leave(
+    context: LodestarContext,
+    agent_id: str,
+    reason: str | None = None,
+) -> CallToolResult:
+    """
+    Mark agent as offline gracefully.
+
+    Marks the agent as offline and logs the leave event. Agents marked offline
+    will have their status set to OFFLINE and will no longer appear in active
+    agent listings.
+
+    Args:
+        context: Lodestar server context
+        agent_id: Agent ID to mark offline (required)
+        reason: Optional reason for leaving
+
+    Returns:
+        CallToolResult with confirmation
+    """
+    # Validate agent ID
+    try:
+        validated_agent_id = validate_agent_id(agent_id)
+    except Exception as e:
+        return error(str(e), error_code="INVALID_AGENT_ID")
+
+    # Mark agent offline
+    success_update = context.db.mark_agent_offline(validated_agent_id, reason)
+
+    if not success_update:
+        return error(
+            f"Agent {validated_agent_id} not found",
+            error_code="AGENT_NOT_FOUND",
+            details={"agent_id": validated_agent_id},
+        )
+
+    # Get agent's active leases count
+    active_leases = context.db.get_agent_leases(validated_agent_id, active_only=True)
+    active_count = len(active_leases)
+
+    # Build structured data
+    data = {
+        "agentId": validated_agent_id,
+        "markedOffline": True,
+        "reason": reason,
+        "warnings": [],
+    }
+
+    # Warn if agent has active leases
+    if active_count > 0:
+        data["warnings"].append(
+            f"Agent has {active_count} active lease(s) that will expire naturally"
+        )
+        data["activeLeases"] = active_count
+
+    summary_parts = ["Marked agent offline:", validated_agent_id]
+    if reason:
+        summary_parts.append(f"(reason: {reason})")
+
+    summary = " ".join(summary_parts)
+
+    return success(summary, data=data)
+
+
 def register_agent_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register agent management tools with the FastMCP server.
@@ -204,3 +268,19 @@ def register_agent_tools(mcp: object, context: LodestarContext) -> None:
             Heartbeat update confirmation with expiration time
         """
         return agent_heartbeat(context=context, agent_id=agent_id)
+
+    @mcp.tool(name="lodestar.agent.leave")
+    def leave_tool(agent_id: str, reason: str | None = None) -> CallToolResult:
+        """Mark agent as offline gracefully.
+
+        Marks the agent as offline and logs the leave event. Use this when
+        an agent is done working and wants to cleanly disconnect.
+
+        Args:
+            agent_id: Agent ID to mark offline (required)
+            reason: Optional reason for leaving
+
+        Returns:
+            Confirmation with any warnings about active leases
+        """
+        return agent_leave(context=context, agent_id=agent_id, reason=reason)
