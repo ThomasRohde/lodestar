@@ -58,7 +58,7 @@ packages = ["src/lodestar"]
 
 [tool.ruff]
 line-length = 100
-target-version = "0.1.5"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "ARG"]
@@ -80,7 +80,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.mypy]
-python_version = "0.1.5"
+python_version = "3.13"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

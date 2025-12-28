@@ -114,7 +114,9 @@ function Set-PyProjectVersion {
 
     $pyprojectFile = Join-Path $ProjectRoot "pyproject.toml"
     $content = Get-Content $pyprojectFile -Raw
-    $newContent = $content -replace 'version\s*=\s*"[^"]+"', "version = `"$NewVersion`""
+    # Only match 'version = "..."' at the start of a line (the project version in [project] section)
+    # This avoids matching target-version, python_version, etc.
+    $newContent = $content -replace '(?m)^version\s*=\s*"[^"]+"', "version = `"$NewVersion`""
     Set-Content -Path $pyprojectFile -Value $newContent -NoNewline
 }
 
