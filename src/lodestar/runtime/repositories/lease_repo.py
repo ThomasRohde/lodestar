@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select, update
 
 from lodestar.models.runtime import Lease
 from lodestar.runtime.converters import lease_to_orm, orm_to_lease
 from lodestar.runtime.engine import get_session
-from lodestar.runtime.models import EventModel, LeaseModel
+from lodestar.runtime.event_types import EventType
+from lodestar.runtime.models import LeaseModel
+from lodestar.runtime.repositories.event_repo import log_event
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
@@ -54,12 +56,12 @@ class LeaseRepository:
             orm_lease = lease_to_orm(lease)
             session.add(orm_lease)
 
-            self._log_event(
+            log_event(
                 session,
-                "task.claim",
-                lease.agent_id,
-                lease.task_id,
-                {"lease_id": lease.lease_id},
+                EventType.TASK_CLAIM,
+                agent_id=lease.agent_id,
+                task_id=lease.task_id,
+                data={"lease_id": lease.lease_id},
             )
 
             return lease
@@ -149,12 +151,12 @@ class LeaseRepository:
                 lease_stmt = select(LeaseModel.task_id).where(LeaseModel.lease_id == lease_id)
                 task_id = session.execute(lease_stmt).scalar_one_or_none()
                 if task_id:
-                    self._log_event(
+                    log_event(
                         session,
-                        "task.renew",
-                        agent_id,
-                        task_id,
-                        {"lease_id": lease_id},
+                        EventType.TASK_RENEW,
+                        agent_id=agent_id,
+                        task_id=task_id,
+                        data={"lease_id": lease_id},
                     )
                 return True
 
@@ -177,25 +179,12 @@ class LeaseRepository:
             result = session.execute(stmt)
 
             if result.rowcount > 0:  # type: ignore[attr-defined]
-                self._log_event(session, "task.release", agent_id, task_id, {})
+                log_event(
+                    session,
+                    EventType.TASK_RELEASE,
+                    agent_id=agent_id,
+                    task_id=task_id,
+                )
                 return True
 
             return False
-
-    def _log_event(
-        self,
-        session: Session,
-        event_type: str,
-        agent_id: str | None,
-        task_id: str | None,
-        data: dict[str, Any],
-    ) -> None:
-        """Log an event to the events table."""
-        event = EventModel(
-            created_at=_utc_now().isoformat(),
-            event_type=event_type,
-            agent_id=agent_id,
-            task_id=task_id,
-            data=data,
-        )
-        session.add(event)

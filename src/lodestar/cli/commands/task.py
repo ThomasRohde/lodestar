@@ -23,6 +23,13 @@ from lodestar.models.envelope import Envelope, NextAction
 from lodestar.models.runtime import Lease
 from lodestar.models.spec import PrdContext, PrdRef, Task, TaskStatus
 from lodestar.runtime.database import RuntimeDatabase
+from lodestar.runtime.engine import (
+    create_runtime_engine,
+    create_session_factory,
+    get_session,
+)
+from lodestar.runtime.event_types import EventType
+from lodestar.runtime.repositories.event_repo import log_event
 from lodestar.spec.dag import validate_dag
 from lodestar.spec.loader import SpecNotFoundError, load_spec, save_spec
 from lodestar.util.output import console, print_json
@@ -1221,6 +1228,14 @@ def task_done(
     task.updated_at = datetime.now(UTC)
     save_spec(spec, root)
 
+    # Log event to runtime database
+    db_path = get_runtime_db_path(root)
+    engine = create_runtime_engine(db_path)
+    session_factory = create_session_factory(engine)
+    with get_session(session_factory) as session:
+        log_event(session, EventType.TASK_DONE, task_id=task_id)
+    engine.dispose()
+
     if json_output:
         print_json(Envelope.success({"task_id": task_id, "status": "done"}).model_dump())
     else:
@@ -1296,8 +1311,16 @@ def task_verify(
     task.updated_at = datetime.now(UTC)
     save_spec(spec, root)
 
+    # Log event to runtime database
+    db_path = get_runtime_db_path(root)
+    engine = create_runtime_engine(db_path)
+    session_factory = create_session_factory(engine)
+    with get_session(session_factory) as session:
+        log_event(session, EventType.TASK_VERIFIED, task_id=task_id)
+    engine.dispose()
+
     # Auto-release any active lease (task is complete, lease no longer needed)
-    db = RuntimeDatabase(get_runtime_db_path(root))
+    db = RuntimeDatabase(db_path)
     active_lease = db.get_active_lease(task_id)
     if active_lease:
         db.release_lease(task_id, active_lease.agent_id)

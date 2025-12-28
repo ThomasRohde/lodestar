@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select, text, update
 
 from lodestar.models.runtime import Agent
 from lodestar.runtime.converters import _parse_datetime, agent_to_orm, orm_to_agent
 from lodestar.runtime.engine import get_session
-from lodestar.runtime.models import AgentModel, EventModel
+from lodestar.runtime.event_types import EventType
+from lodestar.runtime.models import AgentModel
+from lodestar.runtime.repositories.event_repo import log_event
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
@@ -38,7 +40,7 @@ class AgentRepository:
         with get_session(self._session_factory) as session:
             orm_agent = agent_to_orm(agent)
             session.add(orm_agent)
-            self._log_event(session, "agent.join", agent.agent_id, None, {})
+            log_event(session, EventType.AGENT_JOIN, agent_id=agent.agent_id)
 
         return agent
 
@@ -136,21 +138,3 @@ class AgentRepository:
             )
             result = session.execute(stmt)
             return bool(result.rowcount > 0)  # type: ignore[attr-defined]
-
-    def _log_event(
-        self,
-        session: Session,
-        event_type: str,
-        agent_id: str | None,
-        task_id: str | None,
-        data: dict[str, Any],
-    ) -> None:
-        """Log an event to the events table."""
-        event = EventModel(
-            created_at=_utc_now().isoformat(),
-            event_type=event_type,
-            agent_id=agent_id,
-            task_id=task_id,
-            data=data,
-        )
-        session.add(event)

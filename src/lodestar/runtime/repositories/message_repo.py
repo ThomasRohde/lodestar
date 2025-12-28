@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select, update
 
 from lodestar.models.runtime import Message, MessageType
 from lodestar.runtime.converters import message_to_orm, orm_to_message
 from lodestar.runtime.engine import get_session
-from lodestar.runtime.models import EventModel, MessageModel
+from lodestar.runtime.event_types import EventType
+from lodestar.runtime.models import MessageModel
+from lodestar.runtime.repositories.event_repo import log_event
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
@@ -39,12 +41,18 @@ class MessageRepository:
             orm_message = message_to_orm(message)
             session.add(orm_message)
 
-            self._log_event(
+            # Determine target_agent_id based on message type
+            target_agent_id = None
+            if message.to_type == MessageType.AGENT:
+                target_agent_id = message.to_id
+
+            log_event(
                 session,
-                "message.send",
-                message.from_agent_id,
-                message.to_id if message.to_type == MessageType.TASK else None,
-                {"to_type": message.to_type.value, "to_id": message.to_id},
+                EventType.MESSAGE_SENT,
+                agent_id=message.from_agent_id,
+                task_id=message.to_id if message.to_type == MessageType.TASK else None,
+                target_agent_id=target_agent_id,
+                data={"to_type": message.to_type.value, "to_id": message.to_id},
             )
 
             return message
@@ -252,21 +260,3 @@ class MessageRepository:
 
             # Increase sleep time with exponential backoff
             sleep_time = min(sleep_time * 1.5, max_sleep)
-
-    def _log_event(
-        self,
-        session: Session,
-        event_type: str,
-        agent_id: str | None,
-        task_id: str | None,
-        data: dict[str, Any],
-    ) -> None:
-        """Log an event to the events table."""
-        event = EventModel(
-            created_at=_utc_now().isoformat(),
-            event_type=event_type,
-            agent_id=agent_id,
-            task_id=task_id,
-            data=data,
-        )
-        session.add(event)
