@@ -2341,9 +2341,9 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:06:19.469696+00:00'
-    updated_at: '2025-12-28T13:06:19.469699+00:00'
+    updated_at: '2025-12-28T16:02:55.895982+00:00'
   MCP-041:
     title: Implement lodestar.message.list tool
     description: 'Add to mcp/tools/message.py. Implement lodestar.message.list: inputs
