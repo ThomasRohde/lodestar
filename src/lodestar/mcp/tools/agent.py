@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from mcp.types import CallToolResult
 
-from lodestar.mcp.output import format_summary, success
+from lodestar.mcp.output import error, format_summary, success
 from lodestar.mcp.server import LodestarContext
-from lodestar.mcp.validation import validate_ttl
-from lodestar.models.runtime import Agent
+from lodestar.mcp.validation import validate_agent_id, validate_ttl
+from lodestar.models.runtime import DEFAULT_IDLE_THRESHOLD_MINUTES, Agent
 
 
 def agent_join(
@@ -91,6 +91,64 @@ def agent_join(
     return success(summary, data=data)
 
 
+def agent_heartbeat(
+    context: LodestarContext,
+    agent_id: str,
+) -> CallToolResult:
+    """
+    Update agent heartbeat timestamp.
+
+    Refreshes the agent's last_seen_at timestamp to indicate the agent
+    is still active.
+
+    Args:
+        context: Lodestar server context
+        agent_id: Agent ID to update (required)
+
+    Returns:
+        CallToolResult with heartbeat update confirmation
+    """
+    # Validate agent ID
+    try:
+        validated_agent_id = validate_agent_id(agent_id)
+    except Exception as e:
+        return error(str(e), error_code="INVALID_AGENT_ID")
+
+    # Update heartbeat
+    success_update = context.db.update_heartbeat(validated_agent_id)
+
+    if not success_update:
+        return error(
+            f"Agent {validated_agent_id} not found",
+            error_code="AGENT_NOT_FOUND",
+            details={"agent_id": validated_agent_id},
+        )
+
+    # Calculate when agent will be considered idle (expires at)
+    # Agents become idle after DEFAULT_IDLE_THRESHOLD_MINUTES of inactivity
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(minutes=DEFAULT_IDLE_THRESHOLD_MINUTES)
+
+    # Build structured data
+    data = {
+        "agentId": validated_agent_id,
+        "updated": True,
+        "expiresAt": expires_at.isoformat(),
+        "warnings": [],
+    }
+
+    # Add warning if agent should send heartbeats more frequently
+    # Recommend heartbeat at half the idle threshold to maintain active status
+    recommended_interval = DEFAULT_IDLE_THRESHOLD_MINUTES / 2
+    data["warnings"].append(
+        f"Send heartbeat every {recommended_interval:.0f} minutes to maintain active status"
+    )
+
+    summary = format_summary("Updated heartbeat for", validated_agent_id)
+
+    return success(summary, data=data)
+
+
 def register_agent_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register agent management tools with the FastMCP server.
@@ -131,3 +189,18 @@ def register_agent_tools(mcp: object, context: LodestarContext) -> None:
             capabilities=capabilities,
             ttl_seconds=ttl_seconds,
         )
+
+    @mcp.tool(name="lodestar.agent.heartbeat")
+    def heartbeat_tool(agent_id: str) -> CallToolResult:
+        """Update agent heartbeat timestamp.
+
+        Refreshes the agent's presence to indicate it is still active.
+        Agents should send heartbeats regularly to maintain active status.
+
+        Args:
+            agent_id: Agent ID to update (required)
+
+        Returns:
+            Heartbeat update confirmation with expiration time
+        """
+        return agent_heartbeat(context=context, agent_id=agent_id)
