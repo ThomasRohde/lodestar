@@ -1617,9 +1617,9 @@ tasks:
     - agent
     locks: []
     priority: 2
-    status: done
+    status: verified
     created_at: '2025-12-28T01:30:13.902206+00:00'
-    updated_at: '2025-12-28T01:47:31.099437+00:00'
+    updated_at: '2025-12-28T01:51:09.838964+00:00'
   H003:
     title: Standardize REQUIRED markers and add docstring examples
     description: 'WHAT: Audit all CLI option definitions and standardize help text.
@@ -1661,9 +1661,9 @@ tasks:
     - help
     locks: []
     priority: 2
-    status: done
+    status: verified
     created_at: '2025-12-28T01:30:24.867188+00:00'
-    updated_at: '2025-12-28T01:49:42.291579+00:00'
+    updated_at: '2025-12-28T01:51:10.609017+00:00'
   H004:
     title: Update CLI documentation with missing commands
     description: 'WHAT: Update CLI documentation index to include all commands. Add
@@ -1705,9 +1705,9 @@ tasks:
     - docs
     locks: []
     priority: 3
-    status: ready
+    status: done
     created_at: '2025-12-28T01:30:36.406697+00:00'
-    updated_at: '2025-12-28T01:30:36.406701+00:00'
+    updated_at: '2025-12-28T01:55:18.807074+00:00'
 features:
   m0-skeleton:
   - F001

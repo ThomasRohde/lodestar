@@ -201,6 +201,103 @@ $ lodestar msg search --keyword 'bug' --from A1234ABCD --since 2025-01-15T00:00:
 
 ---
 
+## msg wait
+
+Block until a new message arrives in your inbox.
+
+```bash
+lodestar msg wait [OPTIONS]
+```
+
+This command blocks until a new message is received or the timeout expires. If there are already unread messages (optionally after `--since`), returns immediately.
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--agent TEXT` | `-a` | Your agent ID (required) |
+| `--timeout INTEGER` | `-t` | Timeout in seconds (default: wait indefinitely) |
+| `--since TEXT` | `-s` | Only wait for messages after this timestamp (ISO format) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
+
+### Examples
+
+Wait for any new message:
+
+```bash
+$ lodestar msg wait --agent A1234ABCD
+Waiting for messages...
+
+  From: A5678EFGH  just now
+  Your review is needed on F003
+```
+
+Wait with a timeout:
+
+```bash
+$ lodestar msg wait --agent A1234ABCD --timeout 60
+# Returns after 60 seconds if no message arrives
+```
+
+Wait for messages after a specific time:
+
+```bash
+$ lodestar msg wait --agent A1234ABCD --since 2025-01-15T10:00:00
+```
+
+### JSON Output
+
+```bash
+$ lodestar msg wait --agent A1234ABCD --json
+{
+  "ok": true,
+  "data": {
+    "message": {
+      "message_id": "M1234567",
+      "from_agent_id": "A5678EFGH",
+      "to_type": "agent",
+      "to_id": "A1234ABCD",
+      "text": "Your review is needed on F003",
+      "created_at": "2025-01-15T10:35:00Z"
+    }
+  },
+  "next": [],
+  "warnings": []
+}
+```
+
+### Use Cases
+
+**Event-driven workflows:**
+
+Wait for a response before continuing:
+
+```bash
+# Send a question
+lodestar msg send --to agent:A5678EFGH --from A1234ABCD --text "Can you review F003?"
+
+# Wait for the response
+lodestar msg wait --agent A1234ABCD --timeout 300
+```
+
+**Polling alternative:**
+
+Instead of polling `msg inbox` repeatedly, use `msg wait` for efficient blocking:
+
+```bash
+# Inefficient polling
+while true; do
+  lodestar msg inbox --agent A1234ABCD --unread-only
+  sleep 10
+done
+
+# Efficient waiting
+lodestar msg wait --agent A1234ABCD
+```
+
+---
+
 ## msg thread
 
 Read messages in a task thread.

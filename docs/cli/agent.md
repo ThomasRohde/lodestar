@@ -268,7 +268,7 @@ Get a concise brief for spawning a sub-agent on a task.
 lodestar agent brief [OPTIONS]
 ```
 
-This is useful when you need to hand off a task to another agent with all the context they need to get started.
+This is useful when you need to hand off a task to another agent with all the context they need to get started. The output format is optimized for different agent types.
 
 ### Options
 
@@ -279,27 +279,98 @@ This is useful when you need to hand off a task to another agent with all the co
 | `--json` | | Output in JSON format |
 | `--explain` | | Show what this command does |
 
-### Example
+### Format Options
+
+The `--format` flag controls the output style:
+
+| Format | Description | Best For |
+|--------|-------------|----------|
+| `generic` | Plain labeled sections (TASK, CONTEXT, COMMANDS) | General purpose, scripts |
+| `claude` | XML-style tags optimized for Claude's structured prompts | Claude agents |
+| `copilot` | GitHub-flavored markdown with headers and code fences | GitHub Copilot |
+
+### Example: Generic Format (default)
+
+```bash
+$ lodestar agent brief --task F002 --format generic
+TASK: F002 - Implement password reset
+
+CONTEXT:
+  Implement email-based password reset flow with secure token generation.
+  Labels: feature, security
+
+COMMANDS:
+  Claim:    lodestar task claim F002 --agent YOUR_AGENT_ID
+  Progress: lodestar msg send --to task:F002 --from YOUR_AGENT_ID --text 'Update'
+  Done:     lodestar task done F002
+```
+
+### Example: Claude Format
 
 ```bash
 $ lodestar agent brief --task F002 --format claude
-Task: F002 - Implement password reset
+<task>
+  <id>F002</id>
+  <title>Implement password reset</title>
+</task>
 
-Status: ready
-Priority: 1
-Dependencies: F001 (verified)
-
-Description:
+<context>
   Implement email-based password reset flow with secure token generation.
+  <labels>feature, security</labels>
+</context>
 
-Context:
-  - Auth system is in src/auth/
-  - Token utilities are in src/auth/tokens.py
-  - Email templates are in templates/email/
+<instructions>
+  1. Claim task: lodestar task claim F002 --agent YOUR_AGENT_ID
+  2. Report progress: lodestar msg send --to task:F002 --from YOUR_AGENT_ID --text 'Update'
+  3. Mark complete: lodestar task done F002
+</instructions>
+```
 
-Suggested approach:
-  1. Create reset token model
-  2. Add reset endpoint
-  3. Implement email sending
-  4. Add token verification
+### Example: Copilot Format
+
+```bash
+$ lodestar agent brief --task F002 --format copilot
+## Task: F002
+
+**Implement password reset**
+
+### Goal
+
+Implement email-based password reset flow with secure token generation.
+
+**Labels:** feature, security
+
+### Commands
+
+\`\`\`bash
+# Claim this task
+lodestar task claim F002 --agent YOUR_AGENT_ID
+
+# Report progress
+lodestar msg send --to task:F002 --from YOUR_AGENT_ID --text 'Progress update'
+
+# Mark complete
+lodestar task done F002
+\`\`\`
+```
+
+### JSON Output
+
+```bash
+$ lodestar agent brief --task F002 --json
+{
+  "ok": true,
+  "data": {
+    "task_id": "F002",
+    "title": "Implement password reset",
+    "description": "Implement email-based password reset flow...",
+    "labels": ["feature", "security"],
+    "depends_on": ["F001"],
+    "priority": 1,
+    "format": "generic",
+    "brief": "TASK: F002 - Implement password reset\\n\\nCONTEXT:..."
+  },
+  "next": [],
+  "warnings": []
+}
 ```
