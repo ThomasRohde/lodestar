@@ -90,11 +90,13 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
     from lodestar.mcp.tools.agent import register_agent_tools
     from lodestar.mcp.tools.repo import register_repo_tools
     from lodestar.mcp.tools.task import register_task_tools
+    from lodestar.mcp.tools.task_mutations import register_task_mutation_tools
 
     register_repo_tools(mcp, context)
     register_agent_tools(mcp, context)
     register_task_tools(mcp, context)
-    logger.info("Registered repository, agent, and task tools")
+    register_task_mutation_tools(mcp, context)
+    logger.info("Registered repository, agent, task, and task mutation tools")
 
     # TODO: Register resources
 
