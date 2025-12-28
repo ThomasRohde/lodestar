@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import typer
 
@@ -307,7 +307,7 @@ def task_show(
             console.print()
 
         if lease:
-            remaining = lease.expires_at - datetime.now(timezone.utc)
+            remaining = lease.expires_at - datetime.now(UTC)
             console.print(f"[warning]Claimed by {lease.agent_id}[/warning]")
             console.print(f"  Expires in: {format_duration(remaining)}")
         elif result["claimable"]:
@@ -620,15 +620,15 @@ def task_create(
     # Build PRD context if provided
     prd_context = None
     if prd_source:
+        import contextlib
+
         from lodestar.util.prd import compute_prd_hash
 
         prd_path = root / prd_source
         prd_hash = None
         if prd_path.exists():
-            try:
+            with contextlib.suppress(Exception):
                 prd_hash = compute_prd_hash(prd_path)
-            except Exception:
-                pass  # Hash computation is best-effort
 
         prd_context = PrdContext(
             source=prd_source,
@@ -768,7 +768,7 @@ def task_update(
             console.print("[warning]No updates specified[/warning]")
         raise typer.Exit(1)
 
-    task.updated_at = datetime.now(timezone.utc)
+    task.updated_at = datetime.now(UTC)
     save_spec(spec, root)
 
     result = task.model_dump()
@@ -982,7 +982,7 @@ def task_claim(
     lease = Lease(
         task_id=task_id,
         agent_id=agent_id,
-        expires_at=datetime.now(timezone.utc) + duration,
+        expires_at=datetime.now(UTC) + duration,
     )
 
     created_lease = db.create_lease(lease)
@@ -999,7 +999,7 @@ def task_claim(
         else:
             console.print(f"[error]Task {task_id} already claimed[/error]")
             if existing:
-                remaining = existing.expires_at - datetime.now(timezone.utc)
+                remaining = existing.expires_at - datetime.now(UTC)
                 console.print(f"  Claimed by: {existing.agent_id}")
                 console.print(f"  Expires in: {format_duration(remaining)}")
         raise typer.Exit(1)
@@ -1176,7 +1176,7 @@ def task_renew(
         raise typer.Exit(1)
 
     # Renew
-    new_expires = datetime.now(timezone.utc) + duration
+    new_expires = datetime.now(UTC) + duration
     success = db.renew_lease(lease.lease_id, new_expires, agent_id)
 
     if not success:
@@ -1324,7 +1324,7 @@ def task_done(
         raise typer.Exit(1)
 
     task.status = TaskStatus.DONE
-    task.updated_at = datetime.now(timezone.utc)
+    task.updated_at = datetime.now(UTC)
     save_spec(spec, root)
 
     if json_output:
@@ -1391,7 +1391,7 @@ def task_verify(
         raise typer.Exit(1)
 
     task.status = TaskStatus.VERIFIED
-    task.updated_at = datetime.now(timezone.utc)
+    task.updated_at = datetime.now(UTC)
     save_spec(spec, root)
 
     # Auto-release any active lease (task is complete, lease no longer needed)
@@ -1536,7 +1536,7 @@ def task_delete(
     for tid in tasks_to_delete:
         t = spec.tasks[tid]
         t.status = TaskStatus.DELETED
-        t.updated_at = datetime.now(timezone.utc)
+        t.updated_at = datetime.now(UTC)
         deleted_tasks.append({"id": tid, "title": t.title})
 
     save_spec(spec, root)
