@@ -891,7 +891,7 @@ def task_claim(
         ...,
         "--agent",
         "-a",
-        help="Your agent ID (REQUIRED). Get it from 'lodestar agent join'.",
+        help="(REQUIRED) Your agent ID. Get it from 'lodestar agent join'.",
     ),
     ttl: str = typer.Option("15m", "--ttl", "-t", help="Lease duration (e.g., 15m, 1h)."),
     no_context: bool = typer.Option(
@@ -1101,7 +1101,7 @@ def task_renew(
         None,
         "--agent",
         "-a",
-        help="Your agent ID (REQUIRED). Same ID used when claiming.",
+        help="(REQUIRED) Your agent ID. Same ID used when claiming.",
     ),
     ttl: str = typer.Option("15m", "--ttl", "-t", help="New lease duration."),
     json_output: bool = typer.Option(
@@ -1120,8 +1120,10 @@ def task_renew(
     Extend the lease before it expires (default 15min).
     Only the agent who claimed the task can renew it.
 
-    Example:
+    \b
+    Examples:
         lodestar task renew F001 --agent A1234ABCD
+        lodestar task renew F001 --agent A1234ABCD --ttl 30m
     """
     if explain:
         _show_explain_renew(json_output)
@@ -1227,8 +1229,10 @@ def task_release(
     Note: You don't need to release after 'task done' or 'task verify' -
     those commands auto-release the lease.
 
-    Example:
+    \b
+    Examples:
         lodestar task release F001
+        lodestar task release F001 --agent A1234ABCD
         lodestar msg send --to task:F001 --from A1234ABCD --text 'Blocked on X'
     """
     if explain:
@@ -1289,7 +1293,15 @@ def task_done(
         help="Show what this command does.",
     ),
 ) -> None:
-    """Mark a task as done."""
+    """Mark a task as done.
+
+    Sets the task status to 'done'. After review, use 'task verify'
+    to fully complete the task and unblock dependents.
+
+    \b
+    Example:
+        lodestar task done F001
+    """
     if explain:
         _show_explain_done(json_output)
         return
@@ -1348,7 +1360,15 @@ def task_verify(
         help="Show what this command does.",
     ),
 ) -> None:
-    """Mark a task as verified (unblocks dependents)."""
+    """Mark a task as verified (unblocks dependents).
+
+    Verifies the task is complete and releases any active lease.
+    Dependent tasks become claimable after verification.
+
+    \b
+    Example:
+        lodestar task verify F001
+    """
     if explain:
         _show_explain_verify(json_output)
         return
@@ -1580,7 +1600,17 @@ def task_graph(
         help="Show what this command does.",
     ),
 ) -> None:
-    """Export the task dependency graph."""
+    """Export the task dependency graph.
+
+    Outputs all tasks and their dependency relationships.
+    Use --format dot for Graphviz visualization.
+
+    \b
+    Examples:
+        lodestar task graph
+        lodestar task graph --format dot > graph.dot
+        lodestar task graph --json
+    """
     if explain:
         _show_explain_graph(json_output)
         return

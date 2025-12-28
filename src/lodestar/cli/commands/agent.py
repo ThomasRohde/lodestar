@@ -431,6 +431,122 @@ def agent_heartbeat(
         console.print(f"[success]Heartbeat updated for {agent_id}[/success]")
 
 
+class BriefFormat:
+    """Brief output format types."""
+
+    CLAUDE = "claude"
+    COPILOT = "copilot"
+    GENERIC = "generic"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        """Return all valid format types."""
+        return [cls.CLAUDE, cls.COPILOT, cls.GENERIC]
+
+
+def _format_brief_claude(task_id: str, title: str, description: str, acceptance_criteria: list[str], locks: list[str], labels: list[str]) -> str:
+    """Format brief in Claude XML style with system prompt structure."""
+    lines = []
+    lines.append("<task>")
+    lines.append(f"  <id>{task_id}</id>")
+    lines.append(f"  <title>{title}</title>")
+    lines.append("</task>")
+    lines.append("")
+    lines.append("<context>")
+    lines.append(f"  {description or title}")
+    if labels:
+        lines.append(f"  <labels>{', '.join(labels)}</labels>")
+    if locks:
+        lines.append("  <allowed_paths>")
+        for lock in locks:
+            lines.append(f"    <path>{lock}</path>")
+        lines.append("  </allowed_paths>")
+    lines.append("</context>")
+    lines.append("")
+    if acceptance_criteria:
+        lines.append("<acceptance_criteria>")
+        for criterion in acceptance_criteria:
+            lines.append(f"  <criterion>{criterion}</criterion>")
+        lines.append("</acceptance_criteria>")
+        lines.append("")
+    lines.append("<instructions>")
+    lines.append(f"  1. Claim task: lodestar task claim {task_id} --agent YOUR_AGENT_ID")
+    lines.append(f"  2. Report progress: lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Update'")
+    lines.append(f"  3. Mark complete: lodestar task done {task_id}")
+    lines.append("</instructions>")
+    return "\n".join(lines)
+
+
+def _format_brief_copilot(task_id: str, title: str, description: str, acceptance_criteria: list[str], locks: list[str], labels: list[str]) -> str:
+    """Format brief in GitHub Copilot style with markdown headers."""
+    lines = []
+    lines.append(f"## Task: {task_id}")
+    lines.append("")
+    lines.append(f"**{title}**")
+    lines.append("")
+    lines.append("### Goal")
+    lines.append("")
+    lines.append(description or title)
+    lines.append("")
+    if labels:
+        lines.append(f"**Labels:** {', '.join(labels)}")
+        lines.append("")
+    if acceptance_criteria:
+        lines.append("### Acceptance Criteria")
+        lines.append("")
+        for criterion in acceptance_criteria:
+            lines.append(f"- [ ] {criterion}")
+        lines.append("")
+    if locks:
+        lines.append("### Allowed Paths")
+        lines.append("")
+        lines.append("```")
+        for lock in locks:
+            lines.append(lock)
+        lines.append("```")
+        lines.append("")
+    lines.append("### Commands")
+    lines.append("")
+    lines.append("```bash")
+    lines.append(f"# Claim this task")
+    lines.append(f"lodestar task claim {task_id} --agent YOUR_AGENT_ID")
+    lines.append("")
+    lines.append(f"# Report progress")
+    lines.append(f"lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Progress update'")
+    lines.append("")
+    lines.append(f"# Mark complete")
+    lines.append(f"lodestar task done {task_id}")
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def _format_brief_generic(task_id: str, title: str, description: str, acceptance_criteria: list[str], locks: list[str], labels: list[str]) -> str:
+    """Format brief in plain text with labeled sections."""
+    lines = []
+    lines.append(f"TASK: {task_id} - {title}")
+    lines.append("")
+    lines.append("CONTEXT:")
+    lines.append(f"  {description or title}")
+    if labels:
+        lines.append(f"  Labels: {', '.join(labels)}")
+    lines.append("")
+    if acceptance_criteria:
+        lines.append("CRITERIA:")
+        for i, criterion in enumerate(acceptance_criteria, 1):
+            lines.append(f"  {i}. {criterion}")
+        lines.append("")
+    if locks:
+        lines.append("PATHS:")
+        for lock in locks:
+            lines.append(f"  - {lock}")
+        lines.append("")
+    lines.append("COMMANDS:")
+    lines.append(f"  Claim:    lodestar task claim {task_id} --agent YOUR_AGENT_ID")
+    lines.append(f"  Progress: lodestar msg send --to task:{task_id} --from YOUR_AGENT_ID --text 'Update'")
+    lines.append(f"  Done:     lodestar task done {task_id}")
+    return "\n".join(lines)
+
+
 @app.command(name="brief")
 def agent_brief(
     task_id: str = typer.Option(..., "--task", "-t", help="Task ID to get brief for."),
@@ -438,7 +554,7 @@ def agent_brief(
         "generic",
         "--format",
         "-f",
-        help="Brief format: claude, copilot, generic.",
+        help="Brief format: claude (XML tags), copilot (GitHub markdown), generic (plain text).",
     ),
     json_output: bool = typer.Option(
         False,
@@ -451,10 +567,29 @@ def agent_brief(
         help="Show what this command does.",
     ),
 ) -> None:
-    """Get a concise brief for spawning a sub-agent on a task."""
+    """Get a concise brief for spawning a sub-agent on a task.
+
+    Formats output differently based on the target agent type:
+    \b
+    - claude: XML-style tags optimized for Claude's structured prompts
+    - copilot: GitHub-flavored markdown with headers and code fences
+    - generic: Plain labeled sections (TASK, CONTEXT, CRITERIA, COMMANDS)
+    \b
+    Example:
+        lodestar agent brief --task F001 --format copilot
+    """
     if explain:
         _show_explain_brief(json_output)
         return
+
+    # Validate format type
+    if format_type not in BriefFormat.all():
+        valid = ", ".join(BriefFormat.all())
+        if json_output:
+            print_json(Envelope.error(f"Invalid format '{format_type}'. Valid: {valid}").model_dump())
+        else:
+            console.print(f"[error]Invalid format '{format_type}'. Valid: {valid}[/error]")
+        raise typer.Exit(1)
 
     root = find_lodestar_root()
     if root is None:
@@ -481,7 +616,24 @@ def agent_brief(
             console.print(f"[error]Task {task_id} not found[/error]")
         raise typer.Exit(1)
 
-    # Build brief
+    # Format the brief based on format_type
+    if format_type == BriefFormat.CLAUDE:
+        formatted_brief = _format_brief_claude(
+            task.id, task.title, task.description or "",
+            task.acceptance_criteria, task.locks, task.labels
+        )
+    elif format_type == BriefFormat.COPILOT:
+        formatted_brief = _format_brief_copilot(
+            task.id, task.title, task.description or "",
+            task.acceptance_criteria, task.locks, task.labels
+        )
+    else:
+        formatted_brief = _format_brief_generic(
+            task.id, task.title, task.description or "",
+            task.acceptance_criteria, task.locks, task.labels
+        )
+
+    # Build structured brief for JSON output
     brief = {
         "task_id": task.id,
         "title": task.title,
@@ -489,6 +641,8 @@ def agent_brief(
         "acceptance_criteria": task.acceptance_criteria,
         "locks": task.locks,
         "labels": task.labels,
+        "format": format_type,
+        "formatted_output": formatted_brief,
         "commands": {
             "claim": f"lodestar task claim {task.id} --agent <your-agent-id>",
             "report_progress": f"lodestar msg send --to task:{task.id} --from <your-agent-id> --text 'Progress update'",
@@ -499,27 +653,9 @@ def agent_brief(
     if json_output:
         print_json(Envelope.success(brief).model_dump())
     else:
+        # Print the formatted brief directly (no Rich styling to preserve format)
         console.print()
-        console.print(f"[bold]Brief for {task.id}[/bold]")
-        console.print()
-        console.print(f"[info]Goal:[/info] {task.description or task.title}")
-        console.print()
-        if task.acceptance_criteria:
-            console.print("[info]Acceptance Criteria:[/info]")
-            for criterion in task.acceptance_criteria:
-                console.print(f"  - {criterion}")
-            console.print()
-        if task.locks:
-            console.print("[info]Owned paths:[/info]")
-            for lock in task.locks:
-                console.print(f"  - {lock}")
-            console.print()
-        console.print("[info]Commands (replace <your-agent-id>):[/info]")
-        console.print(f"  Claim:  [command]lodestar task claim {task.id} --agent <id>[/command]")
-        console.print(
-            f"  Report: [command]lodestar msg send --to task:{task.id} --from <id> --text '...'[/command]"
-        )
-        console.print(f"  Done:   [command]lodestar task done {task.id}[/command]")
+        console.print(formatted_brief)
         console.print()
         console.print("[muted]Get your agent ID from 'lodestar agent join'[/muted]")
         console.print()
@@ -573,6 +709,16 @@ def _show_explain_brief(json_output: bool) -> None:
     explanation = {
         "command": "lodestar agent brief",
         "purpose": "Get a concise brief for spawning a sub-agent on a task.",
+        "formats": {
+            "claude": "XML-style tags (<task>, <context>, <acceptance_criteria>) optimized for Claude",
+            "copilot": "GitHub-flavored markdown with ## headers, checkboxes, and code fences",
+            "generic": "Plain text with labeled sections (TASK:, CONTEXT:, CRITERIA:, COMMANDS:)",
+        },
+        "examples": [
+            "lodestar agent brief --task F001",
+            "lodestar agent brief --task F001 --format claude",
+            "lodestar agent brief --task F001 --format copilot",
+        ],
         "returns": [
             "Task goal and acceptance criteria",
             "Allowed file paths (locks)",
@@ -587,6 +733,16 @@ def _show_explain_brief(json_output: bool) -> None:
         console.print("[info]lodestar agent brief[/info]")
         console.print()
         console.print("Get a concise brief for spawning a sub-agent on a task.")
+        console.print()
+        console.print("[info]Formats:[/info]")
+        console.print("  claude  - XML-style tags for Claude's structured prompts")
+        console.print("  copilot - GitHub markdown with headers and code fences")
+        console.print("  generic - Plain text with labeled sections (default)")
+        console.print()
+        console.print("[info]Examples:[/info]")
+        console.print("  [command]lodestar agent brief --task F001[/command]")
+        console.print("  [command]lodestar agent brief --task F001 --format claude[/command]")
+        console.print("  [command]lodestar agent brief --task F001 --format copilot[/command]")
         console.print()
 
 

@@ -36,6 +36,12 @@ def export_snapshot(
     """Export a complete snapshot of spec and runtime state.
 
     Useful for CI validation, debugging, and auditing.
+
+    \b
+    Examples:
+        lodestar export snapshot
+        lodestar export snapshot --json > snapshot.json
+        lodestar export snapshot --include-messages --json
     """
     if explain:
         _show_explain(json_output)

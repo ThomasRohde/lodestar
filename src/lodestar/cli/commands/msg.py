@@ -65,19 +65,19 @@ def msg_send(
         ...,
         "--to",
         "-t",
-        help="Recipient: 'task:<task-id>' for task threads or 'agent:<agent-id>' for direct messages.",
+        help="(REQUIRED) Recipient: 'task:<task-id>' or 'agent:<agent-id>'.",
     ),
     text: str = typer.Option(
         ...,
         "--text",
         "-m",
-        help="Message text.",
+        help="(REQUIRED) Message text.",
     ),
     from_agent: str = typer.Option(
         ...,
         "--from",
         "-f",
-        help="Your agent ID (REQUIRED). Get it from 'lodestar agent join'.",
+        help="(REQUIRED) Your agent ID. Get it from 'lodestar agent join'.",
     ),
     json_output: bool = typer.Option(
         False,

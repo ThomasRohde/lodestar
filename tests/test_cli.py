@@ -144,6 +144,130 @@ class TestAgent:
         assert data["data"]["count"] == 1
 
 
+class TestAgentBrief:
+    """Test agent brief command with different formats."""
+
+    def test_brief_claude_format(self, temp_repo):
+        """Test claude format produces XML-style tags."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task", "--id", "F001"])
+        result = runner.invoke(app, ["agent", "brief", "--task", "F001", "--format", "claude"])
+        assert result.exit_code == 0
+        assert "<task>" in result.stdout
+        assert "</task>" in result.stdout
+        assert "<context>" in result.stdout
+        assert "</context>" in result.stdout
+        assert "<instructions>" in result.stdout
+        assert "</instructions>" in result.stdout
+
+    def test_brief_copilot_format(self, temp_repo):
+        """Test copilot format produces GitHub-flavored markdown."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task", "--id", "F001"])
+        result = runner.invoke(app, ["agent", "brief", "--task", "F001", "--format", "copilot"])
+        assert result.exit_code == 0
+        assert "## Task:" in result.stdout
+        assert "### Goal" in result.stdout
+        assert "### Commands" in result.stdout
+        assert "```bash" in result.stdout
+
+    def test_brief_generic_format(self, temp_repo):
+        """Test generic format produces plain labeled sections."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task", "--id", "F001"])
+        result = runner.invoke(app, ["agent", "brief", "--task", "F001", "--format", "generic"])
+        assert result.exit_code == 0
+        assert "TASK:" in result.stdout
+        assert "CONTEXT:" in result.stdout
+        assert "COMMANDS:" in result.stdout
+
+    def test_brief_json_includes_format_field(self, temp_repo):
+        """Test JSON output includes format field."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task", "--id", "F001"])
+
+        for format_type in ["claude", "copilot", "generic"]:
+            result = runner.invoke(
+                app, ["agent", "brief", "--task", "F001", "--format", format_type, "--json"]
+            )
+            assert result.exit_code == 0
+            data = json.loads(result.stdout)
+            assert data["ok"] is True
+            assert data["data"]["format"] == format_type
+            assert "formatted_output" in data["data"]
+
+    def test_brief_formats_are_different(self, temp_repo):
+        """Test that each format produces distinct output."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task", "--id", "F001"])
+
+        claude_result = runner.invoke(
+            app, ["agent", "brief", "--task", "F001", "--format", "claude", "--json"]
+        )
+        copilot_result = runner.invoke(
+            app, ["agent", "brief", "--task", "F001", "--format", "copilot", "--json"]
+        )
+        generic_result = runner.invoke(
+            app, ["agent", "brief", "--task", "F001", "--format", "generic", "--json"]
+        )
+
+        claude_output = json.loads(claude_result.stdout)["data"]["formatted_output"]
+        copilot_output = json.loads(copilot_result.stdout)["data"]["formatted_output"]
+        generic_output = json.loads(generic_result.stdout)["data"]["formatted_output"]
+
+        # All should be different
+        assert claude_output != copilot_output
+        assert copilot_output != generic_output
+        assert claude_output != generic_output
+
+    def test_brief_invalid_format(self, temp_repo):
+        """Test invalid format returns error."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task", "--id", "F001"])
+        result = runner.invoke(app, ["agent", "brief", "--task", "F001", "--format", "invalid"])
+        assert result.exit_code == 1
+        assert "Invalid format" in result.stdout
+
+    def test_brief_with_acceptance_criteria(self, temp_repo):
+        """Test brief includes task info from description."""
+        runner.invoke(app, ["init"])
+        runner.invoke(
+            app,
+            [
+                "task",
+                "create",
+                "--title",
+                "Test Task",
+                "--id",
+                "F001",
+                "--description",
+                "Do important things for the project.",
+            ],
+        )
+
+        # Claude format shows context
+        claude_result = runner.invoke(
+            app, ["agent", "brief", "--task", "F001", "--format", "claude"]
+        )
+        assert claude_result.exit_code == 0
+        assert "<context>" in claude_result.stdout
+        assert "important things" in claude_result.stdout
+
+        # Copilot format shows goal
+        copilot_result = runner.invoke(
+            app, ["agent", "brief", "--task", "F001", "--format", "copilot"]
+        )
+        assert "### Goal" in copilot_result.stdout
+        assert "important things" in copilot_result.stdout
+
+        # Generic shows context
+        generic_result = runner.invoke(
+            app, ["agent", "brief", "--task", "F001", "--format", "generic"]
+        )
+        assert "CONTEXT:" in generic_result.stdout
+        assert "important things" in generic_result.stdout
+
+
 class TestTask:
     """Test task commands."""
 
