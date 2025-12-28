@@ -2,10 +2,40 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from lodestar.models.runtime import Agent, Lease, Message, MessageType
 from lodestar.runtime.models import AgentModel, LeaseModel, MessageModel
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    """Ensure a datetime is timezone-aware (UTC).
+
+    Handles backward compatibility for datetimes stored without timezone info.
+
+    Args:
+        dt: A datetime that may or may not have timezone info.
+
+    Returns:
+        A timezone-aware datetime in UTC.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _parse_datetime(iso_str: str) -> datetime:
+    """Parse an ISO format datetime string and ensure it's UTC.
+
+    Args:
+        iso_str: ISO format datetime string.
+
+    Returns:
+        A timezone-aware datetime in UTC.
+    """
+    dt = datetime.fromisoformat(iso_str)
+    return _ensure_utc(dt)
+
 
 # Agent conversions
 
@@ -49,8 +79,8 @@ def orm_to_agent(model: AgentModel) -> Agent:
         agent_id=model.agent_id,
         display_name=model.display_name,
         role=model.role or "",
-        created_at=datetime.fromisoformat(model.created_at),
-        last_seen_at=datetime.fromisoformat(model.last_seen_at),
+        created_at=_parse_datetime(model.created_at),
+        last_seen_at=_parse_datetime(model.last_seen_at),
         capabilities=capabilities,
         session_meta=model.session_meta or {},
     )
@@ -90,8 +120,8 @@ def orm_to_lease(model: LeaseModel) -> Lease:
         lease_id=model.lease_id,
         task_id=model.task_id,
         agent_id=model.agent_id,
-        created_at=datetime.fromisoformat(model.created_at),
-        expires_at=datetime.fromisoformat(model.expires_at),
+        created_at=_parse_datetime(model.created_at),
+        expires_at=_parse_datetime(model.expires_at),
     )
 
 
@@ -130,11 +160,11 @@ def orm_to_message(model: MessageModel) -> Message:
     """
     return Message(
         message_id=model.message_id,
-        created_at=datetime.fromisoformat(model.created_at),
+        created_at=_parse_datetime(model.created_at),
         from_agent_id=model.from_agent_id,
         to_type=MessageType(model.to_type),
         to_id=model.to_id,
         text=model.text,
         meta=model.meta or {},
-        read_at=datetime.fromisoformat(model.read_at) if model.read_at else None,
+        read_at=_parse_datetime(model.read_at) if model.read_at else None,
     )

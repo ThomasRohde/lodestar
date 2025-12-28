@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from lodestar.models.runtime import Agent, Lease, Message, MessageType
 from lodestar.runtime.converters import (
+    _parse_datetime,
     agent_to_orm,
     lease_to_orm,
     message_to_orm,
@@ -124,8 +125,8 @@ class RuntimeDatabase:
                         agent_id=row.agent_id,
                         display_name=row.display_name,
                         role=row.role or "",
-                        created_at=datetime.fromisoformat(row.created_at),
-                        last_seen_at=datetime.fromisoformat(row.last_seen_at),
+                        created_at=_parse_datetime(row.created_at),
+                        last_seen_at=_parse_datetime(row.last_seen_at),
                         capabilities=capabilities,
                         session_meta=session_meta or {},
                     )
