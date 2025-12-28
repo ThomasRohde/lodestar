@@ -227,6 +227,35 @@ class MessageRepository:
             result = session.execute(stmt).scalar()
             return result or 0
 
+    def mark_messages_read(self, agent_id: str, message_ids: list[str]) -> int:
+        """Mark specific messages as read for an agent.
+
+        Args:
+            agent_id: The agent ID (used for verification)
+            message_ids: List of message IDs to mark as read
+
+        Returns:
+            Number of messages marked as read
+        """
+        if not message_ids:
+            return 0
+
+        with get_session(self._session_factory) as session:
+            now = _utc_now()
+            # Only mark messages that belong to this agent and aren't already read
+            update_stmt = (
+                update(MessageModel)
+                .where(
+                    MessageModel.message_id.in_(message_ids),
+                    MessageModel.to_type == "agent",
+                    MessageModel.to_id == agent_id,
+                    MessageModel.read_at.is_(None),
+                )
+                .values(read_at=now.isoformat())
+            )
+            result = session.execute(update_stmt)
+            return result.rowcount  # type: ignore[return-value]
+
     def wait_for_message(
         self, agent_id: str, timeout_seconds: float | None = None, since: datetime | None = None
     ) -> bool:

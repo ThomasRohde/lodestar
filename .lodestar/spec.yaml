@@ -2357,9 +2357,9 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:06:21.359747+00:00'
-    updated_at: '2025-12-28T13:06:21.359752+00:00'
+    updated_at: '2025-12-28T16:12:41.683791+00:00'
   MCP-042:
     title: Implement lodestar.message.ack tool
     description: 'Add to mcp/tools/message.py. Implement lodestar.message.ack: inputs

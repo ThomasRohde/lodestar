@@ -277,6 +277,81 @@ def message_list(
     return with_item(summary, item=response_data)
 
 
+def message_ack(
+    context: LodestarContext,
+    agent_id: str,
+    message_ids: list[str],
+) -> CallToolResult:
+    """
+    Mark messages as read for an agent.
+
+    Marks one or more messages as read (acknowledged) for a specific agent.
+    Only messages that belong to the agent and are currently unread will be marked.
+
+    Args:
+        context: Lodestar server context
+        agent_id: Agent ID acknowledging the messages (required)
+        message_ids: List of message IDs to mark as read (required, non-empty)
+
+    Returns:
+        CallToolResult with number of messages marked as read
+    """
+    # Validate agent_id
+    if not agent_id or not agent_id.strip():
+        return error(
+            "agent_id is required and cannot be empty",
+            error_code="INVALID_AGENT_ID",
+        )
+
+    # Validate message_ids
+    if not message_ids:
+        return error(
+            "message_ids is required and cannot be empty",
+            error_code="INVALID_MESSAGE_IDS",
+        )
+
+    # Filter out empty strings
+    valid_message_ids = [mid for mid in message_ids if mid and mid.strip()]
+    if not valid_message_ids:
+        return error(
+            "message_ids must contain at least one non-empty message ID",
+            error_code="INVALID_MESSAGE_IDS",
+        )
+
+    # Mark messages as read via database
+    updated_count = context.db._messages.mark_messages_read(
+        agent_id=agent_id,
+        message_ids=valid_message_ids,
+    )
+
+    # Log event (message.ack)
+    with contextlib.suppress(Exception):
+        context.emit_event(
+            event_type="message.ack",
+            agent_id=agent_id,
+            data={
+                "message_ids": valid_message_ids,
+                "updated_count": updated_count,
+            },
+        )
+
+    # Build summary
+    count_str = f"{updated_count} message{'s' if updated_count != 1 else ''}"
+    summary = format_summary(
+        "Marked",
+        count_str,
+        "as read",
+    )
+
+    # Build response
+    response_data = {
+        "ok": True,
+        "updatedCount": updated_count,
+    }
+
+    return with_item(summary, item=response_data)
+
+
 def register_message_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register message tools with the FastMCP server.
@@ -357,4 +432,31 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
             unread_only=unread_only,
             limit=limit,
             since_id=since_id,
+        )
+
+    @mcp.tool(name="lodestar.message.ack")
+    def ack_tool(
+        agent_id: str,
+        message_ids: list[str],
+    ) -> CallToolResult:
+        """Mark messages as read for an agent.
+
+        Marks one or more messages as read (acknowledged) for a specific agent.
+        Only messages that belong to the agent and are currently unread will be marked.
+
+        Args:
+            agent_id: Agent ID acknowledging the messages (required)
+            message_ids: List of message IDs to mark as read (required, non-empty)
+
+        Returns:
+            Success response with:
+            - ok: True if successful
+            - updatedCount: Number of messages marked as read
+
+            Returns error if agent_id is missing or message_ids is empty.
+        """
+        return message_ack(
+            context=context,
+            agent_id=agent_id,
+            message_ids=message_ids,
         )
