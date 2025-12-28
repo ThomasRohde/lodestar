@@ -163,6 +163,115 @@ def task_claim(
     return with_item(summary, item=response_data)
 
 
+def task_release(
+    context: LodestarContext,
+    task_id: str,
+    agent_id: str,
+    reason: str | None = None,
+) -> CallToolResult:
+    """
+    Release a claim on a task before TTL expiry.
+
+    Frees the task for other agents to claim. Use this when blocked or
+    unable to complete the task.
+
+    Args:
+        context: Lodestar server context
+        task_id: Task ID to release (required)
+        agent_id: Agent ID releasing the claim (required)
+        reason: Optional reason for releasing (for logging/audit)
+
+    Returns:
+        CallToolResult with success status and previous lease details
+    """
+    # Validate inputs
+    try:
+        validated_task_id = validate_task_id(task_id)
+    except ValidationError as e:
+        return error(str(e), error_code="INVALID_TASK_ID")
+
+    if not agent_id or not agent_id.strip():
+        return error(
+            "agent_id is required and cannot be empty",
+            error_code="INVALID_AGENT_ID",
+        )
+
+    # Get active lease before releasing
+    active_lease = context.db.get_active_lease(validated_task_id)
+
+    if active_lease is None:
+        return error(
+            f"No active lease for task {validated_task_id}",
+            error_code="NO_ACTIVE_LEASE",
+            details={"task_id": validated_task_id},
+        )
+
+    # Verify the agent_id matches the lease
+    if active_lease.agent_id != agent_id:
+        return error(
+            f"Task {validated_task_id} is claimed by {active_lease.agent_id}, not {agent_id}",
+            error_code="LEASE_MISMATCH",
+            details={
+                "task_id": validated_task_id,
+                "claimed_by": active_lease.agent_id,
+                "requested_by": agent_id,
+            },
+        )
+
+    # Release the lease
+    success = context.db.release_lease(validated_task_id, agent_id)
+
+    if not success:
+        # This shouldn't happen since we checked for active lease above
+        return error(
+            f"Failed to release lease for task {validated_task_id}",
+            error_code="RELEASE_FAILED",
+            details={"task_id": validated_task_id, "agent_id": agent_id},
+        )
+
+    # Log event (task.release)
+    event_data = {
+        "lease_id": active_lease.lease_id,
+    }
+    if reason:
+        event_data["reason"] = reason
+
+    with contextlib.suppress(Exception):
+        context.emit_event(
+            event_type="task.release",
+            task_id=validated_task_id,
+            agent_id=agent_id,
+            data=event_data,
+        )
+
+    # Build previous lease object for response
+    previous_lease = {
+        "leaseId": active_lease.lease_id,
+        "taskId": validated_task_id,
+        "agentId": agent_id,
+        "expiresAt": active_lease.expires_at.isoformat(),
+        "createdAt": active_lease.created_at.isoformat(),
+    }
+
+    # Build summary
+    summary = format_summary(
+        "Released",
+        validated_task_id,
+        f"by {agent_id}",
+    )
+
+    # Build response
+    response_data = {
+        "ok": True,
+        "previousLease": previous_lease,
+    }
+
+    if reason:
+        response_data["reason"] = reason
+
+    return with_item(summary, item=response_data)
+
+
 def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register task mutation tools with the FastMCP server.
@@ -206,4 +315,35 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             agent_id=agent_id,
             ttl_seconds=ttl_seconds,
             force=force,
+        )
+
+    @mcp.tool(name="lodestar.task.release")
+    def release_tool(
+        task_id: str,
+        agent_id: str,
+        reason: str | None = None,
+    ) -> CallToolResult:
+        """Release a claim on a task before TTL expiry.
+
+        Frees the task for other agents to claim. Use this when you're blocked
+        or unable to complete the task. The lease is immediately removed and
+        the task becomes available for others to claim.
+
+        Note: You don't need to release after marking a task as done or verified -
+        those operations automatically release the lease.
+
+        Args:
+            task_id: Task ID to release (required)
+            agent_id: Agent ID releasing the claim (required)
+            reason: Optional reason for releasing (for logging/audit purposes)
+
+        Returns:
+            Success response with previous lease details (leaseId, taskId, agentId, expiresAt)
+            or error if no active lease exists or agent_id doesn't match the lease holder.
+        """
+        return task_release(
+            context=context,
+            task_id=task_id,
+            agent_id=agent_id,
+            reason=reason,
         )
