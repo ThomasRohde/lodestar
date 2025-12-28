@@ -1570,14 +1570,30 @@ def _show_explain_create(json_output: bool) -> None:
     explanation = {
         "command": "lodestar task create",
         "purpose": "Create a new task with detailed context for executing agents.",
+        "options": {
+            "--id": "Task ID (auto-generated as T001, T002... if omitted)",
+            "--title, -t": "Task title (required)",
+            "--description, -d": "Task description - use WHAT/WHERE/WHY/ACCEPT format",
+            "--priority, -p": "Priority number (lower = higher priority, default: 100)",
+            "--status, -s": "Initial status (default: ready)",
+            "--depends-on": "Task ID this depends on (repeatable for multiple)",
+            "--label, -l": "Label for categorization (repeatable for multiple)",
+            "--prd-source": "Path to PRD file (e.g., PRD.md)",
+            "--prd-ref": "PRD section anchor (e.g., #feature-requirements, repeatable)",
+            "--prd-excerpt": "Frozen PRD excerpt text to embed in task",
+        },
         "examples": [
-            "lodestar task create --title 'Add login' --description 'WHAT: Add login form...'",
-            "lodestar task create --id F001 --title 'Feature' --depends-on F000 --label feature",
+            "lodestar task create --title 'Fix login bug' --label bug --priority 1",
+            "lodestar task create --id F001 --title 'Add auth' --depends-on F000 --label feature",
+            "lodestar task create --title 'Add caching' --prd-source PRD.md --prd-ref '#caching'",
+            "lodestar task create --title 'Rate limit' --prd-excerpt 'Limit: 100 req/min'",
         ],
         "notes": [
-            "Write detailed descriptions with WHAT, WHERE, WHY, ACCEPT, CONTEXT",
-            "Task ID is auto-generated if not provided",
-            "Use --depends-on to set task dependencies",
+            "Write detailed descriptions: WHAT (goal), WHERE (files), WHY (context), ACCEPT (criteria)",
+            "Task ID auto-generates as T001, T002... if --id is omitted",
+            "Dependencies must exist before creating the task",
+            "Use --prd-source with --prd-ref to link PRD sections",
+            "Use --prd-excerpt for frozen requirements that shouldn't change",
         ],
     }
     if json_output:
@@ -1585,13 +1601,33 @@ def _show_explain_create(json_output: bool) -> None:
     else:
         console.print("\n[info]lodestar task create[/info]\n")
         console.print("Create a new task with detailed context for executing agents.\n")
+        console.print("[info]Options:[/info]")
+        console.print("  [muted]--id[/muted]           Task ID (auto-generated if omitted)")
+        console.print("  [muted]--title, -t[/muted]    Task title (required)")
+        console.print("  [muted]--description, -d[/muted] Task description")
+        console.print("  [muted]--priority, -p[/muted] Priority (lower = higher, default: 100)")
+        console.print("  [muted]--status, -s[/muted]   Initial status (default: ready)")
+        console.print("  [muted]--depends-on[/muted]   Task IDs this depends on (repeatable)")
+        console.print("  [muted]--label, -l[/muted]    Labels (repeatable)")
+        console.print("  [muted]--prd-source[/muted]   Path to PRD file")
+        console.print("  [muted]--prd-ref[/muted]      PRD section anchors (repeatable)")
+        console.print("  [muted]--prd-excerpt[/muted]  Frozen PRD excerpt to embed")
+        console.print()
         console.print("[info]Examples:[/info]")
         console.print(
-            "  [command]lodestar task create --title 'Add login' --description 'WHAT: ...'[/command]"
+            "  [command]lodestar task create --title 'Fix bug' --label bug --priority 1[/command]"
         )
         console.print(
-            "  [command]lodestar task create --id F001 --title 'Feature' --depends-on F000[/command]"
+            "  [command]lodestar task create --id F001 --title 'Add auth' --depends-on F000[/command]"
         )
+        console.print(
+            "  [command]lodestar task create --title 'Cache' --prd-source PRD.md --prd-ref '#cache'[/command]"
+        )
+        console.print()
+        console.print("[info]Notes:[/info]")
+        console.print("  - Use WHAT/WHERE/WHY/ACCEPT format in descriptions")
+        console.print("  - Dependencies must exist before creating the task")
+        console.print("  - Use --prd-source + --prd-ref to link PRD sections")
         console.print()
 
 

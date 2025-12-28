@@ -194,34 +194,109 @@ lodestar agent join --name "Your Name" # Register, SAVE the agent ID
 lodestar task next                     # Find available work
 ```
 
-## Essential Workflow
+## Finding Work
 
 ```bash
-# Claim before working (--agent is required)
-lodestar task claim <id> --agent <your-agent-id>
+# Get next claimable task (status=ready, all deps verified, no active lease)
+lodestar task next
 
-# Renew if work takes > 10 min
-lodestar task renew <id> --agent <your-agent-id>
+# Get multiple options to choose from
+lodestar task next --count 5
 
-# Complete (auto-releases lease)
-lodestar task done <id>
-lodestar task verify <id>
+# Browse all tasks
+lodestar task list
 
-# Only if you CAN'T complete - release for others
-lodestar task release <id>
+# Filter by status or label
+lodestar task list --status ready
+lodestar task list --label feature
+lodestar task list --status done
+
+# View deleted tasks
+lodestar task list --include-deleted
+lodestar task list --status deleted
+
+# Get full task details
+lodestar task show F001
+lodestar task show F001 --json    # For programmatic access
+```
+
+## Complete Workflow Example
+
+```bash
+# 1. Register as an agent (save your ID!)
+lodestar agent join --name "Agent-1"
+# Output: Registered agent A1234ABCD
+
+# 2. Find available work
+lodestar task next --count 3
+
+# 3. Claim before working (creates 15-min lease)
+lodestar task claim F001 --agent A1234ABCD
+
+# 4. Do the work...
+#    If it takes longer than 10 min, renew the lease:
+lodestar task renew F001 --agent A1234ABCD
+
+# 5. Complete the task
+lodestar task done F001
+lodestar task verify F001
+
+# Alternative: Release if you can't complete
+lodestar task release F001
 ```
 
 ## Creating Tasks
 
-Write **detailed descriptions** so executing agents have full context:
+Write **detailed descriptions** so executing agents have full context.
+
+### Basic Task
 
 ```bash
-lodestar task create --id "F001" --title "Add feature X" \\
-    --description "WHAT: ... WHERE: ... WHY: ... ACCEPT: ... CONTEXT: ..." \\
-    --depends-on "F000" --label feature
+lodestar task create --title "Fix login bug" --label bug --priority 1
 ```
 
-Include: goal, relevant files, acceptance criteria, and pointers to related code.
+### Full Task with Dependencies
+
+```bash
+lodestar task create \\
+    --id "F001" \\
+    --title "Add user authentication" \\
+    --description "WHAT: Implement OAuth2 login. WHERE: src/auth/. WHY: Users need SSO. ACCEPT: Tests pass, login works." \\
+    --depends-on "F000" \\
+    --label feature \\
+    --priority 2
+```
+
+### Task with PRD References
+
+```bash
+# Reference sections in a PRD file
+lodestar task create \\
+    --title "Implement caching layer" \\
+    --prd-source "PRD.md" \\
+    --prd-ref "#caching-requirements" \\
+    --prd-ref "#performance-targets"
+
+# Or embed a frozen excerpt directly
+lodestar task create \\
+    --title "Add rate limiting" \\
+    --prd-excerpt "Rate limit: 100 req/min per user. Use Redis for distributed counting."
+```
+
+### Task Options Reference
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--id` | | Task ID (auto-generated if omitted) |
+| `--title` | `-t` | Task title (required) |
+| `--description` | `-d` | WHAT/WHERE/WHY/ACCEPT format recommended |
+| `--priority` | `-p` | Lower number = higher priority (default: 100) |
+| `--status` | `-s` | Initial status (default: ready) |
+| `--depends-on` | | Task IDs this depends on (repeatable) |
+| `--label` | `-l` | Labels for categorization (repeatable) |
+| `--prd-source` | | Path to PRD file |
+| `--prd-ref` | | PRD section anchors (repeatable) |
+| `--prd-excerpt` | | Frozen PRD text to embed |
 
 ## Multi-Agent File Coordination
 
@@ -248,11 +323,25 @@ Use --force to bypass lock conflict warnings
 
 Use `--force` when you intentionally coordinate with another agent.
 
+## CLI Quick Reference
+
+| Command | Key Options |
+|---------|-------------|
+| `task list` | `--status`, `--label`, `--include-deleted` |
+| `task next` | `--count` |
+| `task show <id>` | `--json` |
+| `task create` | `--title`, `--description`, `--priority`, `--depends-on`, `--label`, `--prd-source`, `--prd-ref`, `--prd-excerpt` |
+| `task claim <id>` | `--agent`, `--force` |
+| `task renew <id>` | `--agent` |
+| `task done <id>` | |
+| `task verify <id>` | |
+| `task delete <id>` | `--cascade` |
+
 ## Get Help
 
 ```bash
-lodestar task claim --help    # See all options
-lodestar task claim --explain # Understand what it does
+lodestar <command> --help    # See all options
+lodestar <command> --explain # Understand what it does
 ```
 
 ## Files
