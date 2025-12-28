@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from lodestar import __version__
 from lodestar.cli.app import app
 
 runner = CliRunner()
@@ -32,7 +33,7 @@ class TestVersion:
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
         assert "lodestar" in result.stdout
-        assert "0.1.0" in result.stdout
+        assert __version__ in result.stdout
 
 
 class TestInit:
