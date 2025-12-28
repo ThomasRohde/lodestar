@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,11 @@ from lodestar.runtime.converters import (
 from lodestar.runtime.engine import create_runtime_engine, create_session_factory, get_session
 from lodestar.runtime.models import AgentModel, Base, EventModel, LeaseModel, MessageModel
 from lodestar.util.paths import get_runtime_db_path
+
+
+def _utc_now() -> datetime:
+    """Return current UTC datetime (timezone-aware)."""
+    return datetime.now(timezone.utc)
 
 
 class RuntimeDatabase:
@@ -152,7 +157,7 @@ class RuntimeDatabase:
             stmt = (
                 update(AgentModel)
                 .where(AgentModel.agent_id == agent_id)
-                .values(last_seen_at=datetime.utcnow().isoformat())
+                .values(last_seen_at=_utc_now().isoformat())
             )
             result = session.execute(stmt)
             return result.rowcount > 0
@@ -164,7 +169,7 @@ class RuntimeDatabase:
 
         Returns the lease if created, None if the task already has an active lease.
         """
-        now = datetime.utcnow()
+        now = _utc_now()
 
         with get_session(self._session_factory) as session:
             # Check for existing active lease (atomic within transaction)
@@ -193,7 +198,7 @@ class RuntimeDatabase:
 
     def get_active_lease(self, task_id: str) -> Lease | None:
         """Get the active lease for a task, if any."""
-        now = datetime.utcnow()
+        now = _utc_now()
 
         with get_session(self._session_factory) as session:
             stmt = (
@@ -214,7 +219,7 @@ class RuntimeDatabase:
 
     def get_agent_leases(self, agent_id: str, active_only: bool = True) -> list[Lease]:
         """Get all leases for an agent."""
-        now = datetime.utcnow()
+        now = _utc_now()
 
         with get_session(self._session_factory) as session:
             if active_only:
@@ -238,7 +243,7 @@ class RuntimeDatabase:
 
     def renew_lease(self, lease_id: str, new_expires_at: datetime, agent_id: str) -> bool:
         """Renew a lease (only if owned by agent and still active)."""
-        now = datetime.utcnow()
+        now = _utc_now()
 
         with get_session(self._session_factory) as session:
             stmt = (
@@ -270,7 +275,7 @@ class RuntimeDatabase:
 
     def release_lease(self, task_id: str, agent_id: str) -> bool:
         """Release a lease (set expires_at to now)."""
-        now = datetime.utcnow()
+        now = _utc_now()
 
         with get_session(self._session_factory) as session:
             stmt = (
@@ -358,7 +363,7 @@ class RuntimeDatabase:
 
             # Mark messages as read if requested
             if mark_as_read and messages:
-                now = datetime.utcnow()
+                now = _utc_now()
                 message_ids = [msg.message_id for msg in messages]
                 update_stmt = (
                     update(MessageModel)
@@ -518,7 +523,7 @@ class RuntimeDatabase:
 
     def get_stats(self) -> dict[str, Any]:
         """Get runtime statistics."""
-        now = datetime.utcnow()
+        now = _utc_now()
 
         with get_session(self._session_factory) as session:
             agent_count = session.execute(select(func.count()).select_from(AgentModel)).scalar()
@@ -563,7 +568,7 @@ class RuntimeDatabase:
     ) -> None:
         """Log an event to the events table."""
         event = EventModel(
-            created_at=datetime.utcnow().isoformat(),
+            created_at=_utc_now().isoformat(),
             event_type=event_type,
             agent_id=agent_id,
             task_id=task_id,

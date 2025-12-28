@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+
+
+def _utc_now() -> datetime:
+    """Return current UTC datetime (timezone-aware)."""
+    return datetime.now(timezone.utc)
 
 
 class TaskStatus(str, Enum):
@@ -21,6 +26,38 @@ class TaskStatus(str, Enum):
     DONE = "done"
     VERIFIED = "verified"
     DELETED = "deleted"
+
+
+class PrdRef(BaseModel):
+    """Reference to a PRD section."""
+
+    anchor: str = Field(description="Section anchor (e.g., #task-claiming)")
+    lines: list[int] | None = Field(
+        default=None,
+        description="Optional [start, end] line range for precise extraction",
+    )
+
+
+class PrdContext(BaseModel):
+    """PRD context attached to a task.
+
+    Enables agents to receive relevant PRD excerpts when claiming tasks
+    without re-reading the full document.
+    """
+
+    source: str = Field(description="Path to PRD file (e.g., PRD.md)")
+    refs: list[PrdRef] = Field(
+        default_factory=list,
+        description="Section references within the PRD",
+    )
+    excerpt: str | None = Field(
+        default=None,
+        description="Frozen excerpt snapshot captured at task creation",
+    )
+    prd_hash: str | None = Field(
+        default=None,
+        description="SHA256 hash of PRD content for drift detection",
+    )
 
 
 class Task(BaseModel):
@@ -54,12 +91,16 @@ class Task(BaseModel):
         description="Current task status",
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=_utc_now,
         description="When the task was created",
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=_utc_now,
         description="When the task was last updated",
+    )
+    prd: PrdContext | None = Field(
+        default=None,
+        description="Optional PRD context for intent and constraints",
     )
 
     @field_validator("id")

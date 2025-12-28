@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 from uuid import uuid4
@@ -15,6 +15,11 @@ from pydantic import BaseModel, Field
 #   LODESTAR_AGENT_OFFLINE_THRESHOLD_MINUTES (default: 60)
 DEFAULT_IDLE_THRESHOLD_MINUTES = 15
 DEFAULT_OFFLINE_THRESHOLD_MINUTES = 60
+
+
+def _utc_now() -> datetime:
+    """Return current UTC datetime (timezone-aware)."""
+    return datetime.now(timezone.utc)
 
 
 class AgentStatus(str, Enum):
@@ -75,11 +80,11 @@ class Agent(BaseModel):
         description="Agent role (e.g., 'code-review', 'testing', 'documentation')",
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=_utc_now,
         description="When the agent registered",
     )
     last_seen_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=_utc_now,
         description="Last heartbeat timestamp",
     )
     capabilities: list[str] = Field(
@@ -101,7 +106,7 @@ class Agent(BaseModel):
             AgentStatus based on time since last_seen_at.
         """
         if now is None:
-            now = datetime.utcnow()
+            now = _utc_now()
 
         idle_threshold, offline_threshold = get_agent_thresholds()
         time_since_seen = now - self.last_seen_at
@@ -124,7 +129,7 @@ class Lease(BaseModel):
     task_id: str = Field(description="The claimed task ID")
     agent_id: str = Field(description="The claiming agent ID")
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=_utc_now,
         description="When the lease was created",
     )
     expires_at: datetime = Field(description="When the lease expires")
@@ -132,7 +137,7 @@ class Lease(BaseModel):
     def is_expired(self, now: datetime | None = None) -> bool:
         """Check if the lease has expired."""
         if now is None:
-            now = datetime.utcnow()
+            now = _utc_now()
         return now >= self.expires_at
 
     def is_active(self, now: datetime | None = None) -> bool:
@@ -155,7 +160,7 @@ class Message(BaseModel):
         description="Unique message identifier",
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=_utc_now,
         description="When the message was sent",
     )
     from_agent_id: str = Field(description="Sender agent ID")

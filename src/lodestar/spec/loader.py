@@ -9,7 +9,7 @@ import portalocker
 import yaml
 from pydantic import ValidationError
 
-from lodestar.models.spec import Project, Spec, Task, TaskStatus
+from lodestar.models.spec import PrdContext, PrdRef, Project, Spec, Task, TaskStatus
 from lodestar.util.paths import get_spec_path
 
 
@@ -51,6 +51,8 @@ def _serialize_task(task: Task) -> dict[str, Any]:
     data["updated_at"] = task.updated_at.isoformat()
     # Remove id from dict (it's the key)
     del data["id"]
+    # Remove None values for cleaner YAML (especially prd when not set)
+    data = {k: v for k, v in data.items() if v is not None}
     return data
 
 

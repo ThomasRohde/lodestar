@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import typer
 
 from lodestar.models.envelope import Envelope, NextAction
 from lodestar.models.runtime import Lease
-from lodestar.models.spec import Task, TaskStatus
+from lodestar.models.spec import PrdContext, PrdRef, Task, TaskStatus
 from lodestar.runtime.database import RuntimeDatabase
 from lodestar.spec.dag import validate_dag
 from lodestar.spec.loader import SpecNotFoundError, load_spec, save_spec
 from lodestar.util.output import console, print_json
 from lodestar.util.paths import find_lodestar_root, get_runtime_db_path
+from lodestar.util.prd import check_prd_drift, extract_prd_section, truncate_to_budget
 from lodestar.util.time import format_duration, parse_duration
 
 app = typer.Typer(
@@ -306,7 +307,7 @@ def task_show(
             console.print()
 
         if lease:
-            remaining = lease.expires_at - datetime.utcnow()
+            remaining = lease.expires_at - datetime.now(timezone.utc)
             console.print(f"[warning]Claimed by {lease.agent_id}[/warning]")
             console.print(f"  Expires in: {format_duration(remaining)}")
         elif result["claimable"]:
@@ -325,6 +326,173 @@ def task_show(
                 console.print(f"  Participating agents: {', '.join(message_agents)}")
 
         console.print()
+
+
+@app.command(name="context")
+def task_context(
+    task_id: str = typer.Argument(..., help="Task ID to get context for."),
+    max_chars: int = typer.Option(
+        1000,
+        "--max-chars",
+        "-m",
+        help="Maximum characters for context output.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Output in JSON format.",
+    ),
+    explain: bool = typer.Option(
+        False,
+        "--explain",
+        help="Show what this command does.",
+    ),
+) -> None:
+    """Get PRD context for a task.
+
+    Returns the task's PRD references, frozen excerpt, and live PRD sections
+    (if available). Respects --max-chars budget for context window management.
+    """
+    if explain:
+        _show_explain_context(json_output)
+        return
+
+    root = find_lodestar_root()
+    if root is None:
+        if json_output:
+            print_json(Envelope.error("Not a Lodestar repository").model_dump())
+        else:
+            console.print("[error]Not a Lodestar repository[/error]")
+        raise typer.Exit(1)
+
+    try:
+        spec = load_spec(root)
+    except SpecNotFoundError:
+        if json_output:
+            print_json(Envelope.error("Spec not found").model_dump())
+        else:
+            console.print("[error]Spec not found[/error]")
+        raise typer.Exit(1)
+
+    task = spec.get_task(task_id)
+    if task is None:
+        if json_output:
+            print_json(Envelope.error(f"Task {task_id} not found").model_dump())
+        else:
+            console.print(f"[error]Task {task_id} not found[/error]")
+        raise typer.Exit(1)
+
+    # Build context bundle
+    context_bundle: dict = {
+        "task_id": task_id,
+        "title": task.title,
+        "description": task.description,
+    }
+
+    warnings = []
+    prd_sections = []
+
+    if task.prd:
+        context_bundle["prd_source"] = task.prd.source
+        context_bundle["prd_refs"] = [ref.model_dump() for ref in task.prd.refs]
+
+        # Include frozen excerpt if available
+        if task.prd.excerpt:
+            context_bundle["prd_excerpt"] = task.prd.excerpt
+
+        # Check for PRD drift
+        if task.prd.prd_hash:
+            prd_path = root / task.prd.source
+            if prd_path.exists():
+                try:
+                    if check_prd_drift(task.prd.prd_hash, prd_path):
+                        warnings.append(
+                            f"PRD has changed since task creation. "
+                            f"Review {task.prd.source} for updates."
+                        )
+                except Exception:
+                    pass  # Ignore hash check errors
+
+        # Try to extract live PRD sections
+        prd_path = root / task.prd.source
+        if prd_path.exists():
+            for ref in task.prd.refs:
+                try:
+                    lines_tuple = tuple(ref.lines) if ref.lines and len(ref.lines) == 2 else None
+                    section = extract_prd_section(
+                        prd_path,
+                        anchor=ref.anchor,
+                        lines=lines_tuple,
+                    )
+                    prd_sections.append({
+                        "anchor": ref.anchor,
+                        "content": section,
+                    })
+                except (ValueError, FileNotFoundError):
+                    pass  # Section not found
+
+    if prd_sections:
+        context_bundle["prd_sections"] = prd_sections
+
+    # Truncate to budget
+    total_content = task.description
+    if task.prd and task.prd.excerpt:
+        total_content += "\n" + task.prd.excerpt
+    for section in prd_sections:
+        total_content += "\n" + section["content"]
+
+    truncated_content = truncate_to_budget(total_content, max_chars)
+    context_bundle["content"] = truncated_content
+    context_bundle["truncated"] = len(total_content) > max_chars
+
+    if json_output:
+        print_json(Envelope.success(context_bundle, warnings=warnings).model_dump())
+    else:
+        console.print()
+        console.print(f"[bold]Context for[/bold] [task_id]{task_id}[/task_id]")
+        console.print()
+
+        if warnings:
+            for warning in warnings:
+                console.print(f"[warning]⚠ {warning}[/warning]")
+            console.print()
+
+        if task.prd:
+            console.print(f"[muted]PRD Source:[/muted] {task.prd.source}")
+            if task.prd.refs:
+                refs_str = ", ".join(ref.anchor for ref in task.prd.refs)
+                console.print(f"[muted]References:[/muted] {refs_str}")
+            console.print()
+
+        console.print("[info]Content:[/info]")
+        console.print(truncated_content)
+
+        if context_bundle["truncated"]:
+            console.print()
+            console.print(f"[muted](Truncated to {max_chars} chars)[/muted]")
+
+        console.print()
+
+
+def _show_explain_context(json_output: bool) -> None:
+    explanation = {
+        "command": "lodestar task context",
+        "purpose": "Get PRD context for a task.",
+        "returns": [
+            "Task description",
+            "PRD references and excerpts",
+            "Live PRD sections if available",
+        ],
+        "notes": [
+            "Respects --max-chars budget for context window management",
+            "Warns if PRD has changed since task creation (drift detection)",
+        ],
+    }
+    if json_output:
+        print_json(explanation)
+    else:
+        console.print("\n[info]lodestar task context[/info]\n")
+        console.print("Get PRD context for a task.\n")
 
 
 @app.command(name="create")
@@ -353,6 +521,21 @@ def task_create(
         "--label",
         "-l",
         help="Labels for the task.",
+    ),
+    prd_source: str | None = typer.Option(
+        None,
+        "--prd-source",
+        help="Path to PRD file (e.g., PRD.md).",
+    ),
+    prd_refs: list[str] | None = typer.Option(
+        None,
+        "--prd-ref",
+        help="PRD section anchors (e.g., #task-claiming). Can specify multiple.",
+    ),
+    prd_excerpt: str | None = typer.Option(
+        None,
+        "--prd-excerpt",
+        help="Frozen PRD excerpt to attach to task.",
     ),
     json_output: bool = typer.Option(
         False,
@@ -421,6 +604,26 @@ def task_create(
                 console.print(f"[error]Unknown dependencies: {missing}[/error]")
             raise typer.Exit(1)
 
+    # Build PRD context if provided
+    prd_context = None
+    if prd_source:
+        from lodestar.util.prd import compute_prd_hash
+
+        prd_path = root / prd_source
+        prd_hash = None
+        if prd_path.exists():
+            try:
+                prd_hash = compute_prd_hash(prd_path)
+            except Exception:
+                pass  # Hash computation is best-effort
+
+        prd_context = PrdContext(
+            source=prd_source,
+            refs=[PrdRef(anchor=ref) for ref in (prd_refs or [])],
+            excerpt=prd_excerpt,
+            prd_hash=prd_hash,
+        )
+
     # Create task
     task = Task(
         id=task_id,
@@ -430,6 +633,7 @@ def task_create(
         status=task_status,
         depends_on=depends_on or [],
         labels=labels or [],
+        prd=prd_context,
     )
 
     spec.tasks[task_id] = task
@@ -542,7 +746,7 @@ def task_update(
             console.print("[warning]No updates specified[/warning]")
         raise typer.Exit(1)
 
-    task.updated_at = datetime.utcnow()
+    task.updated_at = datetime.now(timezone.utc)
     save_spec(spec, root)
 
     result = task.model_dump()
@@ -668,6 +872,11 @@ def task_claim(
         help="Your agent ID (REQUIRED). Get it from 'lodestar agent join'.",
     ),
     ttl: str = typer.Option("15m", "--ttl", "-t", help="Lease duration (e.g., 15m, 1h)."),
+    no_context: bool = typer.Option(
+        False,
+        "--no-context",
+        help="Don't include PRD context in output.",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -751,7 +960,7 @@ def task_claim(
     lease = Lease(
         task_id=task_id,
         agent_id=agent_id,
-        expires_at=datetime.utcnow() + duration,
+        expires_at=datetime.now(timezone.utc) + duration,
     )
 
     created_lease = db.create_lease(lease)
@@ -768,7 +977,7 @@ def task_claim(
         else:
             console.print(f"[error]Task {task_id} already claimed[/error]")
             if existing:
-                remaining = existing.expires_at - datetime.utcnow()
+                remaining = existing.expires_at - datetime.now(timezone.utc)
                 console.print(f"  Claimed by: {existing.agent_id}")
                 console.print(f"  Expires in: {format_duration(remaining)}")
         raise typer.Exit(1)
@@ -781,7 +990,37 @@ def task_claim(
         "ttl_seconds": int(duration.total_seconds()),
     }
 
+    # Build context bundle unless --no-context specified
+    warnings = []
+    if not no_context:
+        result["context"] = {
+            "title": task.title,
+            "description": task.description,
+        }
+        if task.prd:
+            result["context"]["prd_source"] = task.prd.source
+            if task.prd.excerpt:
+                result["context"]["prd_excerpt"] = truncate_to_budget(task.prd.excerpt, 1000)
+
+            # Check for PRD drift
+            if task.prd.prd_hash:
+                prd_path = root / task.prd.source
+                if prd_path.exists():
+                    try:
+                        if check_prd_drift(task.prd.prd_hash, prd_path):
+                            warnings.append(
+                                f"PRD has changed since task creation. "
+                                f"Review {task.prd.source} for updates."
+                            )
+                    except Exception:
+                        pass  # Ignore hash check errors
+
     next_actions = [
+        NextAction(
+            intent="task.context",
+            cmd=f"lodestar task context {task_id}",
+            description="Get full PRD context",
+        ),
         NextAction(
             intent="task.show",
             cmd=f"lodestar task show {task_id}",
@@ -800,12 +1039,28 @@ def task_claim(
     ]
 
     if json_output:
-        print_json(Envelope.success(result, next_actions=next_actions).model_dump())
+        print_json(Envelope.success(result, next_actions=next_actions, warnings=warnings).model_dump())
     else:
         console.print()
         console.print(f"[success]Claimed task[/success] [task_id]{task_id}[/task_id]")
         console.print(f"  Lease: {created_lease.lease_id}")
         console.print(f"  Expires in: {format_duration(duration)}")
+
+        if warnings:
+            console.print()
+            for warning in warnings:
+                console.print(f"[warning]⚠ {warning}[/warning]")
+
+        if not no_context:
+            console.print()
+            console.print("[info]Task Context:[/info]")
+            console.print(f"  {task.title}")
+            if task.description:
+                desc_preview = task.description[:200] + "..." if len(task.description) > 200 else task.description
+                console.print(f"  {desc_preview}")
+            if task.prd and task.prd.source:
+                console.print(f"  [muted]PRD: {task.prd.source}[/muted]")
+
         console.print()
         console.print("[info]Remember to:[/info]")
         console.print(
@@ -882,7 +1137,7 @@ def task_renew(
         raise typer.Exit(1)
 
     # Renew
-    new_expires = datetime.utcnow() + duration
+    new_expires = datetime.now(timezone.utc) + duration
     success = db.renew_lease(lease.lease_id, new_expires, agent_id)
 
     if not success:
@@ -1004,7 +1259,7 @@ def task_done(
         raise typer.Exit(1)
 
     task.status = TaskStatus.DONE
-    task.updated_at = datetime.utcnow()
+    task.updated_at = datetime.now(timezone.utc)
     save_spec(spec, root)
 
     if json_output:
@@ -1058,7 +1313,7 @@ def task_verify(
         raise typer.Exit(1)
 
     task.status = TaskStatus.VERIFIED
-    task.updated_at = datetime.utcnow()
+    task.updated_at = datetime.now(timezone.utc)
     save_spec(spec, root)
 
     # Auto-release any active lease (task is complete, lease no longer needed)
@@ -1190,7 +1445,7 @@ def task_delete(
     for tid in tasks_to_delete:
         t = spec.tasks[tid]
         t.status = TaskStatus.DELETED
-        t.updated_at = datetime.utcnow()
+        t.updated_at = datetime.now(timezone.utc)
         deleted_tasks.append({"id": tid, "title": t.title})
 
     save_spec(spec, root)

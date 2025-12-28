@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import typer
 
@@ -60,7 +60,7 @@ def export_snapshot(
 
     # Build spec snapshot
     snapshot = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "spec": {
             "project": spec.project.model_dump(),
             "tasks": {
