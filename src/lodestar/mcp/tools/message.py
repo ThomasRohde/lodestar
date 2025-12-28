@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import contextlib
+from typing import TYPE_CHECKING
 
 from mcp.types import CallToolResult
 
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import Context
+    from mcp.server.session import ServerSession
+
+from lodestar.mcp.notifications import notify_message_sent
 from lodestar.mcp.output import error, format_summary, with_item
 from lodestar.mcp.server import LodestarContext
 from lodestar.models.runtime import Message, MessageType
 
 
-def message_send(
+async def message_send(
     context: LodestarContext,
     from_agent_id: str,
     body: str,
@@ -19,6 +25,7 @@ def message_send(
     task_id: str | None = None,
     subject: str | None = None,
     severity: str | None = None,
+    ctx: Context | ServerSession | None = None,
 ) -> CallToolResult:
     """
     Send a message to an agent or task thread.
@@ -119,6 +126,14 @@ def message_send(
             agent_id=from_agent_id,
             data=event_data,
         )
+
+    # Notify clients of new message
+    await notify_message_sent(
+        ctx,
+        message_id=message.message_id,
+        to_agent_id=to_agent_id,
+        task_id=task_id,
+    )
 
     # Build delivered_to array
     delivered_to = []
@@ -362,13 +377,14 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
     """
 
     @mcp.tool(name="lodestar.message.send")
-    def send_tool(
+    async def send_tool(
         from_agent_id: str,
         body: str,
         to_agent_id: str | None = None,
         task_id: str | None = None,
         subject: str | None = None,
         severity: str | None = None,
+        ctx: Context | ServerSession | None = None,
     ) -> CallToolResult:
         """Send a message to an agent or task thread.
 
@@ -377,6 +393,8 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
 
         Either to_agent_id or task_id must be provided (not both).
 
+        Sends MCP resource update notifications when supported by the client.
+
         Args:
             from_agent_id: Agent ID sending the message (required)
             body: Message body text (required, max 16KB)
@@ -384,13 +402,14 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
             task_id: Task ID for task thread messaging (optional)
             subject: Message subject line (optional, for organization)
             severity: Message severity level - one of: info, warning, handoff, blocker (optional)
+            ctx: MCP context for notifications (optional, auto-injected)
 
         Returns:
             Success response with messageId, deliveredTo array (e.g., ["agent:A123"] or ["task:F001"]),
             and sentAt timestamp.
             Returns error if both or neither recipients are specified, or if body exceeds 16KB.
         """
-        return message_send(
+        return await message_send(
             context=context,
             from_agent_id=from_agent_id,
             body=body,
@@ -398,6 +417,7 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
             task_id=task_id,
             subject=subject,
             severity=severity,
+            ctx=ctx,
         )
 
     @mcp.tool(name="lodestar.message.list")

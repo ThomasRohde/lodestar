@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from mcp.server.session import ServerSession
 
 from lodestar.core.task_service import detect_lock_conflicts
+from lodestar.mcp.notifications import notify_task_updated
 from lodestar.mcp.output import error, format_summary, with_item
 from lodestar.mcp.server import LodestarContext
 from lodestar.mcp.validation import ValidationError, validate_task_id
@@ -154,6 +155,9 @@ async def task_claim(
             },
         )
 
+    # Notify clients of task update
+    await notify_task_updated(ctx, validated_task_id)
+
     # Log successful claim
     if ctx:
         await ctx.info(
@@ -281,6 +285,9 @@ async def task_release(
             agent_id=agent_id,
             data=event_data,
         )
+
+    # Notify clients of task update
+    await notify_task_updated(ctx, validated_task_id)
 
     # Build previous lease object for response
     previous_lease = {
@@ -420,6 +427,9 @@ async def task_done(
             agent_id=agent_id,
             data=event_data,
         )
+
+    # Notify clients of task update
+    await notify_task_updated(ctx, validated_task_id)
 
     # Build summary
     summary = format_summary(
@@ -568,6 +578,9 @@ async def task_verify(
             data=event_data,
         )
 
+    # Notify clients of task update
+    await notify_task_updated(ctx, validated_task_id)
+
     # Report progress: finding unblocked tasks (90%)
     if ctx and hasattr(ctx, "report_progress"):
         await ctx.report_progress(90.0, 100.0, "Finding newly unblocked tasks...")
@@ -577,6 +590,10 @@ async def task_verify(
     new_claimable = context.spec.get_claimable_tasks()
     newly_unblocked = [t for t in new_claimable if validated_task_id in t.depends_on]
     newly_ready_ids = [t.id for t in newly_unblocked]
+
+    # Notify clients about newly unblocked tasks
+    for unblocked_id in newly_ready_ids:
+        await notify_task_updated(ctx, unblocked_id)
 
     # Report progress: complete (100%)
     if ctx and hasattr(ctx, "report_progress"):
