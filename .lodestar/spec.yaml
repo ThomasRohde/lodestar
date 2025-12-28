@@ -2031,6 +2031,596 @@ tasks:
     status: verified
     created_at: '2025-12-28T07:48:31.933929+00:00'
     updated_at: '2025-12-28T10:12:54.316816+00:00'
+  MCP-001:
+    title: Add MCP SDK dependency as optional extra
+    description: 'Add the official MCP Python SDK (mcp) as an optional dependency.
+      Create lodestar-cli[mcp] extra in pyproject.toml. Decision needed: ship by default
+      or optional (PRD recommends deciding during implementation).'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:03:46.993900+00:00'
+    updated_at: '2025-12-28T13:03:46.993904+00:00'
+  MCP-002:
+    title: Create MCP package structure
+    description: Create src/lodestar/mcp/ package with __init__.py. Establish module
+      structure for server.py (FastMCP setup), tools/ subpackage, resources.py, and
+      utils.py. Keep files focused and small.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-001
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:03:48.857625+00:00'
+    updated_at: '2025-12-28T13:03:48.857628+00:00'
+  MCP-003:
+    title: Add events table to runtime.sqlite
+    description: 'Add runtime table for event stream persistence: id (INTEGER PRIMARY
+      KEY, monotonic cursor), created_at (TEXT ISO8601), type (TEXT - task.claimed,
+      task.done, task.verified, message.sent, lease.expired, agent.joined), actor_agent_id
+      (TEXT NULL), task_id (TEXT NULL), target_agent_id (TEXT NULL), payload_json
+      (TEXT), correlation_id (TEXT). Add migration.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:03:50.698545+00:00'
+    updated_at: '2025-12-28T13:03:50.698549+00:00'
+  MCP-004:
+    title: Create event logging hooks infrastructure
+    description: Create event logging service that appends events on every mutating
+      operation. Integrate with existing services (task, agent, message) to emit events.
+      Events MUST be appended atomically with mutations.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-003
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:03:52.529071+00:00'
+    updated_at: '2025-12-28T13:03:52.529074+00:00'
+  MCP-005:
+    title: Implement lodestar mcp serve command
+    description: 'Add new CLI group: lodestar mcp serve [--repo PATH] [--stdio] [--log-file
+      PATH] [--json-logs] [--dev]. Defaults: --stdio is default transport. Server
+      logs go to stderr; optionally also to a file. Must not emit non-protocol output
+      on stdout.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-002
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:04:16.551602+00:00'
+    updated_at: '2025-12-28T13:04:16.551605+00:00'
+  MCP-006:
+    title: Create FastMCP server setup with stdio transport
+    description: 'Create mcp/server.py with FastMCP initialization. Configure stdio
+      transport (JSON-RPC messages delimited by newlines). Handle server lifecycle:
+      repo root resolution, open/create runtime DB connection, instantiate Lodestar
+      application services.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-005
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:04:18.336233+00:00'
+    updated_at: '2025-12-28T13:04:18.336236+00:00'
+  MCP-007:
+    title: Implement repo targeting logic
+    description: Implement --repo flag support and automatic repo discovery. If repo
+      root not provided, walk upwards from CWD until .lodestar/ directory found; otherwise
+      return clear error in tool results. Integrate with server initialization.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-006
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:04:20.179735+00:00'
+    updated_at: '2025-12-28T13:04:20.179739+00:00'
+  MCP-010:
+    title: Implement lodestar.repo.status tool
+    description: 'Create mcp/tools/repo.py. Implement lodestar.repo.status tool: returns
+      repoRoot, specPath, runtimePath, counts (tasks by status, active leases, agents
+      online, unread messages), suggestedNextActions. Return both text summary and
+      structuredContent.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-007
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:04:38.859116+00:00'
+    updated_at: '2025-12-28T13:04:38.859120+00:00'
+  MCP-011:
+    title: Implement lodestar.agent.join tool
+    description: 'Create mcp/tools/agent.py. Implement lodestar.agent.join: inputs
+      - name, client, model, capabilities, ttlSeconds (all optional). Returns agentId,
+      leaseDefaults, serverTime, notes. Register/announce agent identity. This is
+      the only mutating tool that doesn''t require agentId.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-007
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:04:40.729869+00:00'
+    updated_at: '2025-12-28T13:04:40.729872+00:00'
+  MCP-012:
+    title: Implement lodestar.agent.heartbeat tool
+    description: 'Add to mcp/tools/agent.py. Implement lodestar.agent.heartbeat: input
+      - agentId (required). Returns ok, expiresAt, warnings. Refresh agent presence.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-011
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:04:42.831203+00:00'
+    updated_at: '2025-12-28T13:04:42.831207+00:00'
+  MCP-013:
+    title: Implement lodestar.agent.leave tool
+    description: 'Add to mcp/tools/agent.py. Implement lodestar.agent.leave: inputs
+      - agentId (required), reason (optional). Returns ok. Mark agent offline gracefully.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-012
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:04:44.761750+00:00'
+    updated_at: '2025-12-28T13:04:44.761753+00:00'
+  MCP-020:
+    title: Implement lodestar.task.list tool
+    description: 'Create mcp/tools/task.py. Implement lodestar.task.list: inputs -
+      status (optional: ready|done|verified|deleted|all), label (optional), limit
+      (default 50, max 200), cursor (optional). Returns tasks array of TaskSummary
+      (id, title, status, priority, labels, dependencies, claimedByAgentId, leaseExpiresAt,
+      updatedAt), nextCursor.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-007
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:05:13.034182+00:00'
+    updated_at: '2025-12-28T13:05:13.034185+00:00'
+  MCP-021:
+    title: Implement lodestar.task.get tool
+    description: 'Add to mcp/tools/task.py. Implement lodestar.task.get: input - taskId
+      (required). Returns task (TaskDetail with description, acceptance criteria,
+      PRD context fields, dependency graph info), runtime (status, claimedBy, lease,
+      timestamps), warnings (drift detection, missing PRD source).'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-020
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:05:14.919762+00:00'
+    updated_at: '2025-12-28T13:05:14.919765+00:00'
+  MCP-022:
+    title: Implement lodestar.task.next tool
+    description: 'Add to mcp/tools/task.py. Implement lodestar.task.next: inputs -
+      agentId (optional for personalization), limit (default 5, max 20). Returns candidates
+      (TaskSummary[] filtered to claimable ready tasks), rationale. Dependency-aware
+      ''what should I do next'' tool.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-021
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:05:16.806230+00:00'
+    updated_at: '2025-12-28T13:05:16.806234+00:00'
+  MCP-023:
+    title: Implement lodestar.task.context tool
+    description: 'Add to mcp/tools/task.py. Implement lodestar.task.context: input
+      - taskId (required). Returns context object with prdSource, prdRef, prdExcerpt,
+      drift detection (changed, details). Delivers ''just enough PRD context'' as
+      Lodestar already supports.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-022
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:05:18.723263+00:00'
+    updated_at: '2025-12-28T13:05:18.723266+00:00'
+  MCP-030:
+    title: Implement lodestar.task.claim tool
+    description: 'Create mcp/tools/task_mutations.py. Implement lodestar.task.claim:
+      inputs - taskId (required), agentId (required), ttlSeconds (optional, server
+      clamps to bounds), force (optional, attempt claim on expired lease). Returns
+      ok, lease object (taskId, agentId, expiresAt, ttlSeconds), conflict object on
+      failure.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-007
+    - MCP-004
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:05:58.395431+00:00'
+    updated_at: '2025-12-28T13:05:58.395434+00:00'
+  MCP-031:
+    title: Implement lodestar.task.release tool
+    description: 'Add to mcp/tools/task_mutations.py. Implement lodestar.task.release:
+      inputs - taskId (required), agentId (required), reason (optional). Returns ok,
+      previousLease. Release claim before TTL expiry.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-030
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:06:00.336794+00:00'
+    updated_at: '2025-12-28T13:06:00.336797+00:00'
+  MCP-032:
+    title: Implement lodestar.task.done tool
+    description: 'Add to mcp/tools/task_mutations.py. Implement lodestar.task.done:
+      inputs - taskId (required), agentId (required), note (optional). Returns ok,
+      status (done), warnings (e.g. ''not claimed by you''). Mark task done (pending
+      verification).'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-031
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:06:02.319977+00:00'
+    updated_at: '2025-12-28T13:06:02.319980+00:00'
+  MCP-033:
+    title: Implement lodestar.task.verify tool
+    description: 'Add to mcp/tools/task_mutations.py. Implement lodestar.task.verify:
+      inputs - taskId (required), agentId (required), note (optional). Returns ok,
+      status (verified), newlyReadyTaskIds (unblocked dependents). Mark task verified.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-032
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:06:04.304151+00:00'
+    updated_at: '2025-12-28T13:06:04.304155+00:00'
+  MCP-040:
+    title: Implement lodestar.message.send tool
+    description: 'Create mcp/tools/message.py. Implement lodestar.message.send: inputs
+      - fromAgentId (required), toAgentId (optional for broadcast), taskId (optional),
+      subject (optional), body (required, max 16KB enforced), severity (optional:
+      info|warning|handoff|blocker). Returns ok, messageId, deliveredTo array.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-007
+    - MCP-004
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:06:19.469696+00:00'
+    updated_at: '2025-12-28T13:06:19.469699+00:00'
+  MCP-041:
+    title: Implement lodestar.message.list tool
+    description: 'Add to mcp/tools/message.py. Implement lodestar.message.list: inputs
+      - agentId (required), unreadOnly (optional, default true), limit (default 50,
+      max 200), sinceId (optional for incremental). Returns messages array (id, createdAt,
+      from, to, taskId, subject, body, severity, readAt), nextCursor.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-040
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:06:21.359747+00:00'
+    updated_at: '2025-12-28T13:06:21.359752+00:00'
+  MCP-042:
+    title: Implement lodestar.message.ack tool
+    description: 'Add to mcp/tools/message.py. Implement lodestar.message.ack: inputs
+      - agentId (required), messageIds (required list). Returns ok, updated count.
+      Mark messages as read.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-041
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:06:23.389858+00:00'
+    updated_at: '2025-12-28T13:06:23.389862+00:00'
+  MCP-050:
+    title: Implement lodestar.events.pull tool
+    description: 'Create mcp/tools/events.py. Implement lodestar.events.pull: inputs
+      - sinceCursor (optional, default 0), limit (default 200, max 1000), filterTypes
+      (optional string array). Returns events array (id, createdAt, type, actorAgentId,
+      taskId, targetAgentId, payload), nextCursor. Pull-based fallback for hosts without
+      reliable push.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-004
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:06:33.182026+00:00'
+    updated_at: '2025-12-28T13:06:33.182029+00:00'
+  MCP-060:
+    title: Add structured logging via notifications/message
+    description: Implement MCP notifications/message for structured logs (level, logger
+      name, data). Emit logs when events occur. Use MCP logging specification. Server
+      SHOULD emit lightweight notifications when events are appended.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-050
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:06:56.548405+00:00'
+    updated_at: '2025-12-28T13:06:56.548408+00:00'
+  MCP-061:
+    title: Add progress support for long operations
+    description: Implement MCP notifications/progress. If client provides progress
+      token in request metadata, long-running operations SHOULD emit progress updates.
+      Design for task.verify and future expensive operations.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-060
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:06:58.586545+00:00'
+    updated_at: '2025-12-28T13:06:58.586548+00:00'
+  MCP-062:
+    title: Add background event watcher for push notifications
+    description: Create optional background watcher loop that tails the DB-backed
+      event stream and emits notifications. On event write, emit compact notification/message
+      summary and/or resource-changed hints. Best-effort push for clients that support
+      it.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-061
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:07:00.565574+00:00'
+    updated_at: '2025-12-28T13:07:00.565578+00:00'
+  MCP-070:
+    title: Implement lodestar://spec resource
+    description: Create mcp/resources.py. Implement lodestar://spec resource that
+      returns content of .lodestar/spec.yaml as text (mime text/yaml). Resources are
+      read-only; allows clients to fetch without tool approval flows.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-007
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:07:22.230780+00:00'
+    updated_at: '2025-12-28T13:07:22.230784+00:00'
+  MCP-071:
+    title: Implement lodestar://status resource
+    description: Add to mcp/resources.py. Implement lodestar://status resource that
+      returns JSON summary similar to repo.status (mime application/json). Read-only
+      resource.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-070
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:07:24.178009+00:00'
+    updated_at: '2025-12-28T13:07:24.178012+00:00'
+  MCP-072:
+    title: Implement lodestar://task/{taskId} resource
+    description: Add to mcp/resources.py. Implement lodestar://task/{taskId} resource
+      that returns JSON representation of a task (mime application/json). Read-only
+      resource for individual task access.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-071
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:07:26.215518+00:00'
+    updated_at: '2025-12-28T13:07:26.215522+00:00'
+  MCP-080:
+    title: Implement lodestar_agent_workflow prompt template
+    description: 'Create mcp/prompts.py. Implement lodestar_agent_workflow prompt:
+      short workflow recipe (join -> next -> claim -> context -> done -> verify ->
+      message handoff). Optional - not all hosts surface prompts well.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-072
+    labels:
+    - feature
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-28T13:07:37.767382+00:00'
+    updated_at: '2025-12-28T13:07:37.767385+00:00'
+  MCP-081:
+    title: Implement lodestar_task_execute prompt template
+    description: 'Add to mcp/prompts.py. Implement lodestar_task_execute prompt: asks
+      agent to follow acceptance criteria and produce verification checklist. Optional
+      feature.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-080
+    labels:
+    - feature
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-28T13:07:39.724105+00:00'
+    updated_at: '2025-12-28T13:07:39.724109+00:00'
+  MCP-090:
+    title: Add unit tests for MCP tool input validation
+    description: 'Create tests/test_mcp_tools.py. Add unit tests for: bad ids, bad
+      TTLs, missing repo, max length enforcement, required agentId validation. Test
+      that outputSchemas match expected types. Comprehensive validation testing.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-050
+    labels:
+    - test
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:08:07.431318+00:00'
+    updated_at: '2025-12-28T13:08:07.431322+00:00'
+  MCP-091:
+    title: Add integration tests for MCP server
+    description: 'Create tests/test_mcp_integration.py. Spawn MCP server subprocess
+      and connect with MCP client library over stdio. Test: concurrent claims from
+      two client sessions, message send/receive/ack, event stream consumption. Use
+      shared repo fixture.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-090
+    labels:
+    - test
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:08:09.391281+00:00'
+    updated_at: '2025-12-28T13:08:09.391286+00:00'
+  MCP-092:
+    title: Add docs/mcp.md documentation
+    description: 'Create docs/mcp.md explaining: how to run lodestar mcp serve, example
+      host configurations (VS Code, Claude Desktop), troubleshooting (stderr logs,
+      MCP Inspector testing), tool reference with inputs/outputs, resources reference.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-091
+    labels:
+    - docs
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:08:11.442777+00:00'
+    updated_at: '2025-12-28T13:08:11.442781+00:00'
+  MCP-093:
+    title: Manual acceptance testing with MCP Inspector
+    description: 'Manually test: lodestar mcp serve --repo starts and completes MCP
+      initialization in MCP Inspector. Verify join -> next -> claim -> get/context
+      -> done -> verify workflow. Document any issues found.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-092
+    labels:
+    - test
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-28T13:08:13.474317+00:00'
+    updated_at: '2025-12-28T13:08:13.474321+00:00'
+  MCP-094:
+    title: Test MCP server with real host (VS Code or similar)
+    description: 'Test MCP server with at least one full spec host (VS Code, Visual
+      Studio, or Claude Desktop). Verify: two clients can coordinate via same repo,
+      task state transitions work, events.pull fallback functions correctly.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-093
+    labels:
+    - test
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-28T13:08:15.506660+00:00'
+    updated_at: '2025-12-28T13:08:15.506664+00:00'
+  MCP-008:
+    title: Implement structured output helpers for MCP tools
+    description: 'Create mcp/output.py with helpers for structured tool responses.
+      Every tool returns: human-readable text summary, structuredContent (machine-parseable),
+      outputSchema for stable integration. Standardize response format across all
+      tools.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-006
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:08:29.382993+00:00'
+    updated_at: '2025-12-28T13:08:29.382997+00:00'
+  MCP-009:
+    title: Implement input validation and safety guards
+    description: 'Create mcp/validation.py with input validators. Enforce: max message
+      length 16KB, max list limits, TTL clamp (min 60s, max 2h), agentId required
+      for mutating tools (except agent.join). All inputs must be validated before
+      processing.'
+    acceptance_criteria: []
+    depends_on:
+    - MCP-006
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-28T13:08:31.204589+00:00'
+    updated_at: '2025-12-28T13:08:31.204593+00:00'
 features:
   m0-skeleton:
   - F001
