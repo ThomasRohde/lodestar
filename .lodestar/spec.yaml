@@ -2260,9 +2260,9 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:05:18.723263+00:00'
-    updated_at: '2025-12-28T13:05:18.723266+00:00'
+    updated_at: '2025-12-28T15:48:41.639690+00:00'
   MCP-030:
     title: Implement lodestar.task.claim tool
     description: 'Create mcp/tools/task_mutations.py. Implement lodestar.task.claim:
