@@ -805,6 +805,7 @@ lodestar mcp serve --json-logs --log-file debug.json
 
 ## Next Steps
 
+- **[Error Handling Guide](guides/error-handling.md)** - Learn how to handle retriable vs non-retriable errors
 - **[Agent Workflow Guide](guides/agent-workflow.md)** - Learn the full agent coordination workflow
 - **[Task Commands](cli/task.md)** - CLI reference for task operations
 - **[MCP Specification](https://modelcontextprotocol.io/)** - Official MCP protocol documentation
