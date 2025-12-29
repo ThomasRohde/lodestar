@@ -2823,9 +2823,13 @@ tasks:
     - feature
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:48:14.277069+00:00'
-    updated_at: '2025-12-29T16:48:14.277072+00:00'
+    updated_at: '2025-12-29T16:59:11.920552+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 16:59:07.637136+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 16:59:11.920615+00:00
   W003:
     title: Normalize Windows paths in error messages
     description: 'WHAT: Ensure all file paths in error messages use platform-appropriate
@@ -2857,9 +2861,13 @@ tasks:
     - bug
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:48:21.329666+00:00'
-    updated_at: '2025-12-29T16:48:21.329668+00:00'
+    updated_at: '2025-12-29T17:16:15.657022+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 17:16:11.135436+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 17:16:15.657038+00:00
   F050:
     title: Add combined task_complete MCP tool
     description: 'WHAT: Add a new MCP tool that combines task_done + task_verify in

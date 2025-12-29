@@ -133,7 +133,8 @@ def load_spec(root: Path | None = None) -> Spec:
     spec_path = get_spec_path(root)
 
     if not spec_path.exists():
-        raise SpecNotFoundError(f"Spec not found: {spec_path}")
+        import os
+        raise SpecNotFoundError(f"Spec not found: {os.path.normpath(spec_path)}")
 
     try:
         with open(spec_path, encoding="utf-8") as f:
@@ -206,8 +207,9 @@ def save_spec(spec: Spec, root: Path | None = None) -> None:
                 retry_on_windows_error(do_rename, max_attempts=3, base_delay_ms=50)
             except (OSError, PermissionError) as e:
                 # If retry failed, raise as SpecFileAccessError with context
+                import os
                 raise SpecFileAccessError(
-                    f"Failed to save spec after retries: {e}",
+                    f"Failed to save spec to {os.path.normpath(spec_path)} after retries: {e}",
                     operation="atomic rename",
                 ) from e
 

@@ -51,6 +51,33 @@ class TestSpecLoader:
             with pytest.raises(SpecNotFoundError):
                 load_spec(root)
 
+    def test_windows_path_normalization_in_errors(self):
+        """Test that error messages use platform-native path separators."""
+        import os
+        import sys
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            lodestar_dir = root / ".lodestar"
+            lodestar_dir.mkdir()
+
+            # Test SpecNotFoundError normalizes path
+            with pytest.raises(SpecNotFoundError) as exc_info:
+                load_spec(root)
+            error_msg = str(exc_info.value)
+            # Check that path uses platform-appropriate separators
+            # On Windows, should contain backslashes; on Unix, forward slashes
+            if sys.platform == "win32":
+                # Windows: should have backslashes in the path
+                assert "\\" in error_msg or "/" not in error_msg
+                # More specifically, normalized path should not mix separators
+                spec_path = lodestar_dir / "spec.yaml"
+                normalized = os.path.normpath(spec_path)
+                assert normalized in error_msg
+            else:
+                # Unix: should have forward slashes
+                assert "/" in error_msg or "\\" not in error_msg
+
 
 class TestDagValidation:
     """Test DAG validation."""

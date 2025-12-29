@@ -36,15 +36,16 @@ def validate_repo_root(repo_root: Path) -> tuple[bool, str]:
     Returns:
         Tuple of (is_valid, error_message). error_message is empty if valid.
     """
+    import os
     if not repo_root.exists():
-        return False, f"Repository root does not exist: {repo_root}"
+        return False, f"Repository root does not exist: {os.path.normpath(repo_root)}"
 
     lodestar_dir = repo_root / ".lodestar"
     if not lodestar_dir.is_dir():
-        return False, f"No .lodestar directory found at: {repo_root}"
+        return False, f"No .lodestar directory found at: {os.path.normpath(repo_root)}"
 
     spec_file = lodestar_dir / "spec.yaml"
     if not spec_file.exists():
-        return False, f"No spec.yaml found in: {lodestar_dir}"
+        return False, f"No spec.yaml found in: {os.path.normpath(lodestar_dir)}"
 
     return True, ""

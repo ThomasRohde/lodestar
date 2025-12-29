@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import os
+import sys
+import tempfile
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
+from lodestar.mcp.utils import validate_repo_root
 from lodestar.util.time import format_duration, parse_duration
 
 
@@ -75,3 +80,52 @@ class TestTimeFormatting:
     def test_format_expired(self):
         result = format_duration(timedelta(seconds=-10))
         assert result == "expired"
+
+
+class TestPathNormalization:
+    """Test that paths in error messages use platform-native separators."""
+
+    def test_validate_repo_root_normalizes_paths(self):
+        """Test that validate_repo_root() normalizes paths in error messages."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+
+            # Test with non-existent directory
+            fake_path = root / "nonexistent"
+            is_valid, error_msg = validate_repo_root(fake_path)
+            assert not is_valid
+
+            # Check that path uses platform-appropriate separators
+            if sys.platform == "win32":
+                # On Windows, normalized path should contain backslashes
+                normalized = os.path.normpath(fake_path)
+                assert normalized in error_msg
+                # Should not have mixed separators
+                assert error_msg.count("\\") > 0 or "/" not in error_msg
+            else:
+                # On Unix, should have forward slashes
+                normalized = os.path.normpath(fake_path)
+                assert normalized in error_msg
+
+            # Test with missing .lodestar directory
+            root.mkdir(exist_ok=True)
+            is_valid, error_msg = validate_repo_root(root)
+            assert not is_valid
+            assert ".lodestar" in error_msg
+
+            # Verify path normalization
+            if sys.platform == "win32":
+                normalized = os.path.normpath(root)
+                assert normalized in error_msg
+
+            # Test with missing spec.yaml
+            lodestar_dir = root / ".lodestar"
+            lodestar_dir.mkdir()
+            is_valid, error_msg = validate_repo_root(root)
+            assert not is_valid
+            assert "spec.yaml" in error_msg
+
+            # Verify path normalization for lodestar_dir
+            if sys.platform == "win32":
+                normalized = os.path.normpath(lodestar_dir)
+                assert normalized in error_msg

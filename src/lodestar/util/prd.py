@@ -68,7 +68,8 @@ def extract_prd_section(
                 break
 
         if start_line is None:
-            raise ValueError(f"Anchor '{anchor}' not found in {path}")
+            import os
+            raise ValueError(f"Anchor '{anchor}' not found in {os.path.normpath(path)}")
 
         # Find next heading at same or higher level
         end_line = len(all_lines)
