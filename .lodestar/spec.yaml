@@ -2941,9 +2941,13 @@ tasks:
     - feature
     locks: []
     priority: 4
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:48:37.631726+00:00'
-    updated_at: '2025-12-29T16:48:37.631728+00:00'
+    updated_at: '2025-12-29T18:21:36.205301+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 18:21:31.714641+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 18:21:36.205316+00:00
   F052:
     title: Add label/priority filtering to task_next
     description: 'WHAT: Add optional filtering parameters to the task_next MCP tool.
@@ -2976,9 +2980,13 @@ tasks:
     - feature
     locks: []
     priority: 5
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:48:45.756571+00:00'
-    updated_at: '2025-12-29T16:48:45.756574+00:00'
+    updated_at: '2025-12-29T18:26:40.333368+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 18:26:35.825141+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 18:26:40.333386+00:00
   T010:
     title: Add concurrent verification tests
     description: 'WHAT: Add tests for concurrent task operations to catch file locking
@@ -3052,9 +3060,13 @@ tasks:
     - test
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:49:01.978306+00:00'
-    updated_at: '2025-12-29T16:49:01.978309+00:00'
+    updated_at: '2025-12-29T17:51:36.224541+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 17:51:32.198842+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 17:51:36.224556+00:00
   D030:
     title: Document MCP error handling patterns
     description: 'WHAT: Add error handling documentation to MCP docs.
@@ -3089,9 +3101,13 @@ tasks:
     - docs
     locks: []
     priority: 4
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:49:21.941053+00:00'
-    updated_at: '2025-12-29T16:49:21.941056+00:00'
+    updated_at: '2025-12-29T17:54:03.183298+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 17:53:58.742286+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 17:54:03.183318+00:00
   D031:
     title: Add Windows-specific notes to documentation
     description: 'WHAT: Add Windows-specific guidance and caveats to documentation.
@@ -3125,9 +3141,131 @@ tasks:
     - docs
     locks: []
     priority: 5
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:49:28.535697+00:00'
-    updated_at: '2025-12-29T16:49:28.535701+00:00'
+    updated_at: '2025-12-29T18:22:58.615233+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 18:22:53.848532+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 18:22:58.615247+00:00
+  UX001:
+    title: Add ignored --agent parameter to task query commands
+    description: 'WHAT: Add an ignored --agent parameter to task list, task show,
+      task context, task next, and task graph commands.
+
+
+      WHERE: src/lodestar/cli/commands/task.py
+
+
+      WHY: Agents often develop a pattern of adding --agent to every command after
+      using it with mutation commands (claim, done, verify). When they call query
+      commands with --agent, they get an error ''No such option: --agent''. This breaks
+      agent workflows and causes confusion.
+
+
+      ACCEPT:
+
+      1. All 5 task query commands accept --agent but ignore it silently
+
+      2. No error when --agent is passed
+
+      3. No changes to output or behavior
+
+      4. Parameter marked as hidden in help (typer.Option(None, hidden=True))
+
+      5. Unit test confirming --agent is accepted silently
+
+
+      CONTEXT: This is a usability fix for agent workflows. See similar pattern in
+      mutation commands that require --agent. The goal is consistent CLI interface
+      where --agent never causes an error.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - ux
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-29T18:29:44.441624+00:00'
+    updated_at: '2025-12-29T18:29:44.441628+00:00'
+  UX002:
+    title: Add ignored --agent parameter to agent query commands
+    description: 'WHAT: Add an ignored --agent parameter to agent list, agent find,
+      and agent brief commands.
+
+
+      WHERE: src/lodestar/cli/commands/agent.py
+
+
+      WHY: Agents often develop a pattern of adding --agent to every command after
+      using it with task mutation commands. When they call agent query commands with
+      --agent, they get an error. This breaks agent workflows.
+
+
+      ACCEPT:
+
+      1. agent list, agent find, and agent brief accept --agent but ignore it silently
+
+      2. No error when --agent is passed
+
+      3. No changes to output or behavior
+
+      4. Parameter marked as hidden in help (typer.Option(None, hidden=True))
+
+      5. Unit test confirming --agent is accepted silently
+
+
+      CONTEXT: Part of the consistent --agent handling pattern. See UX001 for related
+      task commands.'
+    acceptance_criteria: []
+    depends_on:
+    - UX001
+    labels:
+    - ux
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-29T18:29:51.817121+00:00'
+    updated_at: '2025-12-29T18:29:51.817124+00:00'
+  UX003:
+    title: Add ignored --agent parameter to msg query commands
+    description: 'WHAT: Add an ignored --agent parameter to msg thread and msg search
+      commands.
+
+
+      WHERE: src/lodestar/cli/commands/msg.py
+
+
+      WHY: Agents often develop a pattern of adding --agent to every command. msg
+      inbox and msg wait require --agent, but msg thread and msg search don''t. For
+      consistency, all commands should accept --agent without error.
+
+
+      ACCEPT:
+
+      1. msg thread and msg search accept --agent but ignore it silently
+
+      2. No error when --agent is passed
+
+      3. No changes to output or behavior
+
+      4. Parameter marked as hidden in help (typer.Option(None, hidden=True))
+
+      5. Unit test confirming --agent is accepted silently
+
+
+      CONTEXT: Part of the consistent --agent handling pattern. See UX001 and UX002
+      for related commands.'
+    acceptance_criteria: []
+    depends_on:
+    - UX002
+    labels:
+    - ux
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-29T18:29:59.102006+00:00'
+    updated_at: '2025-12-29T18:29:59.102010+00:00'
 features:
   m0-skeleton:
   - F001

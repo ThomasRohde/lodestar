@@ -850,3 +850,66 @@ class TestTaskDelete:
         data = json.loads(result.stdout)
         assert data["data"]["count"] == 1
         assert data["data"]["tasks"][0]["id"] == "T002"
+
+
+class TestIgnoredAgentParameter:
+    """Test that --agent parameter is accepted on query commands for CLI consistency."""
+
+    def test_task_list_accepts_agent(self, temp_repo):
+        """Test task list accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        
+        result = runner.invoke(app, ["task", "list", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+        # Should work normally, no error about unknown option
+
+    def test_task_show_accepts_agent(self, temp_repo):
+        """Test task show accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        
+        result = runner.invoke(app, ["task", "show", "T001", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+        assert "T001" in result.stdout
+
+    def test_task_context_accepts_agent(self, temp_repo):
+        """Test task context accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        
+        result = runner.invoke(app, ["task", "context", "T001", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+
+    def test_task_next_accepts_agent(self, temp_repo):
+        """Test task next accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        
+        result = runner.invoke(app, ["task", "next", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+
+    def test_task_graph_accepts_agent(self, temp_repo):
+        """Test task graph accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        
+        result = runner.invoke(app, ["task", "graph", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+
+    def test_agent_parameter_does_not_affect_output(self, temp_repo):
+        """Test that --agent parameter doesn't change output."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        
+        # Get output without --agent
+        result1 = runner.invoke(app, ["task", "list", "--json"])
+        data1 = json.loads(result1.stdout)
+        
+        # Get output with --agent
+        result2 = runner.invoke(app, ["task", "list", "--agent", "TESTID123", "--json"])
+        data2 = json.loads(result2.stdout)
+        
+        # Should be identical (except timestamps might differ slightly)
+        assert data1["data"]["count"] == data2["data"]["count"]
+        assert data1["data"]["tasks"][0]["id"] == data2["data"]["tasks"][0]["id"]
