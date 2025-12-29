@@ -763,6 +763,63 @@ class TestMessaging:
         assert agent2_id in data["data"]["messages"]["by_agent"]
 
 
+class TestIgnoredAgentParameterOnMsgCommands:
+    """Test that --agent parameter is accepted on msg query commands for CLI consistency."""
+
+    def test_msg_thread_accepts_agent(self, temp_repo):
+        """Test msg thread accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        runner.invoke(
+            app,
+            ["msg", "send", "--to", "task:T001", "--text", "Hello", "--from", agent_id],
+        )
+        
+        result = runner.invoke(app, ["msg", "thread", "T001", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+        assert "Hello" in result.stdout
+
+    def test_msg_search_accepts_agent(self, temp_repo):
+        """Test msg search accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        runner.invoke(
+            app,
+            ["msg", "send", "--to", "task:T001", "--text", "Test message", "--from", agent_id],
+        )
+        
+        result = runner.invoke(app, ["msg", "search", "--keyword", "Test", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+
+    def test_agent_parameter_does_not_affect_output(self, temp_repo):
+        """Test that --agent parameter doesn't change msg search output."""
+        runner.invoke(app, ["init"])
+        agent_result = runner.invoke(app, ["agent", "join", "--json"])
+        agent_id = json.loads(agent_result.stdout)["data"]["agent_id"]
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        runner.invoke(
+            app,
+            ["msg", "send", "--to", "task:T001", "--text", "Test message", "--from", agent_id],
+        )
+        
+        # Get output without --agent
+        result1 = runner.invoke(app, ["msg", "search", "--keyword", "Test", "--json"])
+        data1 = json.loads(result1.stdout)
+        
+        # Get output with --agent
+        result2 = runner.invoke(app, ["msg", "search", "--keyword", "Test", "--agent", "TESTID123", "--json"])
+        data2 = json.loads(result2.stdout)
+        
+        # Should be identical
+        assert data1["data"]["count"] == data2["data"]["count"]
+        if data1["data"]["count"] > 0:
+            assert data1["data"]["messages"][0]["message_id"] == data2["data"]["messages"][0]["message_id"]
+
+
 class TestTaskDelete:
     """Test task delete command with soft-delete semantics."""
 

@@ -472,6 +472,12 @@ def msg_search(
         "-n",
         help="Maximum messages to return.",
     ),
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        hidden=True,
+        help="Ignored parameter (accepted for CLI consistency).",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -610,6 +616,12 @@ def msg_thread(
         "--limit",
         "-n",
         help="Maximum messages to return.",
+    ),
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        hidden=True,
+        help="Ignored parameter (accepted for CLI consistency).",
     ),
     json_output: bool = typer.Option(
         False,
