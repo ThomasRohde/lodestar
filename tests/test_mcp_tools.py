@@ -1668,9 +1668,7 @@ class TestTaskComplete:
         context = LodestarContext(tmp_path)
 
         # Register an agent
-        agent = Agent(
-            display_name="Test Agent", role="tester", capabilities=["testing"]
-        )
+        agent = Agent(display_name="Test Agent", role="tester", capabilities=["testing"])
         context.db.register_agent(agent)
 
         # Create a lease for T001
@@ -1776,9 +1774,7 @@ class TestTaskComplete:
                 message: str | None = None,
             ):
                 """Capture progress calls."""
-                progress_calls.append(
-                    {"progress": progress, "total": total, "message": message}
-                )
+                progress_calls.append({"progress": progress, "total": total, "message": message})
 
         mock_ctx = MockContext()
 
@@ -1799,9 +1795,7 @@ class TestTaskComplete:
         assert result.isError is None or result.isError is False
 
         # Verify progress notifications were emitted
-        assert (
-            len(progress_calls) == 8
-        ), f"Expected 8 progress calls, got {len(progress_calls)}"
+        assert len(progress_calls) == 8, f"Expected 8 progress calls, got {len(progress_calls)}"
 
         # Verify the sequence of progress values
         expected_progress = [10.0, 20.0, 30.0, 50.0, 60.0, 70.0, 85.0, 100.0]

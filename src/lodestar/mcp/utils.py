@@ -37,6 +37,7 @@ def validate_repo_root(repo_root: Path) -> tuple[bool, str]:
         Tuple of (is_valid, error_message). error_message is empty if valid.
     """
     import os
+
     if not repo_root.exists():
         return False, f"Repository root does not exist: {os.path.normpath(repo_root)}"
 

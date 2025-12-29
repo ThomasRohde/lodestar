@@ -134,6 +134,7 @@ def load_spec(root: Path | None = None) -> Spec:
 
     if not spec_path.exists():
         import os
+
         raise SpecNotFoundError(f"Spec not found: {os.path.normpath(spec_path)}")
 
     try:
@@ -208,6 +209,7 @@ def save_spec(spec: Spec, root: Path | None = None) -> None:
             except (OSError, PermissionError) as e:
                 # If retry failed, raise as SpecFileAccessError with context
                 import os
+
                 raise SpecFileAccessError(
                     f"Failed to save spec to {os.path.normpath(spec_path)} after retries: {e}",
                     operation="atomic rename",

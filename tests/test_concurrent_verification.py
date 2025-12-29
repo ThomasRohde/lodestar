@@ -173,8 +173,7 @@ class TestConcurrentVerification:
         # 2. The file is still valid YAML
         # 3. At least one operation succeeded
         verified_count = sum(
-            1 for task in final_spec.tasks.values()
-            if task.status == TaskStatus.VERIFIED
+            1 for task in final_spec.tasks.values() if task.status == TaskStatus.VERIFIED
         )
 
         # At least one task should be verified
@@ -409,7 +408,7 @@ class TestStressScenarios:
         # Register 3 agents
         agents = []
         for i in range(3):
-            agent = Agent(display_name=f"Agent{i+1}")
+            agent = Agent(display_name=f"Agent{i + 1}")
             db.register_agent(agent)
             agents.append(agent)
 
@@ -460,9 +459,7 @@ class TestStressScenarios:
                 # Release lease
                 db.release_lease(task_id, agent.agent_id)
 
-                results["successes"].append(
-                    {"agent": agent.agent_id, "task": task_id}
-                )
+                results["successes"].append({"agent": agent.agent_id, "task": task_id})
 
             except Exception as e:
                 results["errors"].append(

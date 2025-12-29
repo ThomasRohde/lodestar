@@ -286,7 +286,9 @@ class TestIgnoredAgentParameterOnAgentCommands:
         runner.invoke(app, ["init"])
         runner.invoke(app, ["agent", "join", "--capability", "python"])
 
-        result = runner.invoke(app, ["agent", "find", "--capability", "python", "--agent", "TESTID123"])
+        result = runner.invoke(
+            app, ["agent", "find", "--capability", "python", "--agent", "TESTID123"]
+        )
         assert result.exit_code == 0
 
     def test_agent_brief_accepts_agent(self, temp_repo):
@@ -811,13 +813,18 @@ class TestIgnoredAgentParameterOnMsgCommands:
         data1 = json.loads(result1.stdout)
 
         # Get output with --agent
-        result2 = runner.invoke(app, ["msg", "search", "--keyword", "Test", "--agent", "TESTID123", "--json"])
+        result2 = runner.invoke(
+            app, ["msg", "search", "--keyword", "Test", "--agent", "TESTID123", "--json"]
+        )
         data2 = json.loads(result2.stdout)
 
         # Should be identical
         assert data1["data"]["count"] == data2["data"]["count"]
         if data1["data"]["count"] > 0:
-            assert data1["data"]["messages"][0]["message_id"] == data2["data"]["messages"][0]["message_id"]
+            assert (
+                data1["data"]["messages"][0]["message_id"]
+                == data2["data"]["messages"][0]["message_id"]
+            )
 
 
 class TestTaskDelete:

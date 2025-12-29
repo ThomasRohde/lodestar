@@ -733,9 +733,7 @@ async def task_complete(
     # Log the complete attempt
     if ctx:
         note_msg = f" ({note})" if note else ""
-        await ctx.info(
-            f"Completing task {task_id} (done + verify) by agent {agent_id}{note_msg}"
-        )
+        await ctx.info(f"Completing task {task_id} (done + verify) by agent {agent_id}{note_msg}")
 
     # Report progress: validating inputs (10%)
     if ctx and hasattr(ctx, "report_progress"):
@@ -799,9 +797,7 @@ async def task_complete(
 
     # Report progress: updating task status (50%)
     if ctx and hasattr(ctx, "report_progress"):
-        await ctx.report_progress(
-            50.0, 100.0, "Updating task status (done + verified).."
-        )
+        await ctx.report_progress(50.0, 100.0, "Updating task status (done + verified)..")
 
     # Update task status to VERIFIED directly (atomic operation)
     now = datetime.now(UTC)
@@ -965,9 +961,7 @@ async def task_batch_verify(
 
     # Log the batch verify attempt
     if ctx:
-        await ctx.info(
-            f"Batch verifying {len(task_ids)} tasks for agent {agent_id}"
-        )
+        await ctx.info(f"Batch verifying {len(task_ids)} tasks for agent {agent_id}")
 
     # Validate inputs
     if not task_ids:
@@ -1016,39 +1010,43 @@ async def task_batch_verify(
             # Get task from spec
             task = context.spec.get_task(task_id)
             if task is None:
-                results.append({
-                    "taskId": task_id,
-                    "success": False,
-                    "error": f"Task {task_id} not found",
-                    "errorCode": "TASK_NOT_FOUND",
-                })
+                results.append(
+                    {
+                        "taskId": task_id,
+                        "success": False,
+                        "error": f"Task {task_id} not found",
+                        "errorCode": "TASK_NOT_FOUND",
+                    }
+                )
                 if ctx:
                     await ctx.warning(f"Task {task_id} not found in batch verify")
                 continue
 
             # Check if task is in DONE status (or already VERIFIED)
             if task.status == TaskStatus.VERIFIED:
-                results.append({
-                    "taskId": task_id,
-                    "success": True,
-                    "status": "verified",
-                    "newlyReadyTaskIds": [],
-                    "warning": "Task was already verified",
-                })
+                results.append(
+                    {
+                        "taskId": task_id,
+                        "success": True,
+                        "status": "verified",
+                        "newlyReadyTaskIds": [],
+                        "warning": "Task was already verified",
+                    }
+                )
                 if ctx:
                     await ctx.info(f"Task {task_id} already verified")
                 continue
             elif task.status != TaskStatus.DONE:
-                results.append({
-                    "taskId": task_id,
-                    "success": False,
-                    "error": f"Task must be done before verifying (current status: {task.status.value})",
-                    "errorCode": "TASK_NOT_DONE",
-                })
+                results.append(
+                    {
+                        "taskId": task_id,
+                        "success": False,
+                        "error": f"Task must be done before verifying (current status: {task.status.value})",
+                        "errorCode": "TASK_NOT_DONE",
+                    }
+                )
                 if ctx:
-                    await ctx.warning(
-                        f"Task {task_id} not done (status: {task.status.value})"
-                    )
+                    await ctx.warning(f"Task {task_id} not done (status: {task.status.value})")
                 continue
 
             # Update task status
@@ -1065,14 +1063,16 @@ async def task_batch_verify(
                 context.save_spec()
             except SpecError as e:
                 # Log the error and continue with remaining tasks
-                results.append({
-                    "taskId": task_id,
-                    "success": False,
-                    "error": str(e),
-                    "errorCode": type(e).__name__.upper(),
-                    "retriable": getattr(e, "retriable", False),
-                    "suggestedAction": getattr(e, "suggested_action", None),
-                })
+                results.append(
+                    {
+                        "taskId": task_id,
+                        "success": False,
+                        "error": str(e),
+                        "errorCode": type(e).__name__.upper(),
+                        "retriable": getattr(e, "retriable", False),
+                        "suggestedAction": getattr(e, "suggested_action", None),
+                    }
+                )
                 if ctx:
                     await ctx.error(f"Failed to verify {task_id}: {e}")
                 continue
@@ -1112,29 +1112,31 @@ async def task_batch_verify(
                 await notify_task_updated(ctx, unblocked_id)
 
             # Record success
-            results.append({
-                "taskId": task_id,
-                "success": True,
-                "status": "verified",
-                "newlyReadyTaskIds": newly_ready_ids,
-            })
+            results.append(
+                {
+                    "taskId": task_id,
+                    "success": True,
+                    "status": "verified",
+                    "newlyReadyTaskIds": newly_ready_ids,
+                }
+            )
 
             if ctx:
                 if newly_ready_ids:
-                    await ctx.info(
-                        f"Verified {task_id}, unblocked {len(newly_ready_ids)} task(s)"
-                    )
+                    await ctx.info(f"Verified {task_id}, unblocked {len(newly_ready_ids)} task(s)")
                 else:
                     await ctx.info(f"Verified {task_id}")
 
         except Exception as e:
             # Catch unexpected errors
-            results.append({
-                "taskId": task_id,
-                "success": False,
-                "error": str(e),
-                "errorCode": "UNEXPECTED_ERROR",
-            })
+            results.append(
+                {
+                    "taskId": task_id,
+                    "success": False,
+                    "error": str(e),
+                    "errorCode": "UNEXPECTED_ERROR",
+                }
+            )
             if ctx:
                 await ctx.error(f"Unexpected error verifying {task_id}: {e}")
 

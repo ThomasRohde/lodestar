@@ -349,16 +349,12 @@ def task_next(
     # Apply label filter if provided
     if labels:
         claimable_tasks = [
-            task for task in claimable_tasks
-            if any(label in task.labels for label in labels)
+            task for task in claimable_tasks if any(label in task.labels for label in labels)
         ]
 
     # Apply max_priority filter if provided
     if max_priority is not None:
-        claimable_tasks = [
-            task for task in claimable_tasks
-            if task.priority <= max_priority
-        ]
+        claimable_tasks = [task for task in claimable_tasks if task.priority <= max_priority]
 
     # Take only the requested limit
     tasks = claimable_tasks[:validated_limit]
@@ -393,7 +389,9 @@ def task_next(
         if max_priority is not None:
             rationale_parts.append(f"with priority <= {max_priority}")
         if not labels and max_priority is None:
-            rationale_parts.append("(tasks must be in 'ready' status with all dependencies verified)")
+            rationale_parts.append(
+                "(tasks must be in 'ready' status with all dependencies verified)"
+            )
     else:
         rationale_parts.append(
             f"Found {total_claimable} claimable task(s), showing top {len(tasks)} by priority."
