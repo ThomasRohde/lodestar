@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING
 
+from mcp.server.fastmcp import Context
 from mcp.types import CallToolResult
-
-if TYPE_CHECKING:
-    from mcp.server.fastmcp import Context
-    from mcp.server.session import ServerSession
 
 from lodestar.mcp.notifications import notify_message_sent
 from lodestar.mcp.output import error, format_summary, with_item
@@ -25,7 +21,7 @@ async def message_send(
     task_id: str | None = None,
     subject: str | None = None,
     severity: str | None = None,
-    ctx: Context | ServerSession | None = None,
+    ctx: Context | None = None,
 ) -> CallToolResult:
     """
     Send a message to an agent or task thread.
@@ -384,7 +380,7 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
         task_id: str | None = None,
         subject: str | None = None,
         severity: str | None = None,
-        ctx: Context | ServerSession | None = None,
+        ctx: Context | None = None,
     ) -> CallToolResult:
         """Send a message to an agent or task thread.
 

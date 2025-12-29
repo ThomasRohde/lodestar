@@ -4,13 +4,9 @@ from __future__ import annotations
 
 import contextlib
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 
+from mcp.server.fastmcp import Context
 from mcp.types import CallToolResult
-
-if TYPE_CHECKING:
-    from mcp.server.fastmcp import Context
-    from mcp.server.session import ServerSession
 
 from lodestar.core.task_service import detect_lock_conflicts
 from lodestar.mcp.notifications import notify_task_updated
@@ -27,7 +23,7 @@ async def task_claim(
     agent_id: str,
     ttl_seconds: int | None = None,
     force: bool = False,
-    ctx: ServerSession | None = None,
+    ctx: Context | None = None,
 ) -> CallToolResult:
     """
     Claim a task with a time-limited lease.
@@ -196,7 +192,7 @@ async def task_release(
     task_id: str,
     agent_id: str,
     reason: str | None = None,
-    ctx: ServerSession | None = None,
+    ctx: Context | None = None,
 ) -> CallToolResult:
     """
     Release a claim on a task before TTL expiry.
@@ -322,7 +318,7 @@ async def task_done(
     task_id: str,
     agent_id: str,
     note: str | None = None,
-    ctx: ServerSession | None = None,
+    ctx: Context | None = None,
 ) -> CallToolResult:
     """
     Mark a task as done (pending verification).
@@ -457,7 +453,7 @@ async def task_verify(
     task_id: str,
     agent_id: str,
     note: str | None = None,
-    ctx: Context | ServerSession | None = None,
+    ctx: Context | None = None,
 ) -> CallToolResult:
     """
     Mark a task as verified (unblocks dependents).
@@ -652,7 +648,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
         agent_id: str,
         ttl_seconds: int | None = None,
         force: bool = False,
-        ctx: ServerSession | None = None,
+        ctx: Context | None = None,
     ) -> CallToolResult:
         """Claim a task with a time-limited lease.
 
@@ -689,7 +685,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
         task_id: str,
         agent_id: str,
         reason: str | None = None,
-        ctx: ServerSession | None = None,
+        ctx: Context | None = None,
     ) -> CallToolResult:
         """Release a claim on a task before TTL expiry.
 
@@ -722,7 +718,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
         task_id: str,
         agent_id: str,
         note: str | None = None,
-        ctx: ServerSession | None = None,
+        ctx: Context | None = None,
     ) -> CallToolResult:
         """Mark a task as done (pending verification).
 
@@ -756,7 +752,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
         task_id: str,
         agent_id: str,
         note: str | None = None,
-        ctx: Context | ServerSession | None = None,
+        ctx: Context | None = None,
     ) -> CallToolResult:
         """Mark a task as verified (unblocks dependents).
 

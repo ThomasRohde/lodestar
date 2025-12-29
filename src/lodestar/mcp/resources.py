@@ -73,7 +73,7 @@ def register_resources(mcp: FastMCP, context: LodestarContext) -> None:
         mime_type="application/json",
         description="Get a specific task by ID (JSON)",
     )
-    def get_task(task_id: str) -> str:
+    def get_task(taskId: str) -> str:  # noqa: N803 - Must match URI parameter name
         """
         Provides read-only access to a specific task.
 
@@ -81,7 +81,7 @@ def register_resources(mcp: FastMCP, context: LodestarContext) -> None:
         runtime state, PRD context, dependency graph, and warnings.
 
         Args:
-            task_id: The task identifier (e.g., "T001", "F099")
+            taskId: The task identifier (e.g., "T001", "F099")
 
         Returns:
             JSON string with task details, or error if task not found.
@@ -89,7 +89,7 @@ def register_resources(mcp: FastMCP, context: LodestarContext) -> None:
         from lodestar.mcp.tools.task import task_get
 
         # Get task using the existing task_get function
-        result = task_get(context, task_id)
+        result = task_get(context, taskId)
 
         # Extract the structured data from the CallToolResult
         if hasattr(result, "structuredContent") and result.structuredContent:
@@ -105,4 +105,4 @@ def register_resources(mcp: FastMCP, context: LodestarContext) -> None:
             return json.dumps(result.structuredContent, indent=2)
 
         # Fallback: return generic error
-        return json.dumps({"error": f"Task {task_id} not found"})
+        return json.dumps({"error": f"Task {taskId} not found"})
