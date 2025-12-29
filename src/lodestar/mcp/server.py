@@ -146,4 +146,10 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
     register_resources(mcp, context)
     logger.info("Registered resources")
 
+    # Register prompts
+    from lodestar.mcp.prompts import register_prompts
+
+    register_prompts(mcp, context)
+    logger.info("Registered prompts")
+
     return mcp
