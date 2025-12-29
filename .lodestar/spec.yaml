@@ -2541,9 +2541,9 @@ tasks:
     - test
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:08:09.391281+00:00'
-    updated_at: '2025-12-28T13:08:09.391286+00:00'
+    updated_at: '2025-12-29T04:15:00.549401+00:00'
   MCP-092:
     title: Add docs/mcp.md documentation
     description: 'Create docs/mcp.md explaining: how to run lodestar mcp serve, example
@@ -2556,9 +2556,9 @@ tasks:
     - docs
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:08:11.442777+00:00'
-    updated_at: '2025-12-28T13:08:11.442781+00:00'
+    updated_at: '2025-12-29T04:27:09.407003+00:00'
   MCP-093:
     title: Manual acceptance testing with MCP Inspector
     description: 'Manually test: lodestar mcp serve --repo starts and completes MCP
@@ -2621,6 +2621,29 @@ tasks:
     status: verified
     created_at: '2025-12-28T13:08:31.204589+00:00'
     updated_at: '2025-12-28T14:55:27.920671+00:00'
+  CLI-001:
+    title: Add --agent parameter to task done and verify commands
+    description: 'The CLI commands ''task done'' and ''task verify'' don''t accept
+      --agent parameters, but the MCP tools require agent_id. This creates confusion
+      and inconsistency.\n\nAdd optional --agent parameter to both commands:\n- Auto-detect
+      from active lease on the task if not provided\n- Store agent ID in spec for
+      audit trail (add completed_by, verified_by fields)\n- Update help text to mention
+      the parameter\n- Ensure consistency with MCP tool signatures\n\nThis prevents
+      errors like ''No such option: --agent'' when users expect CLI/MCP parity.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - enhancement
+    - cli
+    locks: []
+    priority: 2
+    status: verified
+    created_at: '2025-12-29T04:29:10.532732+00:00'
+    updated_at: '2025-12-29T04:34:38.426640+00:00'
+    completed_by: AAF674DE5
+    completed_at: 2025-12-29 04:34:23.689872+00:00
+    verified_by: AAF674DE5
+    verified_at: 2025-12-29 04:34:38.426658+00:00
 features:
   m0-skeleton:
   - F001

@@ -1171,6 +1171,11 @@ def task_release(
 @app.command(name="done")
 def task_done(
     task_id: str | None = typer.Argument(None, help="Task ID to mark as done."),
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        help="Agent ID (auto-detects from active lease if omitted).",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -1190,6 +1195,7 @@ def task_done(
     \b
     Example:
         lodestar task done F001
+        lodestar task done F001 --agent A1234ABCD
     """
     if explain:
         _show_explain_done(json_output)
@@ -1224,8 +1230,20 @@ def task_done(
             console.print(f"[error]Task {task_id} not found[/error]")
         raise typer.Exit(1)
 
+    # Auto-detect agent from active lease if not provided
+    if agent is None:
+        db_path = get_runtime_db_path(root)
+        db = RuntimeDatabase(db_path)
+        lease = db.get_active_lease(task_id)
+        if lease:
+            agent = lease.agent_id
+
+    # Update task status and tracking fields
     task.status = TaskStatus.DONE
     task.updated_at = datetime.now(UTC)
+    if agent:
+        task.completed_by = agent
+        task.completed_at = datetime.now(UTC)
     save_spec(spec, root)
 
     # Log event to runtime database
@@ -1233,11 +1251,15 @@ def task_done(
     engine = create_runtime_engine(db_path)
     session_factory = create_session_factory(engine)
     with get_session(session_factory) as session:
-        log_event(session, EventType.TASK_DONE, task_id=task_id)
+        log_event(session, EventType.TASK_DONE, agent_id=agent, task_id=task_id)
     engine.dispose()
 
+    result = {"task_id": task_id, "status": "done"}
+    if agent:
+        result["completed_by"] = agent
+
     if json_output:
-        print_json(Envelope.success({"task_id": task_id, "status": "done"}).model_dump())
+        print_json(Envelope.success(result).model_dump())
     else:
         console.print(f"[success]Marked {task_id} as done[/success]")
         console.print(f"Run [command]lodestar task verify {task_id}[/command] after review")
@@ -1246,6 +1268,11 @@ def task_done(
 @app.command(name="verify")
 def task_verify(
     task_id: str | None = typer.Argument(None, help="Task ID to verify."),
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        help="Agent ID (auto-detects from active lease if omitted).",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -1265,6 +1292,7 @@ def task_verify(
     \b
     Example:
         lodestar task verify F001
+        lodestar task verify F001 --agent A1234ABCD
     """
     if explain:
         _show_explain_verify(json_output)
@@ -1307,20 +1335,30 @@ def task_verify(
             console.print(f"Current status: {task.status.value}")
         raise typer.Exit(1)
 
+    # Auto-detect agent from active lease if not provided
+    db_path = get_runtime_db_path(root)
+    db = RuntimeDatabase(db_path)
+    if agent is None:
+        lease = db.get_active_lease(task_id)
+        if lease:
+            agent = lease.agent_id
+
+    # Update task status and tracking fields
     task.status = TaskStatus.VERIFIED
     task.updated_at = datetime.now(UTC)
+    if agent:
+        task.verified_by = agent
+        task.verified_at = datetime.now(UTC)
     save_spec(spec, root)
 
     # Log event to runtime database
-    db_path = get_runtime_db_path(root)
     engine = create_runtime_engine(db_path)
     session_factory = create_session_factory(engine)
     with get_session(session_factory) as session:
-        log_event(session, EventType.TASK_VERIFIED, task_id=task_id)
+        log_event(session, EventType.TASK_VERIFIED, agent_id=agent, task_id=task_id)
     engine.dispose()
 
     # Auto-release any active lease (task is complete, lease no longer needed)
-    db = RuntimeDatabase(db_path)
     active_lease = db.get_active_lease(task_id)
     if active_lease:
         db.release_lease(task_id, active_lease.agent_id)
@@ -1334,6 +1372,8 @@ def task_verify(
         "status": "verified",
         "unblocked": [t.id for t in newly_unblocked],
     }
+    if agent:
+        result["verified_by"] = agent
 
     if json_output:
         print_json(Envelope.success(result).model_dump())

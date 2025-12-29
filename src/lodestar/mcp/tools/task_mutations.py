@@ -399,6 +399,8 @@ async def task_done(
     # Update task status
     task.status = TaskStatus.DONE
     task.updated_at = datetime.now(UTC)
+    task.completed_by = agent_id
+    task.completed_at = datetime.now(UTC)
     context.save_spec()
 
     # Release lease if exists
@@ -544,6 +546,8 @@ async def task_verify(
     # Update task status
     task.status = TaskStatus.VERIFIED
     task.updated_at = datetime.now(UTC)
+    task.verified_by = agent_id
+    task.verified_at = datetime.now(UTC)
     context.save_spec()
 
     # Report progress: releasing lease (70%)

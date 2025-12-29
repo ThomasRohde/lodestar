@@ -98,6 +98,22 @@ class Task(BaseModel):
         default_factory=_utc_now,
         description="When the task was last updated",
     )
+    completed_by: str | None = Field(
+        default=None,
+        description="Agent ID who marked the task as done",
+    )
+    completed_at: datetime | None = Field(
+        default=None,
+        description="When the task was marked as done",
+    )
+    verified_by: str | None = Field(
+        default=None,
+        description="Agent ID who verified the task",
+    )
+    verified_at: datetime | None = Field(
+        default=None,
+        description="When the task was verified",
+    )
     prd: PrdContext | None = Field(
         default=None,
         description="Optional PRD context for intent and constraints",

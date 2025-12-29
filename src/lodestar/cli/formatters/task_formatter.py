@@ -117,6 +117,11 @@ def format_task_detail(
     result["created_at"] = task.created_at.isoformat()
     result["updated_at"] = task.updated_at.isoformat()
 
+    if task.completed_at:
+        result["completed_at"] = task.completed_at.isoformat()
+    if task.verified_at:
+        result["verified_at"] = task.verified_at.isoformat()
+
     if lease:
         result["claimed_by"] = {
             "agent_id": lease.agent_id,
@@ -148,6 +153,12 @@ def format_task_detail(
             console.print(f"[muted]Depends on:[/muted] {', '.join(task.depends_on)}")
         if task.locks:
             console.print(f"[muted]Locks:[/muted] {', '.join(task.locks)}")
+
+        # Display completion/verification info
+        if task.completed_by:
+            console.print(f"[muted]Completed by:[/muted] {task.completed_by}")
+        if task.verified_by:
+            console.print(f"[muted]Verified by:[/muted] {task.verified_by}")
 
         console.print()
         if task.description:
