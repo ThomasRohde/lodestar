@@ -315,17 +315,22 @@ def task_next(
     context: LodestarContext,
     agent_id: str | None = None,
     limit: int | None = None,
+    labels: list[str] | None = None,
+    max_priority: int | None = None,
 ) -> CallToolResult:
     """
     Get next claimable tasks for an agent.
 
     Returns tasks that are ready and have all dependencies satisfied,
-    filtered to exclude tasks that are already claimed.
+    filtered to exclude tasks that are already claimed. Optional filters
+    allow agents to focus on specific types of work.
 
     Args:
         context: Lodestar server context
         agent_id: Agent ID for personalization (optional, currently unused)
         limit: Maximum number of tasks to return (default 5, max 20)
+        labels: Filter to tasks with ANY of these labels (optional)
+        max_priority: Filter to tasks with priority <= this value (lower numbers = higher priority) (optional)
 
     Returns:
         CallToolResult with claimable tasks and rationale
@@ -340,6 +345,20 @@ def task_next(
 
     # Get unclaimed claimable tasks
     claimable_tasks = get_unclaimed_claimable_tasks(context.spec, context.db)
+    
+    # Apply label filter if provided
+    if labels:
+        claimable_tasks = [
+            task for task in claimable_tasks
+            if any(label in task.labels for label in labels)
+        ]
+    
+    # Apply max_priority filter if provided
+    if max_priority is not None:
+        claimable_tasks = [
+            task for task in claimable_tasks
+            if task.priority <= max_priority
+        ]
 
     # Take only the requested limit
     tasks = claimable_tasks[:validated_limit]
@@ -369,19 +388,34 @@ def task_next(
 
     if total_claimable == 0:
         rationale_parts.append("No claimable tasks available")
-        rationale_parts.append("Tasks must be in 'ready' status with all dependencies verified")
+        if labels:
+            rationale_parts.append(f"with labels {', '.join(labels)}")
+        if max_priority is not None:
+            rationale_parts.append(f"with priority <= {max_priority}")
+        if not labels and max_priority is None:
+            rationale_parts.append("(tasks must be in 'ready' status with all dependencies verified)")
     else:
         rationale_parts.append(
             f"Found {total_claimable} claimable task(s), showing top {len(tasks)} by priority."
         )
+        if labels:
+            rationale_parts.append(f"Filtered to labels: {', '.join(labels)}.")
+        if max_priority is not None:
+            rationale_parts.append(f"Filtered to priority <= {max_priority}.")
         rationale_parts.append("Tasks are ready for work with all dependencies satisfied")
 
     rationale = " ".join(rationale_parts)
 
     # Build summary
+    summary_parts = [f"{len(tasks)} task(s)"]
+    if labels:
+        summary_parts.append(f"labels={','.join(labels)}")
+    if max_priority is not None:
+        summary_parts.append(f"priority<={max_priority}")
+    
     summary = format_summary(
         "Next",
-        f"{len(tasks)} task(s)",
+        " ".join(summary_parts),
         f"({total_claimable} total claimable)" if total_claimable > 0 else "",
     )
 
@@ -391,6 +425,14 @@ def task_next(
         "rationale": rationale,
         "totalClaimable": total_claimable,
     }
+    
+    # Include filter info in metadata
+    if labels or max_priority is not None:
+        response_data["filters"] = {}
+        if labels:
+            response_data["filters"]["labels"] = labels
+        if max_priority is not None:
+            response_data["filters"]["maxPriority"] = max_priority
 
     return with_item(summary, item=response_data)
 
@@ -620,23 +662,41 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
     def next_tool(
         agent_id: str | None = None,
         limit: int | None = None,
+        labels: list[str] | None = None,
+        max_priority: int | None = None,
     ) -> CallToolResult:
-        """Get next claimable tasks.
+        """Get next claimable tasks with optional filtering.
 
         Returns tasks that are ready for work with all dependencies satisfied.
         Tasks are filtered to exclude already-claimed tasks and sorted by priority.
+        Optional filters allow focusing on specific types of work.
 
         This is the dependency-aware "what should I do next" tool.
 
         Args:
             agent_id: Agent ID for personalization (optional, currently unused for filtering but may be used for future prioritization)
             limit: Maximum number of tasks to return (default 5, max 20)
+            labels: Filter to tasks with ANY of these labels (optional, e.g., ["frontend", "backend"])
+            max_priority: Filter to tasks with priority <= this value (lower numbers = higher priority) (optional, e.g., 10 to skip priority 11+)
 
         Returns:
             Candidates (claimable task summaries), rationale explaining selection,
-            and total number of claimable tasks available
+            total number of claimable tasks available, and applied filters (if any)
+            
+        Example:
+            # Get next 3 frontend tasks with priority <= 5
+            lodestar_task_next(limit=3, labels=["frontend"], max_priority=5)
+            
+            # Get any 10 high-priority tasks
+            lodestar_task_next(limit=10, max_priority=3)
         """
-        return task_next(context=context, agent_id=agent_id, limit=limit)
+        return task_next(
+            context=context,
+            agent_id=agent_id,
+            limit=limit,
+            labels=labels,
+            max_priority=max_priority,
+        )
 
     @mcp.tool(name="lodestar_task_context")
     def context_tool(

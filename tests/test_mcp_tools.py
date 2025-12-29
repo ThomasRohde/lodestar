@@ -1924,3 +1924,137 @@ class TestTaskComplete:
         assert task.verified_at is not None
         assert task.completed_by == agent_id
         assert task.verified_by == agent_id
+
+
+class TestTaskNextFiltering:
+    """Tests for task_next filtering parameters."""
+
+    @pytest.fixture
+    def filtered_context(self, mcp_context):
+        """Use the existing mcp_context which already has tasks with various labels and priorities."""
+        # The mcp_context fixture already has tasks:
+        # T001: priority 1, labels=["feature", "backend"], status=READY
+        # T002: priority 2, labels=["bug", "frontend"], status=DONE
+        # T003: priority 3, labels=["docs"], status=TODO (depends on T001)
+        # T004: priority 5, labels=["feature", "frontend"], status=READY
+        # T005: priority 10, labels=["chore"], status=DELETED
+        
+        return mcp_context
+
+    def test_task_next_no_filters(self, filtered_context):
+        """Test task_next without filters returns all claimable tasks."""
+        from lodestar.mcp.tools.task import task_next
+
+        result = task_next(filtered_context)
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Should return claimable tasks (only READY tasks with satisfied dependencies)
+        assert len(data["candidates"]) >= 1  # At least some claimable tasks
+        assert data["totalClaimable"] >= 1
+
+    def test_task_next_filter_by_single_label(self, filtered_context):
+        """Test filtering by a single label."""
+        from lodestar.mcp.tools.task import task_next
+
+        result = task_next(filtered_context, labels=["frontend"])
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Should only return tasks with "frontend" label
+        for candidate in data["candidates"]:
+            assert "frontend" in candidate["labels"]
+        
+        # Should have filters in response
+        assert "filters" in data
+        assert data["filters"]["labels"] == ["frontend"]
+
+    def test_task_next_filter_by_multiple_labels(self, filtered_context):
+        """Test filtering by multiple labels (ANY match)."""
+        from lodestar.mcp.tools.task import task_next
+
+        result = task_next(filtered_context, labels=["feature", "bug"])
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Should return tasks with "feature" OR "bug" labels
+        for candidate in data["candidates"]:
+            assert any(label in candidate["labels"] for label in ["feature", "bug"])
+
+    def test_task_next_filter_by_max_priority(self, filtered_context):
+        """Test filtering by maximum priority."""
+        from lodestar.mcp.tools.task import task_next
+
+        result = task_next(filtered_context, max_priority=3)
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Should only return tasks with priority <= 3
+        for candidate in data["candidates"]:
+            assert candidate["priority"] <= 3
+        
+        # Should have filters in response
+        assert "filters" in data
+        assert data["filters"]["maxPriority"] == 3
+
+    def test_task_next_combined_filters(self, filtered_context):
+        """Test combining label and priority filters."""
+        from lodestar.mcp.tools.task import task_next
+
+        result = task_next(
+            filtered_context,
+            labels=["feature"],
+            max_priority=3,
+        )
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Should match both filters
+        for candidate in data["candidates"]:
+            assert "feature" in candidate["labels"]
+            assert candidate["priority"] <= 3
+        
+        # Should have both filters in response
+        assert "filters" in data
+        assert data["filters"]["labels"] == ["feature"]
+        assert data["filters"]["maxPriority"] == 3
+
+    def test_task_next_filter_no_matches(self, filtered_context):
+        """Test that no results are returned when filters match nothing."""
+        from lodestar.mcp.tools.task import task_next
+
+        result = task_next(filtered_context, labels=["nonexistent"])
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Should return empty candidates list
+        assert len(data["candidates"]) == 0
+        assert data["totalClaimable"] == 0
+        
+        # Rationale should mention the filter
+        assert "nonexistent" in data["rationale"]
+
+    def test_task_next_filter_respects_limit(self, filtered_context):
+        """Test that limit still applies after filtering."""
+        from lodestar.mcp.tools.task import task_next
+
+        result = task_next(
+            filtered_context,
+            labels=["feature"],
+            limit=1,
+        )
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Should return at most 1 task even if more match
+        assert len(data["candidates"]) <= 1
+        
+        # But totalClaimable shows how many matched the filter
+        assert data["totalClaimable"] >= len(data["candidates"])
