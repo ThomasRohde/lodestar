@@ -269,6 +269,52 @@ class TestAgentBrief:
         assert "important things" in generic_result.stdout
 
 
+class TestIgnoredAgentParameterOnAgentCommands:
+    """Test that --agent parameter is accepted on agent query commands for CLI consistency."""
+
+    def test_agent_list_accepts_agent(self, temp_repo):
+        """Test agent list accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["agent", "join", "--name", "Test Agent"])
+        
+        result = runner.invoke(app, ["agent", "list", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+        # Should work normally, no error about unknown option
+
+    def test_agent_find_accepts_agent(self, temp_repo):
+        """Test agent find accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["agent", "join", "--capability", "python"])
+        
+        result = runner.invoke(app, ["agent", "find", "--capability", "python", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+
+    def test_agent_brief_accepts_agent(self, temp_repo):
+        """Test agent brief accepts --agent parameter silently."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Test Task"])
+        
+        result = runner.invoke(app, ["agent", "brief", "--task", "T001", "--agent", "TESTID123"])
+        assert result.exit_code == 0
+
+    def test_agent_parameter_does_not_affect_output(self, temp_repo):
+        """Test that --agent parameter doesn't change agent list output."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["agent", "join", "--name", "Test Agent"])
+        
+        # Get output without --agent
+        result1 = runner.invoke(app, ["agent", "list", "--json"])
+        data1 = json.loads(result1.stdout)
+        
+        # Get output with --agent
+        result2 = runner.invoke(app, ["agent", "list", "--agent", "TESTID123", "--json"])
+        data2 = json.loads(result2.stdout)
+        
+        # Should be identical
+        assert data1["data"]["count"] == data2["data"]["count"]
+        assert data1["data"]["agents"][0]["agent_id"] == data2["data"]["agents"][0]["agent_id"]
+
+
 class TestTask:
     """Test task commands."""
 

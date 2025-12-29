@@ -193,6 +193,12 @@ def agent_join(
 
 @app.command(name="list")
 def agent_list(
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        hidden=True,
+        help="Ignored parameter (accepted for CLI consistency).",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -280,6 +286,12 @@ def agent_find(
         "--role",
         "-r",
         help="Find agents with this role.",
+    ),
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        hidden=True,
+        help="Ignored parameter (accepted for CLI consistency).",
     ),
     json_output: bool = typer.Option(
         False,
@@ -440,6 +452,12 @@ def agent_brief(
         "--format",
         "-f",
         help="Brief format: claude (XML tags), copilot (GitHub markdown), generic (plain text).",
+    ),
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        hidden=True,
+        help="Ignored parameter (accepted for CLI consistency).",
     ),
     json_output: bool = typer.Option(
         False,
