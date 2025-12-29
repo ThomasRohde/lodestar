@@ -701,6 +701,242 @@ async def task_verify(
     return with_item(summary, item=response_data)
 
 
+async def task_complete(
+    context: LodestarContext,
+    task_id: str,
+    agent_id: str,
+    note: str | None = None,
+    ctx: Context | None = None,
+) -> CallToolResult:
+    """
+    Mark a task as complete (done + verified in one atomic operation).
+
+    This combines task_done and task_verify into a single atomic operation.
+    Both status changes are made in a single spec save, preventing the task
+    from being stuck in 'done' state if an agent crashes between operations.
+
+    If the client provides a progressToken in the request metadata, this operation
+    will emit progress notifications at key stages.
+
+    Args:
+        context: Lodestar server context
+        task_id: Task ID to complete (required)
+        agent_id: Agent ID completing the task (required)
+        note: Optional note about completion (for logging/audit)
+        ctx: Optional MCP context for logging and progress notifications
+
+    Returns:
+        CallToolResult with success status and list of newly unblocked task IDs
+    """
+    from lodestar.spec import SpecError, SpecFileAccessError, SpecLockError
+
+    # Log the complete attempt
+    if ctx:
+        note_msg = f" ({note})" if note else ""
+        await ctx.info(
+            f"Completing task {task_id} (done + verify) by agent {agent_id}{note_msg}"
+        )
+
+    # Report progress: validating inputs (10%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(10.0, 100.0, "Validating inputs..")
+
+    # Validate inputs
+    try:
+        validated_task_id = validate_task_id(task_id)
+    except ValidationError as e:
+        if ctx:
+            await ctx.error(f"Invalid task ID: {task_id}")
+        return error(str(e), error_code="INVALID_TASK_ID")
+
+    if not agent_id or not agent_id.strip():
+        return error(
+            "agent_id is required and cannot be empty",
+            error_code="INVALID_AGENT_ID",
+        )
+
+    # Report progress: reloading spec (20%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(20.0, 100.0, "Reloading spec from disk..")
+
+    # Reload spec to get latest state
+    context.reload_spec()
+
+    # Report progress: checking task status (30%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(30.0, 100.0, "Checking task status..")
+
+    # Get task from spec
+    task = context.spec.get_task(validated_task_id)
+    if task is None:
+        return error(
+            f"Task {validated_task_id} not found",
+            error_code="TASK_NOT_FOUND",
+            details={"task_id": validated_task_id},
+        )
+
+    # Check if task is already verified
+    warnings = []
+    if task.status == TaskStatus.VERIFIED:
+        warnings.append(
+            {
+                "type": "ALREADY_VERIFIED",
+                "message": f"Task {validated_task_id} is already verified",
+                "severity": "info",
+            }
+        )
+
+    # Check if task is claimed by the agent
+    active_lease = context.db.get_active_lease(validated_task_id)
+    if active_lease and active_lease.agent_id != agent_id:
+        warnings.append(
+            {
+                "type": "NOT_CLAIMED_BY_YOU",
+                "message": f"Task {validated_task_id} is claimed by {active_lease.agent_id}, not {agent_id}",
+                "severity": "warning",
+            }
+        )
+
+    # Report progress: updating task status (50%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(
+            50.0, 100.0, "Updating task status (done + verified).."
+        )
+
+    # Update task status to VERIFIED directly (atomic operation)
+    now = datetime.now(UTC)
+    task.status = TaskStatus.VERIFIED
+    task.updated_at = now
+    task.completed_by = agent_id
+    task.completed_at = now
+    task.verified_by = agent_id
+    task.verified_at = now
+
+    # Save spec with error handling (this is the atomic operation)
+    try:
+        context.save_spec()
+    except (SpecLockError, SpecFileAccessError) as e:
+        # Return structured error with retriable info and current state
+        if ctx:
+            await ctx.error(f"Failed to save spec: {e}")
+        return error(
+            str(e),
+            error_code=type(e).__name__.upper(),
+            details={"task_id": validated_task_id},
+            retriable=e.retriable,
+            suggested_action=e.suggested_action,
+            current_state={
+                "task_id": validated_task_id,
+                "task_status": task.status.value,
+                "operation": "task.complete",
+            },
+        )
+    except SpecError as e:
+        # Handle other spec errors
+        if ctx:
+            await ctx.error(f"Spec error: {e}")
+        return error(
+            str(e),
+            error_code="SPEC_ERROR",
+            details={"task_id": validated_task_id},
+            retriable=getattr(e, "retriable", False),
+            suggested_action=getattr(e, "suggested_action", None),
+        )
+
+    # Report progress: releasing lease (60%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(60.0, 100.0, "Releasing active lease..")
+
+    # Auto-release any active lease
+    if active_lease:
+        context.db.release_lease(validated_task_id, active_lease.agent_id)
+
+    # Report progress: logging events (70%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(70.0, 100.0, "Logging completion events..")
+
+    # Log events (task.done and task.verify)
+    event_data = {
+        "agent_id": agent_id,
+        "atomic": True,  # Indicate this was an atomic operation
+    }
+    if note:
+        event_data["note"] = note
+
+    # Log both done and verify events to maintain audit trail
+    with contextlib.suppress(Exception):
+        context.emit_event(
+            event_type="task.done",
+            task_id=validated_task_id,
+            agent_id=agent_id,
+            data=event_data,
+        )
+        context.emit_event(
+            event_type="task.verify",
+            task_id=validated_task_id,
+            agent_id=agent_id,
+            data=event_data,
+        )
+
+    # Notify clients of task update
+    await notify_task_updated(ctx, validated_task_id)
+
+    # Report progress: finding unblocked tasks (85%)
+    if ctx and hasattr(ctx, "report_progress"):
+        await ctx.report_progress(85.0, 100.0, "Finding newly unblocked tasks..")
+
+    # Check what tasks are now unblocked
+    context.reload_spec()  # Reload to get updated state
+    new_claimable = context.spec.get_claimable_tasks()
+    newly_unblocked = [t for t in new_claimable if validated_task_id in t.depends_on]
+    newly_ready_ids = [t.id for t in newly_unblocked]
+
+    # Notify clients about newly unblocked tasks
+    for unblocked_id in newly_ready_ids:
+        await notify_task_updated(ctx, unblocked_id)
+
+    # Report progress: complete (100%)
+    if ctx and hasattr(ctx, "report_progress"):
+        if newly_ready_ids:
+            await ctx.report_progress(
+                100.0,
+                100.0,
+                f"Complete - unblocked {len(newly_ready_ids)} task(s)",
+            )
+        else:
+            await ctx.report_progress(100.0, 100.0, "Complete - no tasks unblocked")
+
+    # Log successful completion
+    if ctx:
+        if newly_ready_ids:
+            await ctx.info(
+                f"Successfully completed task {validated_task_id}, unblocked {len(newly_ready_ids)} task(s): {', '.join(newly_ready_ids)}"
+            )
+        else:
+            await ctx.info(f"Successfully completed task {validated_task_id}")
+
+    # Build summary
+    summary = format_summary(
+        "Complete",
+        validated_task_id,
+        f"- unblocked {len(newly_ready_ids)} task(s)" if newly_ready_ids else "",
+    )
+
+    # Build response
+    response_data = {
+        "ok": True,
+        "taskId": validated_task_id,
+        "status": "verified",
+        "newlyReadyTaskIds": newly_ready_ids,
+        "warnings": warnings,
+    }
+
+    if note:
+        response_data["note"] = note
+
+    return with_item(summary, item=response_data)
+
+
 def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register task mutation tools with the FastMCP server.
@@ -845,6 +1081,47 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             Returns warning if task is already verified.
         """
         return await task_verify(
+            context=context,
+            task_id=task_id,
+            agent_id=agent_id,
+            note=note,
+            ctx=ctx,
+        )
+
+    @mcp.tool(name="lodestar_task_complete")
+    async def complete_tool(
+        task_id: str,
+        agent_id: str,
+        note: str | None = None,
+        ctx: Context | None = None,
+    ) -> CallToolResult:
+        """Mark a task as complete (done + verified in one atomic operation).
+
+        This combines task_done and task_verify into a single atomic operation.
+        Both status changes are made in a single spec save, preventing the task
+        from being stuck in 'done' state if an agent crashes between operations.
+
+        This is the recommended way to complete tasks when:
+        - You've finished the work and verified it works
+        - You want to prevent crash-recovery issues
+        - You're doing both done + verify in the same session
+
+        If the client provides a progressToken in request metadata, this operation
+        emits progress notifications at key stages (10%, 20%, 30%, 50%, 60%, 70%, 85%, 100%).
+
+        Args:
+            task_id: Task ID to complete (required)
+            agent_id: Agent ID completing the task (required)
+            note: Optional note about completion (for logging/audit purposes)
+            ctx: Optional MCP context for logging and progress notifications
+
+        Returns:
+            Success response with status='verified' and list of newly unblocked task IDs.
+            Warnings may include:
+            - Task already verified
+            - Task claimed by different agent (still completes the task)
+        """
+        return await task_complete(
             context=context,
             task_id=task_id,
             agent_id=agent_id,

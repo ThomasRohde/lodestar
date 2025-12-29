@@ -505,6 +505,41 @@ Mark a task as verified (changes status to `verified`).
 }
 ```
 
+#### `lodestar.task.complete`
+
+**Mark a task as complete atomically** (combines `done` + `verify` in one operation).
+
+This is the **recommended way to complete tasks** when you've finished and verified the work in the same session. It prevents tasks from being stuck in 'done' state if an agent crashes between the two operations.
+
+**Inputs:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `task_id` | string | Yes | Task ID |
+| `agent_id` | string | Yes | Agent ID |
+| `note` | string | No | Completion notes (optional) |
+
+**Returns:**
+
+```json
+{
+  "taskId": "F002",
+  "status": "verified",
+  "completedBy": "A1234ABCD",
+  "completedAt": "2025-01-15T11:30:00Z",
+  "verifiedBy": "A1234ABCD",
+  "verifiedAt": "2025-01-15T11:30:00Z",
+  "newlyReadyTaskIds": ["F003", "F004"]
+}
+```
+
+!!! tip "When to use `task.complete` vs separate `done`+`verify`"
+    - **Use `task.complete`**: When you're doing both operations in the same session and want crash protection
+    - **Use `task.done` + `task.verify` separately**: When you need time between completion and verification (e.g., waiting for CI, manual testing, or handoff to another agent)
+
+!!! warning "Atomicity"
+    Unlike calling `task.done` followed by `task.verify`, `task.complete` never leaves the task in 'done' state. It updates directly from the current state to 'verified' in a single spec save operation, preventing orphaned 'done' tasks if the process crashes.
+
 ---
 
 ### Message Tools

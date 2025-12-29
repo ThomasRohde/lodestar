@@ -1593,3 +1593,334 @@ class TestInputValidation:
         assert isinstance(lease["expiresAt"], str)
         assert isinstance(lease["ttlSeconds"], int)
         assert isinstance(lease["createdAt"], str)
+
+
+class TestTaskComplete:
+    """Tests for the task.complete MCP tool (atomic done + verify).
+
+    Tests cover:
+    - Successful atomic completion
+    - Unblocking dependent tasks
+    - Already verified task handling
+    - Progress notifications
+    - Crash recovery prevention
+    """
+
+    @pytest.fixture
+    def complete_context(self, tmp_path):
+        """Create a test context for task completion tests."""
+        from lodestar.models.spec import Project, Spec
+
+        lodestar_dir = tmp_path / ".lodestar"
+        lodestar_dir.mkdir()
+
+        # Create spec with tasks in various states
+        spec = Spec(
+            project=Project(name="test-project"),
+            tasks={
+                "T001": Task(
+                    id="T001",
+                    title="Ready task",
+                    description="Task ready to complete",
+                    status=TaskStatus.READY,
+                    priority=1,
+                    labels=["feature"],
+                ),
+                "T002": Task(
+                    id="T002",
+                    title="Done task",
+                    description="Task already done",
+                    status=TaskStatus.DONE,
+                    priority=2,
+                    labels=["feature"],
+                ),
+                "T003": Task(
+                    id="T003",
+                    title="Verified task",
+                    description="Task already verified",
+                    status=TaskStatus.VERIFIED,
+                    priority=3,
+                    labels=["feature"],
+                ),
+                "T004": Task(
+                    id="T004",
+                    title="Dependent task",
+                    description="Task that depends on T001",
+                    status=TaskStatus.READY,
+                    priority=4,
+                    labels=["feature"],
+                    depends_on=["T001"],
+                ),
+                "T005": Task(
+                    id="T005",
+                    title="Another dependent",
+                    description="Another task that depends on T001",
+                    status=TaskStatus.READY,
+                    priority=5,
+                    labels=["feature"],
+                    depends_on=["T001"],
+                ),
+            },
+        )
+
+        save_spec(spec, tmp_path)
+
+        context = LodestarContext(tmp_path)
+
+        # Register an agent
+        agent = Agent(
+            display_name="Test Agent", role="tester", capabilities=["testing"]
+        )
+        context.db.register_agent(agent)
+
+        # Create a lease for T001
+        lease = Lease(
+            task_id="T001",
+            agent_id=agent.agent_id,
+            expires_at=datetime.now(UTC) + timedelta(minutes=15),
+        )
+        context.db.create_lease(lease)
+
+        return context
+
+    @pytest.mark.anyio
+    async def test_task_complete_success(self, complete_context):
+        """Test successful atomic task completion."""
+        from lodestar.mcp.tools.task_mutations import task_complete
+
+        # Get the agent ID from the lease
+        lease = complete_context.db.get_active_lease("T001")
+        agent_id = lease.agent_id
+
+        # Complete the task
+        result = await task_complete(
+            context=complete_context,
+            task_id="T001",
+            agent_id=agent_id,
+            note="Task completed and verified atomically",
+            ctx=None,
+        )
+
+        # Verify the call succeeded
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        assert data["ok"] is True
+        assert data["status"] == "verified"
+        assert data["taskId"] == "T001"
+
+        # Verify the task is in VERIFIED status (not DONE)
+        complete_context.reload_spec()
+        task = complete_context.spec.get_task("T001")
+        assert task.status == TaskStatus.VERIFIED
+        assert task.completed_by == agent_id
+        assert task.completed_at is not None
+        assert task.verified_by == agent_id
+        assert task.verified_at is not None
+
+        # Verify dependent tasks are unblocked
+        assert "newlyReadyTaskIds" in data
+        assert len(data["newlyReadyTaskIds"]) == 2
+        assert "T004" in data["newlyReadyTaskIds"]
+        assert "T005" in data["newlyReadyTaskIds"]
+
+        # Verify lease was released
+        active_lease = complete_context.db.get_active_lease("T001")
+        assert active_lease is None
+
+    @pytest.mark.anyio
+    async def test_task_complete_already_verified(self, complete_context):
+        """Test completing an already verified task."""
+        from lodestar.mcp.tools.task_mutations import task_complete
+
+        result = await task_complete(
+            context=complete_context,
+            task_id="T003",
+            agent_id="test-agent",
+            ctx=None,
+        )
+
+        # Should succeed with warning
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        assert data["ok"] is True
+
+        # Should have warning about already verified
+        assert "warnings" in data
+        assert len(data["warnings"]) > 0
+        warning_types = [w["type"] for w in data["warnings"]]
+        assert "ALREADY_VERIFIED" in warning_types
+
+    @pytest.mark.anyio
+    async def test_task_complete_with_progress(self, complete_context):
+        """Test that task_complete emits progress notifications."""
+        from lodestar.mcp.tools.task_mutations import task_complete
+
+        # Create a mock context that tracks progress calls
+        progress_calls = []
+
+        class MockContext:
+            """Mock context that captures progress and logging calls."""
+
+            async def info(self, message: str):
+                """Mock info logging."""
+                pass
+
+            async def error(self, message: str):
+                """Mock error logging."""
+                pass
+
+            async def report_progress(
+                self,
+                progress: float,
+                total: float | None = None,
+                message: str | None = None,
+            ):
+                """Capture progress calls."""
+                progress_calls.append(
+                    {"progress": progress, "total": total, "message": message}
+                )
+
+        mock_ctx = MockContext()
+
+        # Get the agent ID from the lease
+        lease = complete_context.db.get_active_lease("T001")
+        agent_id = lease.agent_id
+
+        # Complete the task with mock context
+        result = await task_complete(
+            context=complete_context,
+            task_id="T001",
+            agent_id=agent_id,
+            note="Testing progress",
+            ctx=mock_ctx,
+        )
+
+        # Verify the call succeeded
+        assert result.isError is None or result.isError is False
+
+        # Verify progress notifications were emitted
+        assert (
+            len(progress_calls) == 8
+        ), f"Expected 8 progress calls, got {len(progress_calls)}"
+
+        # Verify the sequence of progress values
+        expected_progress = [10.0, 20.0, 30.0, 50.0, 60.0, 70.0, 85.0, 100.0]
+        actual_progress = [call["progress"] for call in progress_calls]
+        assert actual_progress == expected_progress
+
+        # Verify all have total=100.0
+        for call in progress_calls:
+            assert call["total"] == 100.0
+
+        # Verify messages are present and descriptive
+        for call in progress_calls:
+            assert call["message"] is not None
+            assert len(call["message"]) > 0
+
+    @pytest.mark.anyio
+    async def test_task_complete_not_found(self, complete_context):
+        """Test completing a non-existent task."""
+        from lodestar.mcp.tools.task_mutations import task_complete
+
+        result = await task_complete(
+            context=complete_context,
+            task_id="NONEXISTENT",
+            agent_id="test-agent",
+            ctx=None,
+        )
+
+        # Should fail with error
+        assert result.isError is True
+        data = result.structuredContent
+        assert "error_code" in data
+        assert data["error_code"] == "TASK_NOT_FOUND"
+
+    @pytest.mark.anyio
+    async def test_task_complete_invalid_task_id(self, complete_context):
+        """Test completing with invalid task ID."""
+        from lodestar.mcp.tools.task_mutations import task_complete
+
+        result = await task_complete(
+            context=complete_context,
+            task_id="invalid task id!",
+            agent_id="test-agent",
+            ctx=None,
+        )
+
+        # Should fail with task not found error (validation allows this format)
+        assert result.isError is True
+        data = result.structuredContent
+        assert "error_code" in data
+        assert data["error_code"] == "TASK_NOT_FOUND"
+
+    @pytest.mark.anyio
+    async def test_task_complete_invalid_agent_id(self, complete_context):
+        """Test completing with empty agent ID."""
+        from lodestar.mcp.tools.task_mutations import task_complete
+
+        result = await task_complete(
+            context=complete_context,
+            task_id="T001",
+            agent_id="",
+            ctx=None,
+        )
+
+        # Should fail with validation error
+        assert result.isError is True
+        data = result.structuredContent
+        assert "error_code" in data
+        assert data["error_code"] == "INVALID_AGENT_ID"
+
+    @pytest.mark.anyio
+    async def test_task_complete_with_note(self, complete_context):
+        """Test that notes are preserved in the response."""
+        from lodestar.mcp.tools.task_mutations import task_complete
+
+        # Get the agent ID from the lease
+        lease = complete_context.db.get_active_lease("T001")
+        agent_id = lease.agent_id
+
+        result = await task_complete(
+            context=complete_context,
+            task_id="T001",
+            agent_id=agent_id,
+            note="Tested thoroughly",
+            ctx=None,
+        )
+
+        # Verify note is in response
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        assert "note" in data
+        assert data["note"] == "Tested thoroughly"
+
+    @pytest.mark.anyio
+    async def test_task_complete_atomicity(self, complete_context):
+        """Test that task_complete is truly atomic (never leaves task in DONE state)."""
+        from lodestar.mcp.tools.task_mutations import task_complete
+
+        # Get the agent ID
+        lease = complete_context.db.get_active_lease("T001")
+        agent_id = lease.agent_id
+
+        # Complete the task
+        await task_complete(
+            context=complete_context,
+            task_id="T001",
+            agent_id=agent_id,
+            ctx=None,
+        )
+
+        # Reload spec to ensure we have the latest state
+        complete_context.reload_spec()
+        task = complete_context.spec.get_task("T001")
+
+        # Task should NEVER be in DONE state - should go straight to VERIFIED
+        assert task.status == TaskStatus.VERIFIED
+        assert task.status != TaskStatus.DONE
+
+        # Both completed_at and verified_at should be set
+        assert task.completed_at is not None
+        assert task.verified_at is not None
+        assert task.completed_by == agent_id
+        assert task.verified_by == agent_id
