@@ -21,7 +21,7 @@ app = typer.Typer(
 def _setup_logging(
     log_file: Path | None = None,
     json_logs: bool = False,
-) -> None:
+) -> logging.Logger:
     """
     Setup logging to stderr and optionally to a file.
 

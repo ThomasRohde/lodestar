@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -53,7 +53,7 @@ class LodestarContext:
         task_id: str | None = None,
         target_agent_id: str | None = None,
         correlation_id: str | None = None,
-        data: dict | None = None,
+        data: dict[str, Any] | None = None,
     ) -> None:
         """Emit an event to the event log.
 

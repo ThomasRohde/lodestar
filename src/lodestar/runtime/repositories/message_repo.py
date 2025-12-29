@@ -254,7 +254,7 @@ class MessageRepository:
                 .values(read_at=now.isoformat())
             )
             result = session.execute(update_stmt)
-            return result.rowcount  # type: ignore[return-value]
+            return result.rowcount  # type: ignore[no-any-return, attr-defined]
 
     def wait_for_message(
         self, agent_id: str, timeout_seconds: float | None = None, since: datetime | None = None

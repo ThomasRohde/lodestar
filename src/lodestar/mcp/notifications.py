@@ -38,7 +38,7 @@ async def notify_task_updated(
 
     try:
         # Import here to avoid circular dependency
-        from anyurl import AnyUrl
+        from mcp.types import AnyUrl
 
         # Send resource update notification
         uri = AnyUrl(f"lodestar://task/{task_id}")
@@ -67,7 +67,7 @@ async def notify_spec_updated(
         return
 
     try:
-        from anyurl import AnyUrl
+        from mcp.types import AnyUrl
 
         uri = AnyUrl("lodestar://spec")
         await session.send_resource_updated(uri)
@@ -94,7 +94,7 @@ async def notify_status_updated(
         return
 
     try:
-        from anyurl import AnyUrl
+        from mcp.types import AnyUrl
 
         uri = AnyUrl("lodestar://status")
         await session.send_resource_updated(uri)
@@ -127,7 +127,7 @@ async def notify_message_sent(
         return
 
     try:
-        from anyurl import AnyUrl
+        from mcp.types import AnyUrl
 
         # Notify about the specific message
         message_uri = AnyUrl(f"lodestar://message/{message_id}")
