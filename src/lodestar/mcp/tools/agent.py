@@ -259,10 +259,9 @@ def agent_list(context: LodestarContext) -> CallToolResult:
 
     # Build summary
     summary = format_summary(
-        f"Found {len(agents_data)} agent(s)",
-        f"Active: {data['byStatus'].get('active', 0)}",
-        f"Idle: {data['byStatus'].get('idle', 0)}",
-        f"Offline: {data['byStatus'].get('offline', 0)}",
+        "Listed",
+        f"{len(agents_data)} agent(s)",
+        f"Active: {data['byStatus'].get('active', 0)}, Idle: {data['byStatus'].get('idle', 0)}, Offline: {data['byStatus'].get('offline', 0)}",
     )
 
     return success(summary, data=data)
