@@ -43,7 +43,7 @@ Follow this workflow when working with Lodestar tasks:
 Register yourself in the repository:
 
 ```bash
-lodestar.agent.join(role="ai-agent", capabilities=["python", "testing"])
+lodestar_agent_join(role="ai-agent", capabilities=["python", "testing"])
 # Save the returned agent_id for subsequent commands
 ```
 
@@ -52,14 +52,14 @@ lodestar.agent.join(role="ai-agent", capabilities=["python", "testing"])
 Get the next claimable task:
 
 ```bash
-lodestar.task.next()
+lodestar_task_next()
 # Returns tasks that are ready and have all dependencies verified
 ```
 
 Or list all tasks to find specific work:
 
 ```bash
-lodestar.task.list(status="ready")
+lodestar_task_list(status="ready")
 ```
 
 ## 3. Claim the Task
@@ -67,7 +67,7 @@ lodestar.task.list(status="ready")
 Before starting work, claim the task to prevent duplicate effort:
 
 ```bash
-lodestar.task.claim(task_id="T001", agent_id="YOUR_AGENT_ID")
+lodestar_task_claim(task_id="T001", agent_id="YOUR_AGENT_ID")
 # You now have a 15-minute lease (renewable)
 ```
 
@@ -76,9 +76,9 @@ lodestar.task.claim(task_id="T001", agent_id="YOUR_AGENT_ID")
 Retrieve full task details including PRD context:
 
 ```bash
-lodestar.task.get(task_id="T001")
+lodestar_task_get(task_id="T001")
 # Or for even more context:
-lodestar.task.context(task_id="T001")
+lodestar_task_context(task_id="T001")
 ```
 
 This provides:
@@ -92,14 +92,14 @@ This provides:
 Implement the task following the acceptance criteria. Make sure to:
 - Run tests frequently
 - Commit your changes incrementally
-- Renew your lease if needed: `lodestar.task.renew(task_id="T001")`
+- Renew your lease if needed: `lodestar_task_renew(task_id="T001")`
 
 ## 6. Mark as Done
 
 When implementation is complete and tests pass:
 
 ```bash
-lodestar.task.done(task_id="T001", agent_id="YOUR_AGENT_ID")
+lodestar_task_done(task_id="T001", agent_id="YOUR_AGENT_ID")
 ```
 
 ## 7. Verify the Task
@@ -107,7 +107,7 @@ lodestar.task.done(task_id="T001", agent_id="YOUR_AGENT_ID")
 After reviewing that all acceptance criteria are met:
 
 ```bash
-lodestar.task.verify(task_id="T001", agent_id="YOUR_AGENT_ID")
+lodestar_task_verify(task_id="T001", agent_id="YOUR_AGENT_ID")
 ```
 
 Verification unblocks any dependent tasks.
@@ -118,10 +118,10 @@ If you're blocked or ending your session before completion:
 
 ```bash
 # Release the task
-lodestar.task.release(task_id="T001", agent_id="YOUR_AGENT_ID")
+lodestar_task_release(task_id="T001", agent_id="YOUR_AGENT_ID")
 
 # Leave context for the next agent
-lodestar.message.send(
+lodestar_message_send(
     to_agent_id="task:T001",
     from_agent_id="YOUR_AGENT_ID",
     content="Progress: 60% complete. Token generation works. Blocked on email template approval."
@@ -140,15 +140,15 @@ lodestar.message.send(
 ## Quick Command Reference
 
 ```
-lodestar.agent.join()          # Register as agent
-lodestar.task.next()           # Find claimable tasks
-lodestar.task.claim()          # Claim a task
-lodestar.task.context()        # Get full context
-lodestar.task.renew()          # Extend lease
-lodestar.task.done()           # Mark complete
-lodestar.task.verify()         # Mark verified
-lodestar.task.release()        # Release if blocked
-lodestar.message.send()        # Leave handoff context
+lodestar_agent_join()          # Register as agent
+lodestar_task_next()           # Find claimable tasks
+lodestar_task_claim()          # Claim a task
+lodestar_task_context()        # Get full context
+lodestar_task_renew()          # Extend lease
+lodestar_task_done()           # Mark complete
+lodestar_task_verify()         # Mark verified
+lodestar_task_release()        # Release if blocked
+lodestar_message_send()        # Leave handoff context
 ```
 """
 
@@ -185,7 +185,7 @@ When executing a claimed task, follow this systematic approach:
 Before writing any code, thoroughly review:
 
 ```bash
-lodestar.task.context(task_id="YOUR_TASK_ID")
+lodestar_task_context(task_id="YOUR_TASK_ID")
 ```
 
 This provides:
@@ -239,7 +239,7 @@ Follow test-driven development:
 2. **Write tests first** for new functionality
 3. **Implement in small steps**, running tests after each change
 4. **Commit frequently** with clear messages
-5. **Renew your lease** if needed: `lodestar.task.renew(task_id="T001")`
+5. **Renew your lease** if needed: `lodestar_task_renew(task_id="T001")`
 
 ## 4. Verify Against Checklist
 
@@ -270,7 +270,7 @@ Ask yourself:
 Only when all checks pass:
 
 ```bash
-lodestar.task.done(task_id="YOUR_TASK_ID", agent_id="YOUR_AGENT_ID")
+lodestar_task_done(task_id="YOUR_TASK_ID", agent_id="YOUR_AGENT_ID")
 ```
 
 ## 7. Verify Thoroughly
@@ -278,7 +278,7 @@ lodestar.task.done(task_id="YOUR_TASK_ID", agent_id="YOUR_AGENT_ID")
 The verification step is crucial - it unblocks dependent tasks:
 
 ```bash
-lodestar.task.verify(task_id="YOUR_TASK_ID", agent_id="YOUR_AGENT_ID")
+lodestar_task_verify(task_id="YOUR_TASK_ID", agent_id="YOUR_AGENT_ID")
 ```
 
 **Before verifying:**
@@ -316,7 +316,7 @@ Every task completion should meet these standards:
 
 ```bash
 # 1. Get context
-task_context = lodestar.task.context(task_id="T042")
+task_context = lodestar_task_context(task_id="T042")
 
 # 2. Create verification checklist (in your editor/notes)
 
@@ -332,10 +332,10 @@ ruff format --check src tests
 pytest
 
 # 5. Mark as done
-lodestar.task.done(task_id="T042", agent_id="A123")
+lodestar_task_done(task_id="T042", agent_id="A123")
 
 # 6. Verify thoroughly
-lodestar.task.verify(task_id="T042", agent_id="A123")
+lodestar_task_verify(task_id="T042", agent_id="A123")
 ```
 
 Remember: **Quality over speed**. A properly completed task is better than rushing to "done" with incomplete work.

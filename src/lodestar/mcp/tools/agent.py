@@ -213,6 +213,61 @@ def agent_leave(
     return success(summary, data=data)
 
 
+def agent_list(context: LodestarContext) -> CallToolResult:
+    """
+    List all registered agents.
+
+    Returns all agents registered in the runtime database with their
+    current status, capabilities, and last seen time.
+
+    Args:
+        context: Lodestar server context
+
+    Returns:
+        CallToolResult with list of agents and their details
+    """
+    # Get all agents from database
+    agents = context.db.list_agents()
+
+    # Build agents list with full details
+    agents_data = []
+    for agent in agents:
+        agent_info = {
+            "agentId": agent.agent_id,
+            "displayName": agent.display_name,
+            "role": agent.role,
+            "status": agent.get_status().value,
+            "capabilities": agent.capabilities,
+            "lastSeenAt": agent.last_seen_at.isoformat(),
+            "createdAt": agent.created_at.isoformat(),
+        }
+        if agent.session_meta:
+            agent_info["sessionMeta"] = agent.session_meta
+        agents_data.append(agent_info)
+
+    # Build structured data
+    data = {
+        "agents": agents_data,
+        "totalCount": len(agents_data),
+        "byStatus": {},
+    }
+
+    # Count by status
+    for agent in agents:
+        status = agent.get_status().value
+        data["byStatus"][status] = data["byStatus"].get(status, 0) + 1
+
+    # Build summary
+    summary = format_summary(
+        f"Found {len(agents_data)} agent(s)",
+        f"Active: {data['byStatus'].get('active', 0)}",
+        f"Idle: {data['byStatus'].get('idle', 0)}",
+        f"Offline: {data['byStatus'].get('offline', 0)}",
+    )
+
+    return success(summary, data=data)
+
+
 def register_agent_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register agent management tools with the FastMCP server.
@@ -222,7 +277,7 @@ def register_agent_tools(mcp: object, context: LodestarContext) -> None:
         context: Lodestar context to use for all tools
     """
 
-    @mcp.tool(name="lodestar.agent.join")
+    @mcp.tool(name="lodestar_agent_join")
     def join_tool(
         name: str | None = None,
         client: str | None = None,
@@ -254,7 +309,7 @@ def register_agent_tools(mcp: object, context: LodestarContext) -> None:
             ttl_seconds=ttl_seconds,
         )
 
-    @mcp.tool(name="lodestar.agent.heartbeat")
+    @mcp.tool(name="lodestar_agent_heartbeat")
     def heartbeat_tool(agent_id: str) -> CallToolResult:
         """Update agent heartbeat timestamp.
 
@@ -269,7 +324,7 @@ def register_agent_tools(mcp: object, context: LodestarContext) -> None:
         """
         return agent_heartbeat(context=context, agent_id=agent_id)
 
-    @mcp.tool(name="lodestar.agent.leave")
+    @mcp.tool(name="lodestar_agent_leave")
     def leave_tool(agent_id: str, reason: str | None = None) -> CallToolResult:
         """Mark agent as offline gracefully.
 
@@ -284,3 +339,15 @@ def register_agent_tools(mcp: object, context: LodestarContext) -> None:
             Confirmation with any warnings about active leases
         """
         return agent_leave(context=context, agent_id=agent_id, reason=reason)
+
+    @mcp.tool(name="lodestar_agent_list")
+    def list_tool() -> CallToolResult:
+        """List all registered agents.
+
+        Returns all agents registered in the runtime database with their
+        current status, capabilities, and last seen time.
+
+        Returns:
+            List of agents with their details including status and capabilities
+        """
+        return agent_list(context=context)

@@ -372,7 +372,7 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
         context: Lodestar context to use for all tools
     """
 
-    @mcp.tool(name="lodestar.message.send")
+    @mcp.tool(name="lodestar_message_send")
     async def send_tool(
         from_agent_id: str,
         body: str,
@@ -416,7 +416,7 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
             ctx=ctx,
         )
 
-    @mcp.tool(name="lodestar.message.list")
+    @mcp.tool(name="lodestar_message_list")
     def list_tool(
         agent_id: str,
         unread_only: bool = True,
@@ -450,7 +450,7 @@ def register_message_tools(mcp: object, context: LodestarContext) -> None:
             since_id=since_id,
         )
 
-    @mcp.tool(name="lodestar.message.ack")
+    @mcp.tool(name="lodestar_message_ack")
     def ack_tool(
         agent_id: str,
         message_ids: list[str],

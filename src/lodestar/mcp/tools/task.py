@@ -368,13 +368,13 @@ def task_next(
     rationale_parts = []
 
     if total_claimable == 0:
-        rationale_parts.append("No claimable tasks available.")
-        rationale_parts.append("Tasks must be in 'ready' status with all dependencies verified.")
+        rationale_parts.append("No claimable tasks available")
+        rationale_parts.append("Tasks must be in 'ready' status with all dependencies verified")
     else:
         rationale_parts.append(
             f"Found {total_claimable} claimable task(s), showing top {len(tasks)} by priority."
         )
-        rationale_parts.append("Tasks are ready for work with all dependencies satisfied.")
+        rationale_parts.append("Tasks are ready for work with all dependencies satisfied")
 
     rationale = " ".join(rationale_parts)
 
@@ -567,7 +567,7 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
         context: Lodestar context to use for all tools
     """
 
-    @mcp.tool(name="lodestar.task.list")
+    @mcp.tool(name="lodestar_task_list")
     def list_tool(
         status: str | None = None,
         label: str | None = None,
@@ -596,7 +596,7 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
             cursor=cursor,
         )
 
-    @mcp.tool(name="lodestar.task.get")
+    @mcp.tool(name="lodestar_task_get")
     def get_tool(task_id: str) -> CallToolResult:
         """Get detailed information about a specific task.
 
@@ -616,7 +616,7 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
         """
         return task_get(context=context, task_id=task_id)
 
-    @mcp.tool(name="lodestar.task.next")
+    @mcp.tool(name="lodestar_task_next")
     def next_tool(
         agent_id: str | None = None,
         limit: int | None = None,
@@ -638,7 +638,7 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
         """
         return task_next(context=context, agent_id=agent_id, limit=limit)
 
-    @mcp.tool(name="lodestar.task.context")
+    @mcp.tool(name="lodestar_task_context")
     def context_tool(
         task_id: str,
         max_chars: int | None = None,

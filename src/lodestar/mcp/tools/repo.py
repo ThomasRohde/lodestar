@@ -115,7 +115,7 @@ def register_repo_tools(mcp: object, context: LodestarContext) -> None:
         context: Lodestar context to use for all tools
     """
 
-    @mcp.tool(name="lodestar.repo.status")
+    @mcp.tool(name="lodestar_repo_status")
     def status_tool() -> CallToolResult:
         """Get repository status and statistics.
 

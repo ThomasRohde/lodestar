@@ -127,7 +127,7 @@ def register_event_tools(mcp: object, context: LodestarContext) -> None:
         context: Lodestar context to use for all tools
     """
 
-    @mcp.tool(name="lodestar.events.pull")
+    @mcp.tool(name="lodestar_events_pull")
     def pull_tool(
         since_cursor: int = 0,
         limit: int = 200,

@@ -483,7 +483,7 @@ async def task_verify(
 
     # Report progress: validating inputs (10%)
     if ctx and hasattr(ctx, "report_progress"):
-        await ctx.report_progress(10.0, 100.0, "Validating inputs...")
+        await ctx.report_progress(10.0, 100.0, "Validating inputs..")
 
     # Validate inputs
     try:
@@ -501,14 +501,14 @@ async def task_verify(
 
     # Report progress: reloading spec (25%)
     if ctx and hasattr(ctx, "report_progress"):
-        await ctx.report_progress(25.0, 100.0, "Reloading spec from disk...")
+        await ctx.report_progress(25.0, 100.0, "Reloading spec from disk..")
 
     # Reload spec to get latest state
     context.reload_spec()
 
     # Report progress: checking task status (40%)
     if ctx and hasattr(ctx, "report_progress"):
-        await ctx.report_progress(40.0, 100.0, "Checking task status...")
+        await ctx.report_progress(40.0, 100.0, "Checking task status..")
 
     # Get task from spec
     task = context.spec.get_task(validated_task_id)
@@ -541,7 +541,7 @@ async def task_verify(
 
     # Report progress: updating task status (55%)
     if ctx and hasattr(ctx, "report_progress"):
-        await ctx.report_progress(55.0, 100.0, "Updating task status to verified...")
+        await ctx.report_progress(55.0, 100.0, "Updating task status to verified..")
 
     # Update task status
     task.status = TaskStatus.VERIFIED
@@ -552,7 +552,7 @@ async def task_verify(
 
     # Report progress: releasing lease (70%)
     if ctx and hasattr(ctx, "report_progress"):
-        await ctx.report_progress(70.0, 100.0, "Releasing active lease...")
+        await ctx.report_progress(70.0, 100.0, "Releasing active lease..")
 
     # Auto-release any active lease
     active_lease = context.db.get_active_lease(validated_task_id)
@@ -561,7 +561,7 @@ async def task_verify(
 
     # Report progress: logging event (80%)
     if ctx and hasattr(ctx, "report_progress"):
-        await ctx.report_progress(80.0, 100.0, "Logging verification event...")
+        await ctx.report_progress(80.0, 100.0, "Logging verification event..")
 
     # Log event (task.verify)
     event_data = {
@@ -583,7 +583,7 @@ async def task_verify(
 
     # Report progress: finding unblocked tasks (90%)
     if ctx and hasattr(ctx, "report_progress"):
-        await ctx.report_progress(90.0, 100.0, "Finding newly unblocked tasks...")
+        await ctx.report_progress(90.0, 100.0, "Finding newly unblocked tasks..")
 
     # Check what tasks are now unblocked
     context.reload_spec()  # Reload to get updated state
@@ -646,7 +646,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
         context: Lodestar context to use for all tools
     """
 
-    @mcp.tool(name="lodestar.task.claim")
+    @mcp.tool(name="lodestar_task_claim")
     async def claim_tool(
         task_id: str,
         agent_id: str,
@@ -684,7 +684,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             ctx=ctx,
         )
 
-    @mcp.tool(name="lodestar.task.release")
+    @mcp.tool(name="lodestar_task_release")
     async def release_tool(
         task_id: str,
         agent_id: str,
@@ -717,7 +717,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             ctx=ctx,
         )
 
-    @mcp.tool(name="lodestar.task.done")
+    @mcp.tool(name="lodestar_task_done")
     async def done_tool(
         task_id: str,
         agent_id: str,
@@ -751,7 +751,7 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             ctx=ctx,
         )
 
-    @mcp.tool(name="lodestar.task.verify")
+    @mcp.tool(name="lodestar_task_verify")
     async def verify_tool(
         task_id: str,
         agent_id: str,

@@ -98,12 +98,12 @@ class TestConcurrentClaims:
                 await session1.initialize()
 
                 # Join as agent
-                agent1_result = await session1.call_tool("lodestar.agent.join", {"name": "Agent 1"})
+                agent1_result = await session1.call_tool("lodestar_agent_join", {"name": "Agent 1"})
                 agent1_id = agent1_result.structuredContent["agentId"]
 
                 # Claim INT-001
                 claim1_result = await session1.call_tool(
-                    "lodestar.task.claim",
+                    "lodestar_task_claim",
                     {
                         "task_id": "INT-001",
                         "agent_id": agent1_id,
@@ -123,12 +123,12 @@ class TestConcurrentClaims:
                 await session2.initialize()
 
                 # Join as different agent
-                agent2_result = await session2.call_tool("lodestar.agent.join", {"name": "Agent 2"})
+                agent2_result = await session2.call_tool("lodestar_agent_join", {"name": "Agent 2"})
                 agent2_id = agent2_result.structuredContent["agentId"]
 
                 # Claim INT-002 (different task)
                 claim2_result = await session2.call_tool(
-                    "lodestar.task.claim",
+                    "lodestar_task_claim",
                     {
                         "task_id": "INT-002",
                         "agent_id": agent2_id,
@@ -152,11 +152,11 @@ class TestConcurrentClaims:
             async with ClientSession(read1, write1) as session1:
                 await session1.initialize()
 
-                agent1_result = await session1.call_tool("lodestar.agent.join", {"name": "Agent 1"})
+                agent1_result = await session1.call_tool("lodestar_agent_join", {"name": "Agent 1"})
                 agent1_id = agent1_result.structuredContent["agentId"]
 
                 claim1_result = await session1.call_tool(
-                    "lodestar.task.claim",
+                    "lodestar_task_claim",
                     {
                         "task_id": "INT-001",
                         "agent_id": agent1_id,
@@ -172,12 +172,12 @@ class TestConcurrentClaims:
                         await session2.initialize()
 
                         agent2_result = await session2.call_tool(
-                            "lodestar.agent.join", {"name": "Agent 2"}
+                            "lodestar_agent_join", {"name": "Agent 2"}
                         )
                         agent2_id = agent2_result.structuredContent["agentId"]
 
                         claim2_result = await session2.call_tool(
-                            "lodestar.task.claim",
+                            "lodestar_task_claim",
                             {
                                 "task_id": "INT-001",
                                 "agent_id": agent2_id,
@@ -203,15 +203,15 @@ class TestMessaging:
                 await session.initialize()
 
                 # Join as two different agents
-                agent1_result = await session.call_tool("lodestar.agent.join", {"name": "Agent 1"})
+                agent1_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 1"})
                 agent1_id = agent1_result.structuredContent["agentId"]
 
-                agent2_result = await session.call_tool("lodestar.agent.join", {"name": "Agent 2"})
+                agent2_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
                 agent2_id = agent2_result.structuredContent["agentId"]
 
                 # Agent 1 sends message to Agent 2
                 send_result = await session.call_tool(
-                    "lodestar.message.send",
+                    "lodestar_message_send",
                     {
                         "from_agent_id": agent1_id,
                         "to_agent_id": agent2_id,
@@ -225,7 +225,7 @@ class TestMessaging:
 
                 # Agent 2 lists messages
                 list_result = await session.call_tool(
-                    "lodestar.message.list",
+                    "lodestar_message_list",
                     {
                         "agent_id": agent2_id,
                     },
@@ -252,15 +252,15 @@ class TestMessaging:
                 await session.initialize()
 
                 # Join as two agents
-                agent1_result = await session.call_tool("lodestar.agent.join", {"name": "Agent 1"})
+                agent1_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 1"})
                 agent1_id = agent1_result.structuredContent["agentId"]
 
-                agent2_result = await session.call_tool("lodestar.agent.join", {"name": "Agent 2"})
+                agent2_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
                 agent2_id = agent2_result.structuredContent["agentId"]
 
                 # Send message
                 send_result = await session.call_tool(
-                    "lodestar.message.send",
+                    "lodestar_message_send",
                     {
                         "from_agent_id": agent1_id,
                         "to_agent_id": agent2_id,
@@ -271,7 +271,7 @@ class TestMessaging:
 
                 # Acknowledge the message
                 ack_result = await session.call_tool(
-                    "lodestar.message.ack",
+                    "lodestar_message_ack",
                     {
                         "message_ids": [message_id],
                         "agent_id": agent2_id,
@@ -283,7 +283,7 @@ class TestMessaging:
 
                 # List messages again and verify ack status (pass unread_only=False to see all)
                 list_result = await session.call_tool(
-                    "lodestar.message.list",
+                    "lodestar_message_list",
                     {
                         "agent_id": agent2_id,
                         "unread_only": False,
@@ -310,13 +310,13 @@ class TestEventStreaming:
 
                 # Join as agent
                 agent_result = await session.call_tool(
-                    "lodestar.agent.join", {"name": "Event Agent"}
+                    "lodestar_agent_join", {"name": "Event Agent"}
                 )
                 agent_id = agent_result.structuredContent["agentId"]
 
                 # Claim a task (generates event)
                 await session.call_tool(
-                    "lodestar.task.claim",
+                    "lodestar_task_claim",
                     {
                         "task_id": "INT-001",
                         "agent_id": agent_id,
@@ -326,7 +326,7 @@ class TestEventStreaming:
 
                 # Get event stream
                 events_result = await session.call_tool(
-                    "lodestar.events.pull",
+                    "lodestar_events_pull",
                     {
                         "since_cursor": 0,
                         "limit": 10,
@@ -359,14 +359,14 @@ class TestEventStreaming:
 
                 # Join as agent
                 agent_result = await session.call_tool(
-                    "lodestar.agent.join", {"name": "Pagination Agent"}
+                    "lodestar_agent_join", {"name": "Pagination Agent"}
                 )
                 agent_id = agent_result.structuredContent["agentId"]
 
                 # Generate multiple events by claiming tasks
                 for task_id in ["INT-001", "INT-002", "INT-003"]:
                     await session.call_tool(
-                        "lodestar.task.claim",
+                        "lodestar_task_claim",
                         {
                             "task_id": task_id,
                             "agent_id": agent_id,
@@ -376,7 +376,7 @@ class TestEventStreaming:
 
                 # Get first page of events
                 page1_result = await session.call_tool(
-                    "lodestar.events.pull",
+                    "lodestar_events_pull",
                     {
                         "since_cursor": 0,
                         "limit": 2,
@@ -391,7 +391,7 @@ class TestEventStreaming:
                 if "nextCursor" in page1_result.structuredContent:
                     next_cursor = page1_result.structuredContent["nextCursor"]
                     page2_result = await session.call_tool(
-                        "lodestar.events.pull",
+                        "lodestar_events_pull",
                         {
                             "since_cursor": next_cursor,
                             "limit": 2,
