@@ -21,7 +21,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra mcp
 
       - name: Run ruff check
         run: uv run ruff check src tests
@@ -43,7 +43,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra mcp
 
       - name: Run mypy
         run: uv run mypy src/lodestar
@@ -62,7 +62,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra mcp
 
       - name: Run tests with coverage
         run: uv run pytest --cov=src/lodestar --cov-report=xml --cov-report=term
