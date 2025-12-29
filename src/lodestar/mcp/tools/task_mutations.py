@@ -1143,12 +1143,10 @@ async def task_batch_verify(
     failure_count = len(results) - success_count
 
     # Build summary
-    if failure_count == 0:
-        summary = f"Batch verify: all {success_count} task(s) verified successfully"
-    elif success_count == 0:
-        summary = f"Batch verify: all {failure_count} task(s) failed"
+    if failure_count == 0 or success_count == 0:
+        pass
     else:
-        summary = f"Batch verify: {success_count} succeeded, {failure_count} failed"
+        pass
 
     # Build response
     response_data = {

@@ -12,7 +12,7 @@ import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -82,13 +82,13 @@ class TestConcurrentVerification:
 
         This simulates the most common concurrent scenario where multiple
         agents are working on different tasks and verifying them independently.
-        
+
         NOTE: Due to file-level locking and YAML serialization, concurrent
         modifications to the same spec.yaml file will result in one operation
         overwriting the other. This is expected behavior - the file lock
         prevents corruption, but doesn't merge changes. In practice, agents
         should coordinate to avoid simultaneous modifications.
-        
+
         This test verifies that:
         1. No corruption occurs (file stays valid YAML)
         2. Retry logic handles transient file locks
@@ -165,7 +165,7 @@ class TestConcurrentVerification:
 
         # Verify that the spec file is still valid (not corrupted)
         final_spec = load_spec(root)
-        
+
         # Due to last-write-wins semantics, one of the verifications will be lost.
         # This is expected behavior when two operations modify the same file concurrently.
         # The important thing is that:
@@ -173,13 +173,13 @@ class TestConcurrentVerification:
         # 2. The file is still valid YAML
         # 3. At least one operation succeeded
         verified_count = sum(
-            1 for task in final_spec.tasks.values() 
+            1 for task in final_spec.tasks.values()
             if task.status == TaskStatus.VERIFIED
         )
-        
+
         # At least one task should be verified
         assert verified_count >= 1, "At least one task should be verified"
-        
+
         # Both should be at least DONE (one might have been overwritten back to DONE)
         assert final_spec.tasks["T001"].status in (TaskStatus.DONE, TaskStatus.VERIFIED)
         assert final_spec.tasks["T002"].status in (TaskStatus.DONE, TaskStatus.VERIFIED)
@@ -272,7 +272,7 @@ class TestConcurrentVerification:
         # Initial state: T001 is READY, T003 is TODO (blocked)
         spec = load_spec(root)
         assert spec.tasks["T003"].status == TaskStatus.TODO
-        
+
         # Mark T001 as done
         spec = load_spec(root)
         spec.tasks["T001"].status = TaskStatus.DONE
@@ -291,11 +291,11 @@ class TestConcurrentVerification:
         # But T003's status is still TODO, so it needs to transition to READY
         # In the actual system, this would be done by the spec loader's dependency resolution
         spec = load_spec(root)
-        
+
         # Update T003 to READY since its dependency is verified
         spec.tasks["T003"].status = TaskStatus.READY
         save_spec(spec, root)
-        
+
         # Now check that T003 is claimable
         spec = load_spec(root)
         claimable = spec.get_claimable_tasks()
@@ -309,7 +309,6 @@ class TestRetryLogic:
 
     def test_retry_logic_handles_transient_windows_errors(self, temp_repo):
         """Test that retry logic properly handles simulated Windows file locks."""
-        from unittest.mock import MagicMock
 
         root = temp_repo["root"]
 
@@ -383,10 +382,11 @@ class TestRetryLogic:
             error.winerror = 2
             raise error
 
-        with patch.object(Path, "replace", mock_replace_with_non_transient_error):
-            # Should fail immediately without retries
-            with pytest.raises(SpecFileAccessError):
-                save_spec(spec, root)
+        with (
+            patch.object(Path, "replace", mock_replace_with_non_transient_error),
+            pytest.raises(SpecFileAccessError),
+        ):
+            save_spec(spec, root)
 
         # Should only be called once (no retries for non-transient errors)
         assert call_count["value"] == 1
@@ -471,9 +471,9 @@ class TestStressScenarios:
 
         # Assign tasks to agents - use sequential operations to avoid race conditions
         tasks = ["T001", "T002", "T004"]
-        
+
         # Run sequentially instead of concurrently to avoid last-write-wins issues
-        for agent, task_id in zip(agents, tasks):
+        for agent, task_id in zip(agents, tasks, strict=False):
             agent_workflow(agent, task_id)
 
         # Check results

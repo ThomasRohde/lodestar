@@ -345,14 +345,14 @@ def task_next(
 
     # Get unclaimed claimable tasks
     claimable_tasks = get_unclaimed_claimable_tasks(context.spec, context.db)
-    
+
     # Apply label filter if provided
     if labels:
         claimable_tasks = [
             task for task in claimable_tasks
             if any(label in task.labels for label in labels)
         ]
-    
+
     # Apply max_priority filter if provided
     if max_priority is not None:
         claimable_tasks = [
@@ -412,7 +412,7 @@ def task_next(
         summary_parts.append(f"labels={','.join(labels)}")
     if max_priority is not None:
         summary_parts.append(f"priority<={max_priority}")
-    
+
     summary = format_summary(
         "Next",
         " ".join(summary_parts),
@@ -425,7 +425,7 @@ def task_next(
         "rationale": rationale,
         "totalClaimable": total_claimable,
     }
-    
+
     # Include filter info in metadata
     if labels or max_priority is not None:
         response_data["filters"] = {}
@@ -682,11 +682,11 @@ def register_task_tools(mcp: object, context: LodestarContext) -> None:
         Returns:
             Candidates (claimable task summaries), rationale explaining selection,
             total number of claimable tasks available, and applied filters (if any)
-            
+
         Example:
             # Get next 3 frontend tasks with priority <= 5
             lodestar_task_next(limit=3, labels=["frontend"], max_priority=5)
-            
+
             # Get any 10 high-priority tasks
             lodestar_task_next(limit=10, max_priority=3)
         """

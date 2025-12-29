@@ -1938,7 +1938,7 @@ class TestTaskNextFiltering:
         # T003: priority 3, labels=["docs"], status=TODO (depends on T001)
         # T004: priority 5, labels=["feature", "frontend"], status=READY
         # T005: priority 10, labels=["chore"], status=DELETED
-        
+
         return mcp_context
 
     def test_task_next_no_filters(self, filtered_context):
@@ -1966,7 +1966,7 @@ class TestTaskNextFiltering:
         # Should only return tasks with "frontend" label
         for candidate in data["candidates"]:
             assert "frontend" in candidate["labels"]
-        
+
         # Should have filters in response
         assert "filters" in data
         assert data["filters"]["labels"] == ["frontend"]
@@ -1996,7 +1996,7 @@ class TestTaskNextFiltering:
         # Should only return tasks with priority <= 3
         for candidate in data["candidates"]:
             assert candidate["priority"] <= 3
-        
+
         # Should have filters in response
         assert "filters" in data
         assert data["filters"]["maxPriority"] == 3
@@ -2018,7 +2018,7 @@ class TestTaskNextFiltering:
         for candidate in data["candidates"]:
             assert "feature" in candidate["labels"]
             assert candidate["priority"] <= 3
-        
+
         # Should have both filters in response
         assert "filters" in data
         assert data["filters"]["labels"] == ["feature"]
@@ -2036,7 +2036,7 @@ class TestTaskNextFiltering:
         # Should return empty candidates list
         assert len(data["candidates"]) == 0
         assert data["totalClaimable"] == 0
-        
+
         # Rationale should mention the filter
         assert "nonexistent" in data["rationale"]
 
@@ -2055,6 +2055,6 @@ class TestTaskNextFiltering:
 
         # Should return at most 1 task even if more match
         assert len(data["candidates"]) <= 1
-        
+
         # But totalClaimable shows how many matched the filter
         assert data["totalClaimable"] >= len(data["candidates"])
