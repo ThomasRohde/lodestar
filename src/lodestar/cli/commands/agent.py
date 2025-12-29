@@ -193,7 +193,7 @@ def agent_join(
 
 @app.command(name="list")
 def agent_list(
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,
@@ -287,7 +287,7 @@ def agent_find(
         "-r",
         help="Find agents with this role.",
     ),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,
@@ -453,7 +453,7 @@ def agent_brief(
         "-f",
         help="Brief format: claude (XML tags), copilot (GitHub markdown), generic (plain text).",
     ),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,

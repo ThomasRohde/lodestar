@@ -472,7 +472,7 @@ def msg_search(
         "-n",
         help="Maximum messages to return.",
     ),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,
@@ -617,7 +617,7 @@ def msg_thread(
         "-n",
         help="Maximum messages to return.",
     ),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,

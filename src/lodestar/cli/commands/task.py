@@ -100,7 +100,7 @@ def task_list(
         "--include-deleted",
         help="Include deleted tasks in the list.",
     ),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,
@@ -182,7 +182,7 @@ def task_list(
 @app.command(name="show")
 def task_show(
     task_id: str = typer.Argument(..., help="Task ID to show."),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,
@@ -256,7 +256,7 @@ def task_context(
         "-m",
         help="Maximum characters for context output.",
     ),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,
@@ -715,7 +715,7 @@ def task_update(
 @app.command(name="next")
 def task_next(
     count: int = typer.Option(1, "--count", "-n", help="Number of tasks to return."),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,
@@ -1523,7 +1523,7 @@ def task_graph(
         "-f",
         help="Output format: json, dot.",
     ),
-    agent: str | None = typer.Option(
+    _agent: str | None = typer.Option(
         None,
         "--agent",
         hidden=True,
