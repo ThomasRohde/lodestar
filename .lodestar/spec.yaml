@@ -2495,9 +2495,13 @@ tasks:
     - feature
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:07:37.767382+00:00'
-    updated_at: '2025-12-28T13:07:37.767385+00:00'
+    updated_at: '2025-12-29T04:49:37.833437+00:00'
+    completed_by: ACC24654F
+    completed_at: 2025-12-29 04:49:36.339301+00:00
+    verified_by: ACC24654F
+    verified_at: 2025-12-29 04:49:37.833460+00:00
   MCP-081:
     title: Implement lodestar_task_execute prompt template
     description: 'Add to mcp/prompts.py. Implement lodestar_task_execute prompt: asks
@@ -2510,9 +2514,13 @@ tasks:
     - feature
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:07:39.724105+00:00'
-    updated_at: '2025-12-28T13:07:39.724109+00:00'
+    updated_at: '2025-12-29T05:15:20.288858+00:00'
+    completed_by: AECE94C59
+    completed_at: 2025-12-29 05:15:07.238736+00:00
+    verified_by: AECE94C59
+    verified_at: 2025-12-29 05:15:20.288948+00:00
   MCP-090:
     title: Add unit tests for MCP tool input validation
     description: 'Create tests/test_mcp_tools.py. Add unit tests for: bad ids, bad
@@ -2571,9 +2579,13 @@ tasks:
     - test
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:08:13.474317+00:00'
-    updated_at: '2025-12-28T13:08:13.474321+00:00'
+    updated_at: '2025-12-29T05:53:38.280007+00:00'
+    completed_by: A016709FC
+    completed_at: 2025-12-29 05:53:31.557634+00:00
+    verified_by: A016709FC
+    verified_at: 2025-12-29 05:53:38.280029+00:00
   MCP-094:
     title: Test MCP server with real host (VS Code or similar)
     description: 'Test MCP server with at least one full spec host (VS Code, Visual
@@ -2644,6 +2656,79 @@ tasks:
     completed_at: 2025-12-29 04:34:23.689872+00:00
     verified_by: AAF674DE5
     verified_at: 2025-12-29 04:34:38.426658+00:00
+  MCP-TEST-1:
+    title: MCP Copilot Test Task 1
+    description: Safe test task for VS Code Copilot MCP testing
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - test
+    locks: []
+    priority: 50
+    status: verified
+    created_at: '2025-12-29T06:08:19.513174+00:00'
+    updated_at: '2025-12-29T06:45:13.133372+00:00'
+    completed_by: A1977EEDB
+    completed_at: 2025-12-29 06:44:35.587840+00:00
+    verified_by: A1977EEDB
+    verified_at: 2025-12-29 06:45:13.133396+00:00
+  MCP-TEST-2:
+    title: MCP Copilot Test Task 2
+    description: Second safe test task for coordination testing
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - test
+    locks: []
+    priority: 50
+    status: verified
+    created_at: '2025-12-29T06:08:21.268903+00:00'
+    updated_at: '2025-12-29T06:48:25.238651+00:00'
+    completed_by: A1656327B
+    completed_at: 2025-12-29 06:48:21.262965+00:00
+    verified_by: A1656327B
+    verified_at: 2025-12-29 06:48:25.238654+00:00
+  MCP-TEST-3:
+    title: MCP Copilot Test Task 3
+    description: Third safe test task for lifecycle testing
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - test
+    locks: []
+    priority: 50
+    status: ready
+    created_at: '2025-12-29T06:08:22.967380+00:00'
+    updated_at: '2025-12-29T06:08:22.967383+00:00'
+  MCP-095:
+    title: 'Fix MCP tool names: replace dots with underscores/hyphens'
+    description: VS Code rejects tool names with dots. Rename all MCP tools from lodestar.X.Y
+      to lodestar_X_Y or lodestar-X-Y format. Affects all 16 tools. Update tests and
+      documentation.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-094
+    labels:
+    - bug
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2025-12-29T06:14:26.395681+00:00'
+    updated_at: '2025-12-29T06:14:26.395684+00:00'
+  MCP-096:
+    title: Implement missing lodestar.agent.list MCP tool
+    description: Add lodestar.agent.list MCP tool to list all registered agents. Should
+      match CLI 'lodestar agent list' functionality. Include filtering options.
+    acceptance_criteria: []
+    depends_on:
+    - MCP-094
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-29T06:14:28.013560+00:00'
+    updated_at: '2025-12-29T06:14:28.013563+00:00'
 features:
   m0-skeleton:
   - F001
