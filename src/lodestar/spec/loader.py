@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from lodestar.models.spec import Project, Spec, Task, TaskStatus
 from lodestar.util.paths import get_spec_path
+from lodestar.util.retry import retry_on_windows_error
 
 
 class SpecError(Exception):
@@ -136,8 +137,11 @@ def save_spec(spec: Spec, root: Path | None = None) -> None:
             with open(temp_path, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
-            # Atomic rename
-            temp_path.replace(spec_path)
+            # Atomic rename with retry logic for Windows file system locks
+            def do_rename() -> None:
+                temp_path.replace(spec_path)
+
+            retry_on_windows_error(do_rename, max_attempts=3, base_delay_ms=50)
 
     except portalocker.LockException as e:
         raise SpecLockError(f"Failed to acquire spec lock: {e}") from e
