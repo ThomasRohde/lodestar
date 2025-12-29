@@ -49,20 +49,20 @@ def repo_status(context: LodestarContext) -> CallToolResult:
     if runtime_stats["agents"] == 0:
         suggested_actions.append(
             {
-                "action": "agent.join",
+                "action": "agent_join",
                 "description": "Register as an agent",
             }
         )
     if claimable_tasks:
         suggested_actions.append(
             {
-                "action": "task.next",
+                "action": "task_next",
                 "description": f"Get next claimable task ({len(claimable_tasks)} available)",
             }
         )
     suggested_actions.append(
         {
-            "action": "task.list",
+            "action": "task_list",
             "description": "See all tasks",
         }
     )

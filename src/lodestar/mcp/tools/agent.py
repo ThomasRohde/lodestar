@@ -76,7 +76,7 @@ def agent_join(
         "serverTime": server_time,
         "notes": [
             f"{claimable_count} tasks available to claim",
-            "Use task.next to find claimable tasks",
+            "Use task_next to find claimable tasks",
             "Remember to renew leases before they expire",
         ],
     }
