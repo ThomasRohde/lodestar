@@ -56,6 +56,9 @@ def error(
     message: str,
     error_code: str | None = None,
     details: dict[str, Any] | None = None,
+    retriable: bool = False,
+    suggested_action: str | None = None,
+    current_state: dict[str, Any] | None = None,
 ) -> CallToolResult:
     """
     Create an error tool response with structured output.
@@ -64,19 +67,26 @@ def error(
         message: Human-readable error message
         error_code: Machine-readable error code (optional)
         details: Additional error details (optional)
+        retriable: Whether this error is transient and can be retried (optional, default False)
+        suggested_action: Suggested action for recovery (optional)
+        current_state: Partial state information even on failure (optional)
 
     Returns:
         CallToolResult with error information
 
     Example:
         >>> error(
-        ...     "Task not found",
-        ...     error_code="TASK_NOT_FOUND",
-        ...     details={"task_id": "T999"}
+        ...     "File system lock detected",
+        ...     error_code="SPEC_LOCK_ERROR",
+        ...     details={"timeout": 5.0},
+        ...     retriable=True,
+        ...     suggested_action="retry_immediately",
+        ...     current_state={"task_status": "done"}
         ... )
     """
     structured_data: dict[str, Any] = {
         "error": message,
+        "retriable": retriable,
     }
 
     if error_code is not None:
@@ -84,6 +94,12 @@ def error(
 
     if details is not None:
         structured_data["details"] = details
+
+    if suggested_action is not None:
+        structured_data["suggested_action"] = suggested_action
+
+    if current_state is not None:
+        structured_data["current_state"] = current_state
 
     return CallToolResult(
         content=[TextContent(type="text", text=f"Error: {message}")],

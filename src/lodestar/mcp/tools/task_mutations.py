@@ -335,6 +335,8 @@ async def task_done(
     Returns:
         CallToolResult with success status and warnings
     """
+    from lodestar.spec import SpecError, SpecFileAccessError, SpecLockError
+
     # Log the done marking attempt
     if ctx:
         note_msg = f" ({note})" if note else ""
@@ -401,7 +403,37 @@ async def task_done(
     task.updated_at = datetime.now(UTC)
     task.completed_by = agent_id
     task.completed_at = datetime.now(UTC)
-    context.save_spec()
+
+    # Save spec with error handling
+    try:
+        context.save_spec()
+    except (SpecLockError, SpecFileAccessError) as e:
+        # Return structured error with retriable info and current state
+        if ctx:
+            await ctx.error(f"Failed to save spec: {e}")
+        return error(
+            str(e),
+            error_code=type(e).__name__.upper(),
+            details={"task_id": validated_task_id},
+            retriable=e.retriable,
+            suggested_action=e.suggested_action,
+            current_state={
+                "task_id": validated_task_id,
+                "task_status": task.status.value,
+                "operation": "task.done",
+            },
+        )
+    except SpecError as e:
+        # Handle other spec errors
+        if ctx:
+            await ctx.error(f"Spec error: {e}")
+        return error(
+            str(e),
+            error_code="SPEC_ERROR",
+            details={"task_id": validated_task_id},
+            retriable=getattr(e, "retriable", False),
+            suggested_action=getattr(e, "suggested_action", None),
+        )
 
     # Release lease if exists
     if active_lease:
@@ -476,6 +508,8 @@ async def task_verify(
     Returns:
         CallToolResult with success status and list of newly unblocked task IDs
     """
+    from lodestar.spec import SpecError, SpecFileAccessError, SpecLockError
+
     # Log the verify attempt
     if ctx:
         note_msg = f" ({note})" if note else ""
@@ -548,7 +582,37 @@ async def task_verify(
     task.updated_at = datetime.now(UTC)
     task.verified_by = agent_id
     task.verified_at = datetime.now(UTC)
-    context.save_spec()
+
+    # Save spec with error handling
+    try:
+        context.save_spec()
+    except (SpecLockError, SpecFileAccessError) as e:
+        # Return structured error with retriable info and current state
+        if ctx:
+            await ctx.error(f"Failed to save spec: {e}")
+        return error(
+            str(e),
+            error_code=type(e).__name__.upper(),
+            details={"task_id": validated_task_id},
+            retriable=e.retriable,
+            suggested_action=e.suggested_action,
+            current_state={
+                "task_id": validated_task_id,
+                "task_status": task.status.value,
+                "operation": "task.verify",
+            },
+        )
+    except SpecError as e:
+        # Handle other spec errors
+        if ctx:
+            await ctx.error(f"Spec error: {e}")
+        return error(
+            str(e),
+            error_code="SPEC_ERROR",
+            details={"task_id": validated_task_id},
+            retriable=getattr(e, "retriable", False),
+            suggested_action=getattr(e, "suggested_action", None),
+        )
 
     # Report progress: releasing lease (70%)
     if ctx and hasattr(ctx, "report_progress"):

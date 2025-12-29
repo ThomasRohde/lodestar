@@ -17,17 +17,77 @@ from lodestar.util.retry import retry_on_windows_error
 class SpecError(Exception):
     """Base exception for spec-related errors."""
 
+    def __init__(self, message: str, retriable: bool = False, suggested_action: str | None = None):
+        """Initialize SpecError with retriable flag and suggested action.
+
+        Args:
+            message: Error message
+            retriable: Whether this error is transient and can be retried
+            suggested_action: Suggested action for the user/agent
+        """
+        super().__init__(message)
+        self.retriable = retriable
+        self.suggested_action = suggested_action
+
 
 class SpecNotFoundError(SpecError):
     """Spec file not found."""
+
+    def __init__(self, message: str):
+        """Initialize SpecNotFoundError (not retriable - file doesn't exist)."""
+        super().__init__(
+            message,
+            retriable=False,
+            suggested_action="Run 'lodestar init' to initialize the repository",
+        )
 
 
 class SpecValidationError(SpecError):
     """Spec validation failed."""
 
+    def __init__(self, message: str):
+        """Initialize SpecValidationError (not retriable - spec is invalid)."""
+        super().__init__(
+            message,
+            retriable=False,
+            suggested_action="Fix the spec file or restore from backup",
+        )
+
 
 class SpecLockError(SpecError):
-    """Failed to acquire spec lock."""
+    """Failed to acquire spec lock (transient)."""
+
+    def __init__(self, message: str, timeout: float = 5.0):
+        """Initialize SpecLockError (retriable - another process has the lock).
+
+        Args:
+            message: Error message
+            timeout: Lock timeout that was attempted
+        """
+        super().__init__(
+            message,
+            retriable=True,
+            suggested_action=f"Retry immediately (lock timeout was {timeout}s)",
+        )
+        self.timeout = timeout
+
+
+class SpecFileAccessError(SpecError):
+    """File system access error (transient on Windows)."""
+
+    def __init__(self, message: str, operation: str = "file operation"):
+        """Initialize SpecFileAccessError (retriable - Windows file lock).
+
+        Args:
+            message: Error message
+            operation: The operation that failed (e.g., 'atomic rename')
+        """
+        super().__init__(
+            message,
+            retriable=True,
+            suggested_action=f"Retry immediately (transient Windows file lock during {operation})",
+        )
+        self.operation = operation
 
 
 def _parse_task(task_id: str, data: dict[str, Any]) -> Task:
@@ -114,6 +174,7 @@ def save_spec(spec: Spec, root: Path | None = None) -> None:
 
     Raises:
         SpecLockError: If the lock cannot be acquired.
+        SpecFileAccessError: If file system access fails (transient on Windows).
     """
     spec_path = get_spec_path(root)
     lock_path = spec_path.with_suffix(".lock")
@@ -141,7 +202,14 @@ def save_spec(spec: Spec, root: Path | None = None) -> None:
             def do_rename() -> None:
                 temp_path.replace(spec_path)
 
-            retry_on_windows_error(do_rename, max_attempts=3, base_delay_ms=50)
+            try:
+                retry_on_windows_error(do_rename, max_attempts=3, base_delay_ms=50)
+            except (OSError, PermissionError) as e:
+                # If retry failed, raise as SpecFileAccessError with context
+                raise SpecFileAccessError(
+                    f"Failed to save spec after retries: {e}",
+                    operation="atomic rename",
+                ) from e
 
     except portalocker.LockException as e:
         raise SpecLockError(f"Failed to acquire spec lock: {e}") from e

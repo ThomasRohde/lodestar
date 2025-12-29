@@ -2745,6 +2745,373 @@ tasks:
     completed_at: 2025-12-29 07:25:36.645760+00:00
     verified_by: A15137B88
     verified_at: 2025-12-29 07:25:45.453942+00:00
+  W001:
+    title: Add retry logic for Windows file operations
+    description: 'WHAT: Implement exponential backoff retry logic for file system
+      operations on Windows.
+
+
+      WHERE: src/lodestar/spec/loader.py (atomic save operations)
+
+
+      WHY: Windows file system has brief locks during atomic rename operations that
+      cause ''[WinError 5] Access is denied'' errors. This occurred ~5 times out of
+      12 task verifications during testing.
+
+
+      ACCEPT:
+
+      1) Atomic file operations retry up to 3 times with exponential backoff (50ms,
+      100ms, 200ms)
+
+      2) Only retry on transient file system errors (WinError 5, 32, 33)
+
+      3) Non-retriable errors fail immediately with clear message
+
+      4) All existing tests pass
+
+      5) Add Windows-specific retry test
+
+
+      CONTEXT: Error pattern in LODESTAR_MCP_FEEDBACK.md. The save_spec() function
+      in spec/loader.py does atomic rename that fails on Windows.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - bug
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2025-12-29T16:48:05.733646+00:00'
+    updated_at: '2025-12-29T16:54:33.011432+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 16:54:27.981807+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 16:54:33.011445+00:00
+  W002:
+    title: Improve error messages for file operations
+    description: 'WHAT: Distinguish between transient and permanent file system errors
+      in error messages.
+
+
+      WHERE: src/lodestar/spec/loader.py, src/lodestar/mcp/tools/
+
+
+      WHY: Current error messages don''t indicate whether an error is retriable, forcing
+      agents to guess. Better messages improve agent workflow.
+
+
+      ACCEPT:
+
+      1) Error responses include ''retriable'' boolean field where applicable
+
+      2) Transient errors (file locks) have clear ''retry immediately'' guidance
+
+      3) Permanent errors (permissions, missing files) have actionable guidance
+
+      4) MCP tool errors return structured error info with suggested_action field
+
+      5) Error message includes current task status even on failure
+
+
+      CONTEXT: See LODESTAR_MCP_FEEDBACK.md recommendation for partial status response
+      on failure.'
+    acceptance_criteria: []
+    depends_on:
+    - W001
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-29T16:48:14.277069+00:00'
+    updated_at: '2025-12-29T16:48:14.277072+00:00'
+  W003:
+    title: Normalize Windows paths in error messages
+    description: 'WHAT: Ensure all file paths in error messages use platform-appropriate
+      separators.
+
+
+      WHERE: src/lodestar/spec/loader.py, src/lodestar/util/paths.py, src/lodestar/mcp/
+
+
+      WHY: Some error messages show Unix-style paths even on Windows, which is confusing
+      for users.
+
+
+      ACCEPT:
+
+      1) All error messages use os.path.normpath() or pathlib.Path for paths
+
+      2) Paths are consistent with the platform''s native format
+
+      3) Add test verifying path format in error messages on Windows
+
+      4) No breaking changes to existing functionality
+
+
+      CONTEXT: LODESTAR_MCP_FEEDBACK.md ''Better Windows Path Handling'' section.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - bug
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2025-12-29T16:48:21.329666+00:00'
+    updated_at: '2025-12-29T16:48:21.329668+00:00'
+  F050:
+    title: Add combined task_complete MCP tool
+    description: 'WHAT: Add a new MCP tool that combines task_done + task_verify in
+      a single atomic operation.
+
+
+      WHERE: src/lodestar/mcp/tools/
+
+
+      WHY: If an agent crashes between done and verify, the task remains in ''done''
+      state indefinitely. A combined operation prevents this failure mode.
+
+
+      ACCEPT:
+
+      1) New lodestar_task_complete tool that marks task done AND verified atomically
+
+      2) Both operations succeed or neither does (transactional)
+
+      3) Returns list of unblocked dependent tasks (same as verify)
+
+      4) Tool is documented in MCP docs
+
+      5) Integration test covering crash-recovery scenario
+
+
+      CONTEXT: LODESTAR_MCP_FEEDBACK.md ''No Atomic Transaction Support'' section.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-29T16:48:29.990677+00:00'
+    updated_at: '2025-12-29T16:48:29.990680+00:00'
+  F051:
+    title: Add batch verification MCP tool
+    description: 'WHAT: Add a new MCP tool for verifying multiple tasks in a single
+      operation.
+
+
+      WHERE: src/lodestar/mcp/tools/
+
+
+      WHY: When completing multiple independent tasks in sequence, batch operations
+      reduce round-trips and improve efficiency.
+
+
+      ACCEPT:
+
+      1) New lodestar_task_batch_verify tool accepting array of task_ids
+
+      2) Returns summary of successes and failures for each task
+
+      3) Partial success is allowed (some tasks may fail)
+
+      4) All dependent task unblocking happens correctly
+
+      5) Integration test with 3+ tasks
+
+
+      CONTEXT: LODESTAR_MCP_FEEDBACK.md ''Bulk Operations'' feature request.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 4
+    status: ready
+    created_at: '2025-12-29T16:48:37.631726+00:00'
+    updated_at: '2025-12-29T16:48:37.631728+00:00'
+  F052:
+    title: Add label/priority filtering to task_next
+    description: 'WHAT: Add optional filtering parameters to the task_next MCP tool.
+
+
+      WHERE: src/lodestar/mcp/tools/task.py
+
+
+      WHY: Agents may want to focus on specific types of work (e.g., only frontend
+      tasks) or skip low-priority items.
+
+
+      ACCEPT:
+
+      1) task_next accepts optional ''labels'' array parameter
+
+      2) task_next accepts optional ''max_priority'' integer parameter
+
+      3) Filtering is applied before returning candidates
+
+      4) Documentation updated with new parameters
+
+      5) Unit tests for filtering logic
+
+
+      CONTEXT: LODESTAR_MCP_FEEDBACK.md ''Task Filtering Enhancement'' feature request.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 5
+    status: ready
+    created_at: '2025-12-29T16:48:45.756571+00:00'
+    updated_at: '2025-12-29T16:48:45.756574+00:00'
+  T010:
+    title: Add concurrent verification tests
+    description: 'WHAT: Add tests for concurrent task operations to catch file locking
+      issues.
+
+
+      WHERE: tests/
+
+
+      WHY: Race conditions during concurrent verification were discovered during Windows
+      testing. Need automated tests to prevent regression.
+
+
+      ACCEPT:
+
+      1) Test: Two agents verify different tasks simultaneously
+
+      2) Test: Simulate file locks and verify retry logic works
+
+      3) Test: Back-to-back done->verify on same task
+
+      4) All tests pass on Windows and Linux
+
+      5) Tests use threading or asyncio for true concurrency
+
+
+      CONTEXT: LODESTAR_MCP_FEEDBACK.md ''Testing Recommendations'' section.'
+    acceptance_criteria: []
+    depends_on:
+    - W001
+    labels:
+    - test
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-29T16:48:54.648379+00:00'
+    updated_at: '2025-12-29T16:48:54.648382+00:00'
+  T011:
+    title: Add Windows CI workflow
+    description: 'WHAT: Add Windows-specific GitHub Actions CI workflow.
+
+
+      WHERE: .github/workflows/
+
+
+      WHY: File system race conditions on Windows are not caught by Linux-only CI.
+      Need Windows CI to prevent regression.
+
+
+      ACCEPT:
+
+      1) GitHub Actions workflow runs tests on windows-latest
+
+      2) Workflow triggers on push and PR to main
+
+      3) Uses same Python version as Linux CI
+
+      4) All tests pass on Windows
+
+      5) Workflow completes in reasonable time (<10 min)
+
+
+      CONTEXT: LODESTAR_MCP_FEEDBACK.md ''Testing Recommendations'' section.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - test
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2025-12-29T16:49:01.978306+00:00'
+    updated_at: '2025-12-29T16:49:01.978309+00:00'
+  D030:
+    title: Document MCP error handling patterns
+    description: 'WHAT: Add error handling documentation to MCP docs.
+
+
+      WHERE: docs/mcp.md or new docs/guides/error-handling.md
+
+
+      WHY: Users need to know which errors are retriable vs permanent, and how to
+      handle them in agent code.
+
+
+      ACCEPT:
+
+      1) List of retriable vs. non-retriable error types
+
+      2) Recommended retry strategies with code examples
+
+      3) Example error handling code for common scenarios
+
+      4) Linked from main MCP documentation page
+
+      5) Tested code examples
+
+
+      CONTEXT: LODESTAR_MCP_FEEDBACK.md ''Documentation Improvements'' section.'
+    acceptance_criteria: []
+    depends_on:
+    - W001
+    - W002
+    labels:
+    - docs
+    locks: []
+    priority: 4
+    status: ready
+    created_at: '2025-12-29T16:49:21.941053+00:00'
+    updated_at: '2025-12-29T16:49:21.941056+00:00'
+  D031:
+    title: Add Windows-specific notes to documentation
+    description: 'WHAT: Add Windows-specific guidance and caveats to documentation.
+
+
+      WHERE: docs/getting-started.md, docs/mcp.md
+
+
+      WHY: Windows users may encounter file locking issues and need to know mitigation
+      strategies.
+
+
+      ACCEPT:
+
+      1) Warning about potential file locking on Windows
+
+      2) Mitigation strategies documented
+
+      3) Any Windows-specific configuration noted
+
+      4) Performance characteristics section added
+
+      5) Expected operation times documented
+
+
+      CONTEXT: LODESTAR_MCP_FEEDBACK.md ''Documentation Improvements'' section.'
+    acceptance_criteria: []
+    depends_on:
+    - W001
+    labels:
+    - docs
+    locks: []
+    priority: 5
+    status: ready
+    created_at: '2025-12-29T16:49:28.535697+00:00'
+    updated_at: '2025-12-29T16:49:28.535701+00:00'
 features:
   m0-skeleton:
   - F001
