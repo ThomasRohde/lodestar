@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -161,7 +162,7 @@ def init_command(
 
 def _show_explain(json_output: bool) -> None:
     """Show command explanation."""
-    explanation = {
+    explanation: dict[str, Any] = {
         "command": "lodestar init",
         "purpose": "Initialize a new Lodestar repository for multi-agent coordination.",
         "creates": [
