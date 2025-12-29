@@ -29,6 +29,7 @@ When multiple agents work in the same repository, chaos ensues: duplicate work, 
 - **Self-Documenting CLI**: Every command supports `--json`, `--schema`, and `--explain` flags for programmatic access
 - **Progressive Discovery**: No-args commands suggest next actions to guide workflows
 - **Agent Messaging**: Built-in inter-agent communication for handoffs and coordination
+- **MCP Server Integration**: Expose Lodestar as an MCP server for seamless integration with AI assistants like Claude Desktop
 
 ## Installation
 
@@ -102,6 +103,102 @@ lodestar status
 ```
 
 For development/testing, use `uv run lodestar` instead of `lodestar` to run from source.
+
+## MCP Server Integration
+
+Lodestar can be exposed as an MCP (Model Context Protocol) server, allowing AI assistants like Claude Desktop to interact with your Lodestar repository through standardized tools.
+
+### Installing MCP Dependencies
+
+The MCP server functionality requires additional dependencies. Install them using:
+
+```bash
+# Using uv tool (recommended for global installation)
+uv tool install 'lodestar-cli[mcp]'
+
+# Or upgrade if already installed
+uv tool upgrade 'lodestar-cli[mcp]'
+
+# Using uv in a project
+uv add 'lodestar-cli[mcp]'
+
+# Using pip
+pip install 'lodestar-cli[mcp]'
+
+# Using pipx (alternative global installation)
+pipx install 'lodestar-cli[mcp]'
+
+# For development
+uv sync --extra mcp
+```
+
+### Starting the MCP Server
+
+Run the MCP server from within a Lodestar repository:
+
+```bash
+# Auto-discover repository from current directory
+lodestar mcp serve
+
+# Specify repository path explicitly
+lodestar mcp serve --repo /path/to/repository
+
+# Enable logging to file
+lodestar mcp serve --log-file mcp.log
+
+# Use JSON-formatted logs
+lodestar mcp serve --log-file mcp.log --json-logs
+```
+
+The server uses stdio transport by default, making it compatible with MCP clients like Claude Desktop.
+
+### Configuring with Claude Desktop
+
+Add Lodestar as an MCP server in Claude Desktop's configuration file:
+
+**macOS/Linux:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "lodestar": {
+      "command": "lodestar",
+      "args": ["mcp", "serve", "--repo", "/absolute/path/to/your/repository"],
+      "env": {}
+    }
+  }
+}
+```
+
+If you installed Lodestar with `uv` in a project, use:
+
+```json
+{
+  "mcpServers": {
+    "lodestar": {
+      "command": "uv",
+      "args": ["run", "lodestar", "mcp", "serve", "--repo", "/absolute/path/to/your/repository"],
+      "env": {}
+    }
+  }
+}
+```
+
+After updating the configuration, restart Claude Desktop. The Lodestar tools will be available for Claude to use when working with your repository.
+
+### Available MCP Tools
+
+When connected, Claude can use Lodestar tools to:
+- List and query tasks
+- Create and update tasks
+- Claim and release tasks
+- Mark tasks as done or verified
+- Send messages between agents
+- View dependency graphs
+- And more...
+
+All Lodestar CLI functionality is exposed through the MCP interface.
 
 ## Architecture Overview
 

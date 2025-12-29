@@ -2598,9 +2598,13 @@ tasks:
     - test
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:08:15.506660+00:00'
-    updated_at: '2025-12-28T13:08:15.506664+00:00'
+    updated_at: '2025-12-29T07:21:22.609196+00:00'
+    completed_by: A15137B88
+    completed_at: 2025-12-29 07:21:13.950728+00:00
+    verified_by: A15137B88
+    verified_at: 2025-12-29 07:21:22.609211+00:00
   MCP-008:
     title: Implement structured output helpers for MCP tools
     description: 'Create mcp/output.py with helpers for structured tool responses.
@@ -2697,9 +2701,13 @@ tasks:
     - test
     locks: []
     priority: 50
-    status: ready
+    status: verified
     created_at: '2025-12-29T06:08:22.967380+00:00'
-    updated_at: '2025-12-29T06:08:22.967383+00:00'
+    updated_at: '2025-12-29T07:26:53.317666+00:00'
+    completed_by: A15137B88
+    completed_at: 2025-12-29 07:26:47.881940+00:00
+    verified_by: A15137B88
+    verified_at: 2025-12-29 07:26:53.317681+00:00
   MCP-095:
     title: 'Fix MCP tool names: replace dots with underscores/hyphens'
     description: VS Code rejects tool names with dots. Rename all MCP tools from lodestar.X.Y
@@ -2712,9 +2720,13 @@ tasks:
     - bug
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2025-12-29T06:14:26.395681+00:00'
-    updated_at: '2025-12-29T06:14:26.395684+00:00'
+    updated_at: '2025-12-29T07:22:40.683553+00:00'
+    completed_by: A15137B88
+    completed_at: 2025-12-29 07:22:35.638499+00:00
+    verified_by: A15137B88
+    verified_at: 2025-12-29 07:22:40.683568+00:00
   MCP-096:
     title: Implement missing lodestar.agent.list MCP tool
     description: Add lodestar.agent.list MCP tool to list all registered agents. Should
@@ -2726,9 +2738,13 @@ tasks:
     - feature
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-29T06:14:28.013560+00:00'
-    updated_at: '2025-12-29T06:14:28.013563+00:00'
+    updated_at: '2025-12-29T07:25:45.453927+00:00'
+    completed_by: A15137B88
+    completed_at: 2025-12-29 07:25:36.645760+00:00
+    verified_by: A15137B88
+    verified_at: 2025-12-29 07:25:45.453942+00:00
 features:
   m0-skeleton:
   - F001
