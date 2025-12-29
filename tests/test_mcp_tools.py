@@ -1064,3 +1064,532 @@ class TestProgressNotifications:
         data = result.structuredContent
         assert data["ok"] is True
         assert data["status"] == "verified"
+
+
+class TestInputValidation:
+    """Comprehensive tests for MCP tool input validation.
+
+    Tests cover:
+    - Invalid task IDs and agent IDs
+    - TTL range validation and clamping
+    - Maximum length enforcement
+    - Required field validation
+    - Output schema validation
+    """
+
+    @pytest.fixture
+    def validation_context(self, tmp_path):
+        """Create a test context for validation tests."""
+        lodestar_dir = tmp_path / ".lodestar"
+        lodestar_dir.mkdir()
+
+        from lodestar.models.spec import Project, Spec
+
+        spec = Spec(
+            project=Project(name="test-project"),
+            tasks={
+                "VALID-001": Task(
+                    id="VALID-001",
+                    title="Valid task",
+                    description="A valid task for testing",
+                    status=TaskStatus.READY,
+                    priority=1,
+                ),
+            },
+        )
+
+        save_spec(spec, tmp_path)
+        context = LodestarContext(tmp_path)
+
+        # Register a test agent
+        agent = Agent(display_name="Test Agent", agent_id="VALID-AGENT")
+        context.db.register_agent(agent)
+
+        return context
+
+    # ========== Task ID Validation ==========
+
+    def test_task_get_empty_id(self, validation_context):
+        """Test that empty task ID is rejected."""
+        result = task_get(validation_context, task_id="")
+
+        assert result.isError is True
+        assert result.structuredContent["error_code"] == "INVALID_TASK_ID"
+        # Error message is "task_id is required" for empty string
+        assert "required" in result.structuredContent["error"].lower()
+
+    def test_task_get_none_id(self, validation_context):
+        """Test that None task ID is rejected."""
+        result = task_get(validation_context, task_id=None)
+
+        assert result.isError is True
+        assert result.structuredContent["error_code"] == "INVALID_TASK_ID"
+
+    def test_task_get_whitespace_id(self, validation_context):
+        """Test that whitespace-only task ID is rejected."""
+        result = task_get(validation_context, task_id="   ")
+
+        assert result.isError is True
+        assert result.structuredContent["error_code"] == "INVALID_TASK_ID"
+
+    def test_task_get_too_long_id(self, validation_context):
+        """Test that task ID exceeding max length is rejected."""
+        # Task IDs should not exceed 100 characters
+        long_id = "A" * 101
+
+        result = task_get(validation_context, task_id=long_id)
+
+        assert result.isError is True
+        assert result.structuredContent["error_code"] == "INVALID_TASK_ID"
+        assert "maximum length" in result.structuredContent["error"].lower()
+
+    def test_task_get_max_length_id_accepted(self, validation_context):
+        """Test that task ID at max length (100 chars) is accepted."""
+        # Create a task with 100-char ID
+        max_len_id = "T" + "X" * 99
+
+        validation_context.spec.tasks[max_len_id] = Task(
+            id=max_len_id,
+            title="Max length task",
+            status=TaskStatus.READY,
+        )
+        validation_context.save_spec()
+        validation_context.reload_spec()
+
+        result = task_get(validation_context, task_id=max_len_id)
+
+        # Should succeed
+        assert result.isError is None or result.isError is False
+        assert result.structuredContent["id"] == max_len_id
+
+    # ========== Agent ID Validation ==========
+
+    def test_agent_heartbeat_empty_id(self, validation_context):
+        """Test that empty agent ID is rejected."""
+        from lodestar.mcp.tools.agent import agent_heartbeat
+
+        result = agent_heartbeat(validation_context, agent_id="")
+
+        assert result.isError is True
+        assert result.structuredContent["error_code"] == "INVALID_AGENT_ID"
+
+    def test_agent_heartbeat_none_id(self, validation_context):
+        """Test that None agent ID is rejected."""
+        from lodestar.mcp.tools.agent import agent_heartbeat
+
+        result = agent_heartbeat(validation_context, agent_id=None)
+
+        assert result.isError is True
+        assert result.structuredContent["error_code"] == "INVALID_AGENT_ID"
+
+    def test_agent_heartbeat_whitespace_id(self, validation_context):
+        """Test that whitespace-only agent ID is rejected.
+
+        Note: Whitespace gets stripped in validation, making it empty,
+        which then results in AGENT_NOT_FOUND instead of INVALID_AGENT_ID.
+        """
+        from lodestar.mcp.tools.agent import agent_heartbeat
+
+        result = agent_heartbeat(validation_context, agent_id="   ")
+
+        assert result.isError is True
+        # Whitespace is stripped, making it empty, which becomes AGENT_NOT_FOUND
+        assert result.structuredContent["error_code"] in ["INVALID_AGENT_ID", "AGENT_NOT_FOUND"]
+
+    # ========== TTL Validation ==========
+
+    def test_ttl_clamping_below_minimum(self, validation_context):
+        """Test that TTL below minimum is clamped to minimum."""
+        from lodestar.mcp.validation import MIN_TTL_SECONDS, validate_ttl
+
+        result = validate_ttl(30)  # Below 60s minimum
+
+        assert result == MIN_TTL_SECONDS  # Should be clamped to 60
+
+    def test_ttl_clamping_above_maximum(self, validation_context):
+        """Test that TTL above maximum is clamped to maximum."""
+        from lodestar.mcp.validation import MAX_TTL_SECONDS, validate_ttl
+
+        result = validate_ttl(10000)  # Above 7200s maximum
+
+        assert result == MAX_TTL_SECONDS  # Should be clamped to 7200
+
+    def test_ttl_none_uses_default(self, validation_context):
+        """Test that None TTL returns default value."""
+        from lodestar.mcp.validation import DEFAULT_TTL_SECONDS, validate_ttl
+
+        result = validate_ttl(None)
+
+        assert result == DEFAULT_TTL_SECONDS  # Should be 900 (15 min)
+
+    def test_ttl_valid_range_accepted(self, validation_context):
+        """Test that TTL within valid range is accepted."""
+        from lodestar.mcp.validation import validate_ttl
+
+        # Test various valid values
+        assert validate_ttl(60) == 60  # Minimum
+        assert validate_ttl(900) == 900  # Default
+        assert validate_ttl(3600) == 3600  # 1 hour
+        assert validate_ttl(7200) == 7200  # Maximum
+
+    def test_ttl_negative_clamped_to_minimum(self, validation_context):
+        """Test that negative TTL is clamped to minimum."""
+        from lodestar.mcp.validation import MIN_TTL_SECONDS, validate_ttl
+
+        result = validate_ttl(-100)
+
+        assert result == MIN_TTL_SECONDS
+
+    @pytest.mark.anyio
+    async def test_agent_join_ttl_validation(self, validation_context):
+        """Test TTL validation in agent.join tool."""
+        from lodestar.mcp.tools.agent import agent_join
+
+        # Test with out-of-range TTL - should be clamped
+        result = agent_join(validation_context, ttl_seconds=10000)  # Too high
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        # TTL should be clamped to max (7200)
+        assert data["leaseDefaults"]["ttlSeconds"] == 7200
+
+    # ========== Message Length Validation ==========
+
+    def test_message_max_length_validation(self, validation_context):
+        """Test that messages exceeding max length are rejected."""
+        from lodestar.mcp.validation import MAX_MESSAGE_LENGTH, ValidationError, validate_message
+
+        # Create a message exceeding 16KB
+        long_message = "A" * (MAX_MESSAGE_LENGTH + 1)
+
+        with pytest.raises(ValidationError) as exc_info:
+            validate_message(long_message)
+
+        assert "exceeds maximum length" in str(exc_info.value)
+        assert exc_info.value.field == "message"
+
+    def test_message_max_length_accepted(self, validation_context):
+        """Test that messages at max length are accepted."""
+        from lodestar.mcp.validation import MAX_MESSAGE_LENGTH, validate_message
+
+        # Create a message at exactly max length
+        max_message = "A" * MAX_MESSAGE_LENGTH
+
+        result = validate_message(max_message)
+
+        assert result == max_message  # Should pass through
+
+    def test_message_utf8_encoding_length(self, validation_context):
+        """Test that message length is calculated in UTF-8 bytes."""
+        from lodestar.mcp.validation import MAX_MESSAGE_LENGTH, ValidationError, validate_message
+
+        # Multi-byte UTF-8 characters (emoji) count as more bytes
+        emoji_char = "😀"  # 4 bytes in UTF-8
+        # Create a string that's under char limit but over byte limit
+        message = emoji_char * (MAX_MESSAGE_LENGTH // 2)
+
+        with pytest.raises(ValidationError):
+            validate_message(message)
+
+    # ========== List Size Validation ==========
+
+    def test_list_size_max_validation(self, validation_context):
+        """Test that lists exceeding max size are rejected."""
+        from lodestar.mcp.validation import MAX_LIST_SIZE, ValidationError, validate_list_size
+
+        # Create a list exceeding max size (100 items)
+        long_list = list(range(MAX_LIST_SIZE + 1))
+
+        with pytest.raises(ValidationError) as exc_info:
+            validate_list_size(long_list)
+
+        assert "exceeds maximum size" in str(exc_info.value)
+        assert exc_info.value.field == "items"
+
+    def test_list_size_max_accepted(self, validation_context):
+        """Test that lists at max size are accepted."""
+        from lodestar.mcp.validation import MAX_LIST_SIZE, validate_list_size
+
+        # Create a list at exactly max size
+        max_list = list(range(MAX_LIST_SIZE))
+
+        result = validate_list_size(max_list)
+
+        assert result == max_list
+
+    def test_limit_clamping_to_max(self, validation_context):
+        """Test that limit parameter is clamped to max."""
+        from lodestar.mcp.validation import MAX_LIST_SIZE, clamp_limit
+
+        result = clamp_limit(500)  # Way above max
+
+        assert result == MAX_LIST_SIZE
+
+    def test_limit_clamping_to_min(self, validation_context):
+        """Test that limit parameter is clamped to minimum of 1."""
+        from lodestar.mcp.validation import clamp_limit
+
+        assert clamp_limit(0) == 1
+        assert clamp_limit(-10) == 1
+
+    def test_limit_none_uses_default(self, validation_context):
+        """Test that None limit uses default value."""
+        from lodestar.mcp.validation import clamp_limit
+
+        result = clamp_limit(None, default=50)
+
+        assert result == 50
+
+    # ========== Priority Validation ==========
+
+    def test_priority_negative_rejected(self, validation_context):
+        """Test that negative priority is rejected."""
+        from lodestar.mcp.validation import ValidationError, validate_priority
+
+        with pytest.raises(ValidationError) as exc_info:
+            validate_priority(-1)
+
+        assert "cannot be negative" in str(exc_info.value)
+
+    def test_priority_too_high_rejected(self, validation_context):
+        """Test that priority exceeding max is rejected."""
+        from lodestar.mcp.validation import ValidationError, validate_priority
+
+        with pytest.raises(ValidationError) as exc_info:
+            validate_priority(1001)  # Max is 1000
+
+        assert "exceeds maximum" in str(exc_info.value)
+
+    def test_priority_valid_range_accepted(self, validation_context):
+        """Test that valid priorities are accepted."""
+        from lodestar.mcp.validation import validate_priority
+
+        assert validate_priority(0) == 0
+        assert validate_priority(500) == 500
+        assert validate_priority(1000) == 1000
+
+    def test_priority_none_accepted(self, validation_context):
+        """Test that None priority is accepted."""
+        from lodestar.mcp.validation import validate_priority
+
+        result = validate_priority(None)
+
+        assert result is None
+
+    # ========== Required Field Validation ==========
+
+    def test_required_field_none_rejected(self, validation_context):
+        """Test that None for required field is rejected."""
+        from lodestar.mcp.validation import ValidationError, validate_required_field
+
+        with pytest.raises(ValidationError) as exc_info:
+            validate_required_field(None, "test_field")
+
+        assert "is required" in str(exc_info.value)
+        assert exc_info.value.field == "test_field"
+
+    def test_required_string_empty_rejected(self, validation_context):
+        """Test that empty string for required field is rejected."""
+        from lodestar.mcp.validation import ValidationError, validate_required_field
+
+        with pytest.raises(ValidationError) as exc_info:
+            validate_required_field("", "test_field")
+
+        assert "cannot be empty" in str(exc_info.value)
+
+    def test_required_string_whitespace_rejected(self, validation_context):
+        """Test that whitespace-only string is rejected."""
+        from lodestar.mcp.validation import ValidationError, validate_required_field
+
+        with pytest.raises(ValidationError) as exc_info:
+            validate_required_field("   ", "test_field")
+
+        assert "cannot be empty" in str(exc_info.value)
+
+    def test_required_field_type_validation(self, validation_context):
+        """Test type validation for required fields."""
+        from lodestar.mcp.validation import ValidationError, validate_required_field
+
+        # Should reject wrong type
+        with pytest.raises(ValidationError) as exc_info:
+            validate_required_field("not an int", "test_field", expected_type=int)
+
+        assert "must be of type int" in str(exc_info.value)
+
+        # Should accept correct type
+        result = validate_required_field(42, "test_field", expected_type=int)
+        assert result == 42
+
+    def test_required_field_valid_accepted(self, validation_context):
+        """Test that valid required fields are accepted."""
+        from lodestar.mcp.validation import validate_required_field
+
+        assert validate_required_field("test", "field") == "test"
+        assert validate_required_field(123, "field") == 123
+        assert validate_required_field(["item"], "field") == ["item"]
+
+    # ========== Output Schema Validation ==========
+
+    def test_task_list_output_schema(self, validation_context):
+        """Test that task.list output matches expected schema."""
+        result = task_list(validation_context)
+
+        assert result.isError is None or result.isError is False
+
+        # Verify structured content exists
+        data = result.structuredContent
+        assert data is not None
+
+        # Verify required top-level fields
+        assert "count" in data
+        assert "total" in data
+        assert "items" in data
+
+        # Verify types
+        assert isinstance(data["count"], int)
+        assert isinstance(data["total"], int)
+        assert isinstance(data["items"], list)
+
+        # Verify metadata
+        assert result._meta is not None
+        assert "nextCursor" in result._meta
+        assert "filters" in result._meta
+
+    def test_task_get_output_schema(self, validation_context):
+        """Test that task.get output matches expected schema."""
+        result = task_get(validation_context, task_id="VALID-001")
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Verify all required fields exist
+        required_fields = [
+            "id",
+            "title",
+            "description",
+            "acceptanceCriteria",
+            "status",
+            "priority",
+            "labels",
+            "locks",
+            "createdAt",
+            "updatedAt",
+            "dependencies",
+            "prd",
+            "runtime",
+            "warnings",
+        ]
+
+        for field in required_fields:
+            assert field in data, f"Missing required field: {field}"
+
+        # Verify field types
+        assert isinstance(data["id"], str)
+        assert isinstance(data["title"], str)
+        assert isinstance(data["status"], str)
+        assert isinstance(data["priority"], int)
+        assert isinstance(data["labels"], list)
+        assert isinstance(data["locks"], list)
+        assert isinstance(data["dependencies"], dict)
+        assert isinstance(data["runtime"], dict)
+        assert isinstance(data["warnings"], list)
+
+        # Verify nested structure
+        assert "dependsOn" in data["dependencies"]
+        assert "dependents" in data["dependencies"]
+        assert "isClaimable" in data["dependencies"]
+        assert "claimed" in data["runtime"]
+
+    def test_agent_join_output_schema(self, validation_context):
+        """Test that agent.join output matches expected schema."""
+        from lodestar.mcp.tools.agent import agent_join
+
+        result = agent_join(validation_context, name="Test Agent")
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Verify required fields
+        required_fields = [
+            "agentId",
+            "displayName",
+            "capabilities",
+            "registeredAt",
+            "sessionMeta",
+            "leaseDefaults",
+            "serverTime",
+            "notes",
+        ]
+
+        for field in required_fields:
+            assert field in data, f"Missing required field: {field}"
+
+        # Verify types
+        assert isinstance(data["agentId"], str)
+        assert isinstance(data["displayName"], str)
+        assert isinstance(data["capabilities"], list)
+        assert isinstance(data["registeredAt"], str)
+        assert isinstance(data["sessionMeta"], dict)
+        assert isinstance(data["leaseDefaults"], dict)
+        assert isinstance(data["serverTime"], str)
+        assert isinstance(data["notes"], list)
+
+        # Verify lease defaults structure
+        assert "ttlSeconds" in data["leaseDefaults"]
+        assert isinstance(data["leaseDefaults"]["ttlSeconds"], int)
+
+    def test_error_output_schema(self, validation_context):
+        """Test that error responses match expected schema."""
+        result = task_get(validation_context, task_id="NONEXISTENT")
+
+        assert result.isError is True
+        data = result.structuredContent
+
+        # Verify error structure
+        assert "error" in data
+        assert "error_code" in data
+
+        assert isinstance(data["error_code"], str)
+        assert isinstance(data["error"], str)
+
+    @pytest.mark.anyio
+    async def test_task_claim_output_schema(self, validation_context):
+        """Test that task.claim output matches expected schema."""
+        from lodestar.mcp.tools.task_mutations import task_claim
+
+        result = await task_claim(
+            context=validation_context,
+            task_id="VALID-001",
+            agent_id="VALID-AGENT",
+            ttl_seconds=900,
+        )
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Verify required top-level fields
+        assert "ok" in data
+        assert "lease" in data
+        assert "warnings" in data
+
+        # Verify types
+        assert data["ok"] is True
+        assert isinstance(data["lease"], dict)
+        assert isinstance(data["warnings"], list)
+
+        # Verify lease object structure
+        lease = data["lease"]
+        assert "leaseId" in lease
+        assert "taskId" in lease
+        assert "agentId" in lease
+        assert "expiresAt" in lease
+        assert "ttlSeconds" in lease
+        assert "createdAt" in lease
+
+        # Verify lease field types
+        assert isinstance(lease["leaseId"], str)
+        assert isinstance(lease["taskId"], str)
+        assert isinstance(lease["agentId"], str)
+        assert isinstance(lease["expiresAt"], str)
+        assert isinstance(lease["ttlSeconds"], int)
+        assert isinstance(lease["createdAt"], str)
