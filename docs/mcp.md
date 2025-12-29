@@ -132,6 +132,27 @@ Replace `/absolute/path/to/your/repo` with the actual path to your Lodestar-init
 !!! warning "Use absolute paths"
     Claude Desktop launches servers from an unpredictable working directory. Always use `--repo` with an absolute path.
 
+!!! note "Windows Path Format"
+    On Windows, use either forward slashes or escaped backslashes in paths:
+    
+    **Forward slashes (recommended):**
+    ```json
+    "args": ["mcp", "serve", "--repo", "C:/Users/YourName/Projects/my-repo"]
+    ```
+    
+    **Escaped backslashes:**
+    ```json
+    "args": ["mcp", "serve", "--repo", "C:\\Users\\YourName\\Projects\\my-repo"]
+    ```
+    
+    For UV users on Windows:
+    ```json
+    {
+      "command": "uv",
+      "args": ["run", "lodestar", "mcp", "serve", "--repo", "C:/Users/YourName/Projects/my-repo"]
+    }
+    ```
+
 ### Other MCP Hosts
 
 Any MCP-compatible host that supports stdio transport can connect to Lodestar. The server:

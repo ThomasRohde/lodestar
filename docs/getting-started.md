@@ -7,6 +7,15 @@ This guide walks you through installing Lodestar and completing your first task 
 - Python 3.12 or later
 - Git repository (Lodestar works within Git repos)
 
+!!! note "Windows Users"
+    Windows file system behavior differs from Linux/macOS in ways that affect Lodestar:
+    
+    - **File locking**: Windows may briefly lock files during save operations (~20-40% of operations)
+    - **Performance**: File operations are typically 2-3x slower than on Linux/macOS
+    - **Antivirus**: Windows Defender or other antivirus software may cause additional file locks
+    
+    Lodestar v0.2.0+ includes automatic retry logic for these transient errors. Most operations succeed within 1-2 retries.
+
 ## Installation
 
 Lodestar is available on PyPI as `lodestar-cli`:
@@ -190,6 +199,36 @@ Now that you've completed your first task, explore these resources:
 - **[PRD Context Delivery](concepts/prd-context.md)** - How tasks carry product intent from PRDs
 - **[CLI Reference](cli/index.md)** - Complete documentation of all commands
 - **[Agent Workflow Guide](guides/agent-workflow.md)** - Best practices for working as an agent
+- **[Error Handling Guide](guides/error-handling.md)** - How to handle errors and retries (important for Windows users)
+
+## Performance Characteristics
+
+Expected operation times for common tasks:
+
+| Operation | Linux/macOS | Windows | Notes |
+|-----------|-------------|---------|-------|
+| `task claim` | 50-100ms | 100-300ms | Includes spec lock + DB write |
+| `task done` | 50-150ms | 150-500ms | Spec save with atomic rename |
+| `task verify` | 100-200ms | 200-600ms | Updates spec + checks dependencies |
+| `task list` | 10-50ms | 20-100ms | Read-only operation |
+| `task create` | 100-200ms | 200-500ms | Spec validation + save |
+
+**Windows Performance Tips:**
+
+- Run from local drive (not network share) for best performance
+- Disable real-time antivirus scanning for `.lodestar/` directory if possible
+- SSD storage provides significant improvement over HDD
+- Concurrent operations may trigger file locks - use retry logic (see [Error Handling Guide](guides/error-handling.md))
+
+**Network File Systems (NFS/SMB):**
+
+Lodestar is designed for local file systems. Network file systems may have:
+
+- Stale lock files
+- Higher latency
+- Inconsistent file locking behavior
+
+For best results, clone your repository locally rather than working on a network share.
 
 ## Advanced: Tasks with PRD Context
 
