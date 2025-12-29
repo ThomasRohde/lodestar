@@ -70,6 +70,7 @@ nav:
       - Agent Commands: cli/agent.md
       - Task Commands: cli/task.md
       - Message Commands: cli/msg.md
+      - MCP Server: mcp.md
       - Other Commands: cli/other.md
   - Guides:
       - guides/index.md
