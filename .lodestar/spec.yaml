@@ -2901,9 +2901,13 @@ tasks:
     - feature
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:48:29.990677+00:00'
-    updated_at: '2025-12-29T16:48:29.990680+00:00'
+    updated_at: '2025-12-29T17:21:33.058528+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 17:21:28.902176+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 17:21:33.058544+00:00
   F051:
     title: Add batch verification MCP tool
     description: 'WHAT: Add a new MCP tool for verifying multiple tasks in a single
@@ -3009,9 +3013,13 @@ tasks:
     - test
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2025-12-29T16:48:54.648379+00:00'
-    updated_at: '2025-12-29T16:48:54.648382+00:00'
+    updated_at: '2025-12-29T17:48:39.976757+00:00'
+    completed_by: AEB8F7DF9
+    completed_at: 2025-12-29 17:48:35.613755+00:00
+    verified_by: AEB8F7DF9
+    verified_at: 2025-12-29 17:48:39.976774+00:00
   T011:
     title: Add Windows CI workflow
     description: 'WHAT: Add Windows-specific GitHub Actions CI workflow.
