@@ -937,6 +937,241 @@ async def task_complete(
     return with_item(summary, item=response_data)
 
 
+async def task_batch_verify(
+    context: LodestarContext,
+    task_ids: list[str],
+    agent_id: str,
+    notes: dict[str, str] | None = None,
+    ctx: Context | None = None,
+) -> CallToolResult:
+    """
+    Verify multiple tasks in a single batch operation.
+
+    This is more efficient than calling task_verify multiple times when completing
+    multiple independent tasks in sequence. Partial success is allowed - some tasks
+    may succeed while others fail.
+
+    Args:
+        context: Lodestar server context
+        task_ids: List of task IDs to verify (required, non-empty)
+        agent_id: Agent ID verifying the tasks (required)
+        notes: Optional dict mapping task IDs to verification notes
+        ctx: Optional MCP context for logging
+
+    Returns:
+        CallToolResult with summary of successes and failures for each task
+    """
+    from lodestar.spec import SpecError
+
+    # Log the batch verify attempt
+    if ctx:
+        await ctx.info(
+            f"Batch verifying {len(task_ids)} tasks for agent {agent_id}"
+        )
+
+    # Validate inputs
+    if not task_ids:
+        return error(
+            "task_ids is required and cannot be empty",
+            error_code="INVALID_INPUT",
+        )
+
+    if not agent_id or not agent_id.strip():
+        return error(
+            "agent_id is required and cannot be empty",
+            error_code="INVALID_AGENT_ID",
+        )
+
+    # Limit batch size
+    if len(task_ids) > 100:
+        return error(
+            f"Batch size exceeds maximum of 100 tasks (got {len(task_ids)})",
+            error_code="BATCH_TOO_LARGE",
+            details={"batch_size": len(task_ids), "max_size": 100},
+        )
+
+    # Validate task IDs
+    validated_task_ids = []
+    for task_id in task_ids:
+        try:
+            validated_task_ids.append(validate_task_id(task_id))
+        except ValidationError as e:
+            if ctx:
+                await ctx.error(f"Invalid task ID in batch: {task_id}")
+            return error(
+                f"Invalid task ID in batch: {task_id} - {e}",
+                error_code="INVALID_TASK_ID",
+            )
+
+    # Track results for each task
+    results = []
+    all_newly_ready = set()
+
+    # Process each task
+    for task_id in validated_task_ids:
+        try:
+            # Reload spec for each verification to get latest state
+            context.reload_spec()
+
+            # Get task from spec
+            task = context.spec.get_task(task_id)
+            if task is None:
+                results.append({
+                    "taskId": task_id,
+                    "success": False,
+                    "error": f"Task {task_id} not found",
+                    "errorCode": "TASK_NOT_FOUND",
+                })
+                if ctx:
+                    await ctx.warning(f"Task {task_id} not found in batch verify")
+                continue
+
+            # Check if task is in DONE status (or already VERIFIED)
+            if task.status == TaskStatus.VERIFIED:
+                results.append({
+                    "taskId": task_id,
+                    "success": True,
+                    "status": "verified",
+                    "newlyReadyTaskIds": [],
+                    "warning": "Task was already verified",
+                })
+                if ctx:
+                    await ctx.info(f"Task {task_id} already verified")
+                continue
+            elif task.status != TaskStatus.DONE:
+                results.append({
+                    "taskId": task_id,
+                    "success": False,
+                    "error": f"Task must be done before verifying (current status: {task.status.value})",
+                    "errorCode": "TASK_NOT_DONE",
+                })
+                if ctx:
+                    await ctx.warning(
+                        f"Task {task_id} not done (status: {task.status.value})"
+                    )
+                continue
+
+            # Update task status
+            task.status = TaskStatus.VERIFIED
+            task.updated_at = datetime.now(UTC)
+            task.verified_by = agent_id
+            task.verified_at = datetime.now(UTC)
+
+            # Get note for this task if provided
+            note = notes.get(task_id) if notes else None
+
+            # Save spec with error handling
+            try:
+                context.save_spec()
+            except SpecError as e:
+                # Log the error and continue with remaining tasks
+                results.append({
+                    "taskId": task_id,
+                    "success": False,
+                    "error": str(e),
+                    "errorCode": type(e).__name__.upper(),
+                    "retriable": getattr(e, "retriable", False),
+                    "suggestedAction": getattr(e, "suggested_action", None),
+                })
+                if ctx:
+                    await ctx.error(f"Failed to verify {task_id}: {e}")
+                continue
+
+            # Auto-release any active lease
+            active_lease = context.db.get_active_lease(task_id)
+            if active_lease:
+                context.db.release_lease(task_id, active_lease.agent_id)
+
+            # Log event
+            event_data = {"agent_id": agent_id, "batch": True}
+            if note:
+                event_data["note"] = note
+
+            with contextlib.suppress(Exception):
+                context.emit_event(
+                    event_type="task.verify",
+                    task_id=task_id,
+                    agent_id=agent_id,
+                    data=event_data,
+                )
+
+            # Notify clients
+            await notify_task_updated(ctx, task_id)
+
+            # Check what tasks are now unblocked
+            context.reload_spec()
+            new_claimable = context.spec.get_claimable_tasks()
+            newly_unblocked = [t for t in new_claimable if task_id in t.depends_on]
+            newly_ready_ids = [t.id for t in newly_unblocked]
+
+            # Add to global set of newly ready tasks
+            all_newly_ready.update(newly_ready_ids)
+
+            # Notify about newly unblocked tasks
+            for unblocked_id in newly_ready_ids:
+                await notify_task_updated(ctx, unblocked_id)
+
+            # Record success
+            results.append({
+                "taskId": task_id,
+                "success": True,
+                "status": "verified",
+                "newlyReadyTaskIds": newly_ready_ids,
+            })
+
+            if ctx:
+                if newly_ready_ids:
+                    await ctx.info(
+                        f"Verified {task_id}, unblocked {len(newly_ready_ids)} task(s)"
+                    )
+                else:
+                    await ctx.info(f"Verified {task_id}")
+
+        except Exception as e:
+            # Catch unexpected errors
+            results.append({
+                "taskId": task_id,
+                "success": False,
+                "error": str(e),
+                "errorCode": "UNEXPECTED_ERROR",
+            })
+            if ctx:
+                await ctx.error(f"Unexpected error verifying {task_id}: {e}")
+
+    # Calculate summary stats
+    success_count = sum(1 for r in results if r["success"])
+    failure_count = len(results) - success_count
+
+    # Build summary
+    if failure_count == 0:
+        summary = f"Batch verify: all {success_count} task(s) verified successfully"
+    elif success_count == 0:
+        summary = f"Batch verify: all {failure_count} task(s) failed"
+    else:
+        summary = f"Batch verify: {success_count} succeeded, {failure_count} failed"
+
+    # Build response
+    response_data = {
+        "ok": success_count > 0,  # ok if at least one succeeded
+        "summary": {
+            "total": len(task_ids),
+            "succeeded": success_count,
+            "failed": failure_count,
+        },
+        "results": results,
+        "allNewlyReadyTaskIds": sorted(all_newly_ready),
+    }
+
+    # Use format_summary for consistent formatting
+    formatted_summary = format_summary(
+        "Batch Verify",
+        f"{success_count}/{len(task_ids)} tasks",
+        f"unblocked {len(all_newly_ready)} task(s)" if all_newly_ready else "",
+    )
+
+    return with_item(formatted_summary, item=response_data)
+
+
 def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
     """
     Register task mutation tools with the FastMCP server.
@@ -1126,5 +1361,56 @@ def register_task_mutation_tools(mcp: object, context: LodestarContext) -> None:
             task_id=task_id,
             agent_id=agent_id,
             note=note,
+            ctx=ctx,
+        )
+
+    @mcp.tool(name="lodestar_task_batch_verify")
+    async def batch_verify_tool(
+        task_ids: list[str],
+        agent_id: str,
+        notes: dict[str, str] | None = None,
+        ctx: Context | None = None,
+    ) -> CallToolResult:
+        """Verify multiple tasks in a single batch operation.
+
+        This is more efficient than calling task_verify multiple times when completing
+        multiple independent tasks in sequence. Batch operations reduce round-trips
+        and improve agent workflow efficiency.
+
+        Partial success is allowed - some tasks may succeed while others fail. Each
+        task result is reported individually.
+
+        All dependent task unblocking happens correctly for successfully verified tasks.
+
+        Args:
+            task_ids: List of task IDs to verify (required, non-empty, max 100)
+            agent_id: Agent ID verifying the tasks (required)
+            notes: Optional dict mapping task IDs to verification notes
+
+        Returns:
+            Summary of successes and failures for each task, including:
+            - total: Total number of tasks in batch
+            - succeeded: Number of successfully verified tasks
+            - failed: Number of failed verifications
+            - results: Array of individual task results with success status, errors, and newly ready tasks
+            - allNewlyReadyTaskIds: Combined list of all tasks unblocked by this batch
+
+        Example:
+            {
+              "ok": true,
+              "summary": {"total": 3, "succeeded": 2, "failed": 1},
+              "results": [
+                {"taskId": "F001", "success": true, "status": "verified", "newlyReadyTaskIds": ["F002"]},
+                {"taskId": "F003", "success": true, "status": "verified", "newlyReadyTaskIds": []},
+                {"taskId": "F004", "success": false, "error": "Task not found", "errorCode": "TASK_NOT_FOUND"}
+              ],
+              "allNewlyReadyTaskIds": ["F002"]
+            }
+        """
+        return await task_batch_verify(
+            context=context,
+            task_ids=task_ids,
+            agent_id=agent_id,
+            notes=notes,
             ctx=ctx,
         )
