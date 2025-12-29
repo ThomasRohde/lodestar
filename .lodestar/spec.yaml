@@ -2450,9 +2450,9 @@ tasks:
     - feature
     locks: []
     priority: 2
-    status: ready
+    status: verified
     created_at: '2025-12-28T13:07:22.230780+00:00'
-    updated_at: '2025-12-28T13:07:22.230784+00:00'
+    updated_at: '2025-12-28T17:24:55.787726+00:00'
   MCP-071:
     title: Implement lodestar://status resource
     description: Add to mcp/resources.py. Implement lodestar://status resource that
