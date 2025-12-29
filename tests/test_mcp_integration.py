@@ -93,54 +93,58 @@ class TestConcurrentClaims:
         server_params = get_server_params(test_repo)
 
         # Client 1 connects and claims INT-001
-        async with stdio_client(server_params) as (read1, write1):
-            async with ClientSession(read1, write1) as session1:
-                await session1.initialize()
+        async with (
+            stdio_client(server_params) as (read1, write1),
+            ClientSession(read1, write1) as session1,
+        ):
+            await session1.initialize()
 
-                # Join as agent
-                agent1_result = await session1.call_tool("lodestar_agent_join", {"name": "Agent 1"})
-                agent1_id = agent1_result.structuredContent["agentId"]
+            # Join as agent
+            agent1_result = await session1.call_tool("lodestar_agent_join", {"name": "Agent 1"})
+            agent1_id = agent1_result.structuredContent["agentId"]
 
-                # Claim INT-001
-                claim1_result = await session1.call_tool(
-                    "lodestar_task_claim",
-                    {
-                        "task_id": "INT-001",
-                        "agent_id": agent1_id,
-                        "ttl_seconds": 900,
-                    },
-                )
+            # Claim INT-001
+            claim1_result = await session1.call_tool(
+                "lodestar_task_claim",
+                {
+                    "task_id": "INT-001",
+                    "agent_id": agent1_id,
+                    "ttl_seconds": 900,
+                },
+            )
 
-                assert claim1_result.isError is None or claim1_result.isError is False
-                assert claim1_result.structuredContent["ok"] is True
-                lease1 = claim1_result.structuredContent["lease"]
-                assert lease1["taskId"] == "INT-001"
-                assert lease1["agentId"] == agent1_id
+            assert claim1_result.isError is None or claim1_result.isError is False
+            assert claim1_result.structuredContent["ok"] is True
+            lease1 = claim1_result.structuredContent["lease"]
+            assert lease1["taskId"] == "INT-001"
+            assert lease1["agentId"] == agent1_id
 
         # Client 2 connects independently and claims INT-002
-        async with stdio_client(server_params) as (read2, write2):
-            async with ClientSession(read2, write2) as session2:
-                await session2.initialize()
+        async with (
+            stdio_client(server_params) as (read2, write2),
+            ClientSession(read2, write2) as session2,
+        ):
+            await session2.initialize()
 
-                # Join as different agent
-                agent2_result = await session2.call_tool("lodestar_agent_join", {"name": "Agent 2"})
-                agent2_id = agent2_result.structuredContent["agentId"]
+            # Join as different agent
+            agent2_result = await session2.call_tool("lodestar_agent_join", {"name": "Agent 2"})
+            agent2_id = agent2_result.structuredContent["agentId"]
 
-                # Claim INT-002 (different task)
-                claim2_result = await session2.call_tool(
-                    "lodestar_task_claim",
-                    {
-                        "task_id": "INT-002",
-                        "agent_id": agent2_id,
-                        "ttl_seconds": 900,
-                    },
-                )
+            # Claim INT-002 (different task)
+            claim2_result = await session2.call_tool(
+                "lodestar_task_claim",
+                {
+                    "task_id": "INT-002",
+                    "agent_id": agent2_id,
+                    "ttl_seconds": 900,
+                },
+            )
 
-                assert claim2_result.isError is None or claim2_result.isError is False
-                assert claim2_result.structuredContent["ok"] is True
-                lease2 = claim2_result.structuredContent["lease"]
-                assert lease2["taskId"] == "INT-002"
-                assert lease2["agentId"] == agent2_id
+            assert claim2_result.isError is None or claim2_result.isError is False
+            assert claim2_result.structuredContent["ok"] is True
+            lease2 = claim2_result.structuredContent["lease"]
+            assert lease2["taskId"] == "INT-002"
+            assert lease2["agentId"] == agent2_id
 
     @pytest.mark.anyio
     async def test_second_claim_on_same_task_fails(self, test_repo):
@@ -148,46 +152,48 @@ class TestConcurrentClaims:
         server_params = get_server_params(test_repo)
 
         # First client claims INT-001
-        async with stdio_client(server_params) as (read1, write1):
-            async with ClientSession(read1, write1) as session1:
-                await session1.initialize()
+        async with (
+            stdio_client(server_params) as (read1, write1),
+            ClientSession(read1, write1) as session1,
+        ):
+            await session1.initialize()
 
-                agent1_result = await session1.call_tool("lodestar_agent_join", {"name": "Agent 1"})
-                agent1_id = agent1_result.structuredContent["agentId"]
+            agent1_result = await session1.call_tool("lodestar_agent_join", {"name": "Agent 1"})
+            agent1_id = agent1_result.structuredContent["agentId"]
 
-                claim1_result = await session1.call_tool(
+            claim1_result = await session1.call_tool(
+                "lodestar_task_claim",
+                {
+                    "task_id": "INT-001",
+                    "agent_id": agent1_id,
+                    "ttl_seconds": 900,
+                },
+            )
+
+            assert claim1_result.structuredContent["ok"] is True
+
+            # Second client tries to claim the same task
+            async with (
+                stdio_client(server_params) as (read2, write2),
+                ClientSession(read2, write2) as session2,
+            ):
+                await session2.initialize()
+
+                agent2_result = await session2.call_tool("lodestar_agent_join", {"name": "Agent 2"})
+                agent2_id = agent2_result.structuredContent["agentId"]
+
+                claim2_result = await session2.call_tool(
                     "lodestar_task_claim",
                     {
                         "task_id": "INT-001",
-                        "agent_id": agent1_id,
+                        "agent_id": agent2_id,
                         "ttl_seconds": 900,
                     },
                 )
 
-                assert claim1_result.structuredContent["ok"] is True
-
-                # Second client tries to claim the same task
-                async with stdio_client(server_params) as (read2, write2):
-                    async with ClientSession(read2, write2) as session2:
-                        await session2.initialize()
-
-                        agent2_result = await session2.call_tool(
-                            "lodestar_agent_join", {"name": "Agent 2"}
-                        )
-                        agent2_id = agent2_result.structuredContent["agentId"]
-
-                        claim2_result = await session2.call_tool(
-                            "lodestar_task_claim",
-                            {
-                                "task_id": "INT-001",
-                                "agent_id": agent2_id,
-                                "ttl_seconds": 900,
-                            },
-                        )
-
-                        # Should fail - task is already claimed
-                        assert claim2_result.isError is True
-                        assert "ALREADY_CLAIMED" in claim2_result.structuredContent["error_code"]
+                # Should fail - task is already claimed
+                assert claim2_result.isError is True
+                assert "ALREADY_CLAIMED" in claim2_result.structuredContent["error_code"]
 
 
 class TestMessaging:
@@ -198,102 +204,106 @@ class TestMessaging:
         """Test sending a message and receiving it."""
         server_params = get_server_params(test_repo)
 
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        async with (
+            stdio_client(server_params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
 
-                # Join as two different agents
-                agent1_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 1"})
-                agent1_id = agent1_result.structuredContent["agentId"]
+            # Join as two different agents
+            agent1_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 1"})
+            agent1_id = agent1_result.structuredContent["agentId"]
 
-                agent2_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
-                agent2_id = agent2_result.structuredContent["agentId"]
+            agent2_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
+            agent2_id = agent2_result.structuredContent["agentId"]
 
-                # Agent 1 sends message to Agent 2
-                send_result = await session.call_tool(
-                    "lodestar_message_send",
-                    {
-                        "from_agent_id": agent1_id,
-                        "to_agent_id": agent2_id,
-                        "body": "Hello from Agent 1!",
-                    },
-                )
+            # Agent 1 sends message to Agent 2
+            send_result = await session.call_tool(
+                "lodestar_message_send",
+                {
+                    "from_agent_id": agent1_id,
+                    "to_agent_id": agent2_id,
+                    "body": "Hello from Agent 1!",
+                },
+            )
 
-                assert send_result.isError is None or send_result.isError is False
-                assert send_result.structuredContent["ok"] is True
-                message_id = send_result.structuredContent["messageId"]
+            assert send_result.isError is None or send_result.isError is False
+            assert send_result.structuredContent["ok"] is True
+            message_id = send_result.structuredContent["messageId"]
 
-                # Agent 2 lists messages
-                list_result = await session.call_tool(
-                    "lodestar_message_list",
-                    {
-                        "agent_id": agent2_id,
-                    },
-                )
+            # Agent 2 lists messages
+            list_result = await session.call_tool(
+                "lodestar_message_list",
+                {
+                    "agent_id": agent2_id,
+                },
+            )
 
-                assert list_result.isError is None or list_result.isError is False
-                messages = list_result.structuredContent["messages"]
-                assert len(messages) > 0
+            assert list_result.isError is None or list_result.isError is False
+            messages = list_result.structuredContent["messages"]
+            assert len(messages) > 0
 
-                # Find our message
-                our_message = next((m for m in messages if m["id"] == message_id), None)
-                assert our_message is not None
-                assert our_message["from"] == agent1_id
-                assert our_message["to"] == agent2_id
-                assert our_message["body"] == "Hello from Agent 1!"
+            # Find our message
+            our_message = next((m for m in messages if m["id"] == message_id), None)
+            assert our_message is not None
+            assert our_message["from"] == agent1_id
+            assert our_message["to"] == agent2_id
+            assert our_message["body"] == "Hello from Agent 1!"
 
     @pytest.mark.anyio
     async def test_message_acknowledgment(self, test_repo):
         """Test acknowledging a message."""
         server_params = get_server_params(test_repo)
 
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        async with (
+            stdio_client(server_params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
 
-                # Join as two agents
-                agent1_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 1"})
-                agent1_id = agent1_result.structuredContent["agentId"]
+            # Join as two agents
+            agent1_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 1"})
+            agent1_id = agent1_result.structuredContent["agentId"]
 
-                agent2_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
-                agent2_id = agent2_result.structuredContent["agentId"]
+            agent2_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
+            agent2_id = agent2_result.structuredContent["agentId"]
 
-                # Send message
-                send_result = await session.call_tool(
-                    "lodestar_message_send",
-                    {
-                        "from_agent_id": agent1_id,
-                        "to_agent_id": agent2_id,
-                        "body": "Test message for ack",
-                    },
-                )
-                message_id = send_result.structuredContent["messageId"]
+            # Send message
+            send_result = await session.call_tool(
+                "lodestar_message_send",
+                {
+                    "from_agent_id": agent1_id,
+                    "to_agent_id": agent2_id,
+                    "body": "Test message for ack",
+                },
+            )
+            message_id = send_result.structuredContent["messageId"]
 
-                # Acknowledge the message
-                ack_result = await session.call_tool(
-                    "lodestar_message_ack",
-                    {
-                        "message_ids": [message_id],
-                        "agent_id": agent2_id,
-                    },
-                )
+            # Acknowledge the message
+            ack_result = await session.call_tool(
+                "lodestar_message_ack",
+                {
+                    "message_ids": [message_id],
+                    "agent_id": agent2_id,
+                },
+            )
 
-                assert ack_result.isError is None or ack_result.isError is False
-                assert ack_result.structuredContent["ok"] is True
+            assert ack_result.isError is None or ack_result.isError is False
+            assert ack_result.structuredContent["ok"] is True
 
-                # List messages again and verify ack status (pass unread_only=False to see all)
-                list_result = await session.call_tool(
-                    "lodestar_message_list",
-                    {
-                        "agent_id": agent2_id,
-                        "unread_only": False,
-                    },
-                )
+            # List messages again and verify ack status (pass unread_only=False to see all)
+            list_result = await session.call_tool(
+                "lodestar_message_list",
+                {
+                    "agent_id": agent2_id,
+                    "unread_only": False,
+                },
+            )
 
-                messages = list_result.structuredContent["messages"]
-                our_message = next((m for m in messages if m["id"] == message_id), None)
-                assert our_message is not None
-                assert "readAt" in our_message  # Should have readAt field if acknowledged
+            messages = list_result.structuredContent["messages"]
+            our_message = next((m for m in messages if m["id"] == message_id), None)
+            assert our_message is not None
+            assert "readAt" in our_message  # Should have readAt field if acknowledged
 
 
 class TestEventStreaming:
@@ -304,109 +314,111 @@ class TestEventStreaming:
         """Test that event stream contains task claim events."""
         server_params = get_server_params(test_repo)
 
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        async with (
+            stdio_client(server_params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
 
-                # Join as agent
-                agent_result = await session.call_tool(
-                    "lodestar_agent_join", {"name": "Event Agent"}
-                )
-                agent_id = agent_result.structuredContent["agentId"]
+            # Join as agent
+            agent_result = await session.call_tool("lodestar_agent_join", {"name": "Event Agent"})
+            agent_id = agent_result.structuredContent["agentId"]
 
-                # Claim a task (generates event)
-                await session.call_tool(
-                    "lodestar_task_claim",
-                    {
-                        "task_id": "INT-001",
-                        "agent_id": agent_id,
-                        "ttl_seconds": 900,
-                    },
-                )
+            # Claim a task (generates event)
+            await session.call_tool(
+                "lodestar_task_claim",
+                {
+                    "task_id": "INT-001",
+                    "agent_id": agent_id,
+                    "ttl_seconds": 900,
+                },
+            )
 
-                # Get event stream
-                events_result = await session.call_tool(
-                    "lodestar_events_pull",
-                    {
-                        "since_cursor": 0,
-                        "limit": 10,
-                    },
-                )
+            # Get event stream
+            events_result = await session.call_tool(
+                "lodestar_events_pull",
+                {
+                    "since_cursor": 0,
+                    "limit": 10,
+                },
+            )
 
-                assert events_result.isError is None or events_result.isError is False
-                events = events_result.structuredContent["events"]
+            assert events_result.isError is None or events_result.isError is False
+            events = events_result.structuredContent["events"]
 
-                # Should have at least one event
-                assert len(events) > 0
+            # Should have at least one event
+            assert len(events) > 0
 
-                # Find task.claim event
-                claim_events = [e for e in events if e["type"] == "task.claim"]
-                assert len(claim_events) > 0
+            # Find task.claim event
+            claim_events = [e for e in events if e["type"] == "task.claim"]
+            assert len(claim_events) > 0
 
-                # Verify event data
-                claim_event = claim_events[0]
-                assert claim_event["actorAgentId"] == agent_id
-                assert claim_event["taskId"] == "INT-001"
+            # Verify event data
+            claim_event = claim_events[0]
+            assert claim_event["actorAgentId"] == agent_id
+            assert claim_event["taskId"] == "INT-001"
 
     @pytest.mark.anyio
     async def test_event_stream_pagination(self, test_repo):
         """Test event stream pagination with limit and offset."""
         server_params = get_server_params(test_repo)
 
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        async with (
+            stdio_client(server_params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
 
-                # Join as agent
-                agent_result = await session.call_tool(
-                    "lodestar_agent_join", {"name": "Pagination Agent"}
+            # Join as agent
+            agent_result = await session.call_tool(
+                "lodestar_agent_join", {"name": "Pagination Agent"}
+            )
+            agent_id = agent_result.structuredContent["agentId"]
+
+            # Generate multiple events by claiming tasks
+            for task_id in ["INT-001", "INT-002", "INT-003"]:
+                await session.call_tool(
+                    "lodestar_task_claim",
+                    {
+                        "task_id": task_id,
+                        "agent_id": agent_id,
+                        "ttl_seconds": 900,
+                    },
                 )
-                agent_id = agent_result.structuredContent["agentId"]
 
-                # Generate multiple events by claiming tasks
-                for task_id in ["INT-001", "INT-002", "INT-003"]:
-                    await session.call_tool(
-                        "lodestar_task_claim",
-                        {
-                            "task_id": task_id,
-                            "agent_id": agent_id,
-                            "ttl_seconds": 900,
-                        },
-                    )
+            # Get first page of events
+            page1_result = await session.call_tool(
+                "lodestar_events_pull",
+                {
+                    "since_cursor": 0,
+                    "limit": 2,
+                },
+            )
 
-                # Get first page of events
-                page1_result = await session.call_tool(
+            assert page1_result.isError is None or page1_result.isError is False
+            page1_events = page1_result.structuredContent["events"]
+            assert len(page1_events) >= 1  # Should have at least the agent.join event
+
+            # Get second page of events using nextCursor from first page
+            if "nextCursor" in page1_result.structuredContent:
+                next_cursor = page1_result.structuredContent["nextCursor"]
+                page2_result = await session.call_tool(
                     "lodestar_events_pull",
                     {
-                        "since_cursor": 0,
+                        "since_cursor": next_cursor,
                         "limit": 2,
                     },
                 )
 
-                assert page1_result.isError is None or page1_result.isError is False
-                page1_events = page1_result.structuredContent["events"]
-                assert len(page1_events) >= 1  # Should have at least the agent.join event
+                assert page2_result.isError is None or page2_result.isError is False
+                page2_events = page2_result.structuredContent["events"]
+                assert len(page2_events) >= 0  # May be less than 2 depending on total events
 
-                # Get second page of events using nextCursor from first page
-                if "nextCursor" in page1_result.structuredContent:
-                    next_cursor = page1_result.structuredContent["nextCursor"]
-                    page2_result = await session.call_tool(
-                        "lodestar_events_pull",
-                        {
-                            "since_cursor": next_cursor,
-                            "limit": 2,
-                        },
-                    )
-
-                    assert page2_result.isError is None or page2_result.isError is False
-                    page2_events = page2_result.structuredContent["events"]
-                    assert len(page2_events) >= 0  # May be less than 2 depending on total events
-
-                    # Events should be different (no overlap)
-                    if len(page2_events) > 0:
-                        page1_ids = {e["id"] for e in page1_events}
-                        page2_ids = {e["id"] for e in page2_events}
-                        assert page1_ids.isdisjoint(page2_ids)
+                # Events should be different (no overlap)
+                if len(page2_events) > 0:
+                    page1_ids = {e["id"] for e in page1_events}
+                    page2_ids = {e["id"] for e in page2_events}
+                    assert page1_ids.isdisjoint(page2_ids)
 
 
 class TestResourceAccess:
@@ -417,65 +429,71 @@ class TestResourceAccess:
         """Test accessing the lodestar://status resource."""
         server_params = get_server_params(test_repo)
 
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        async with (
+            stdio_client(server_params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
 
-                # List resources
-                resources_result = await session.list_resources()
-                resource_uris = [r.uri for r in resources_result.resources]
+            # List resources
+            resources_result = await session.list_resources()
+            resource_uris = [r.uri for r in resources_result.resources]
 
-                # Should have status resource
-                assert any("lodestar://status" in str(uri) for uri in resource_uris)
+            # Should have status resource
+            assert any("lodestar://status" in str(uri) for uri in resource_uris)
 
-                # Read status resource
-                from mcp.types import AnyUrl
+            # Read status resource
+            from mcp.types import AnyUrl
 
-                status_content = await session.read_resource(AnyUrl("lodestar://status"))
-                assert len(status_content.contents) > 0
+            status_content = await session.read_resource(AnyUrl("lodestar://status"))
+            assert len(status_content.contents) > 0
 
     @pytest.mark.anyio
     async def test_spec_resource(self, test_repo):
         """Test accessing the lodestar://spec resource."""
         server_params = get_server_params(test_repo)
 
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        async with (
+            stdio_client(server_params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
 
-                # Read spec resource
-                from mcp.types import AnyUrl
+            # Read spec resource
+            from mcp.types import AnyUrl
 
-                spec_content = await session.read_resource(AnyUrl("lodestar://spec"))
-                assert len(spec_content.contents) > 0
+            spec_content = await session.read_resource(AnyUrl("lodestar://spec"))
+            assert len(spec_content.contents) > 0
 
-                # Verify it contains YAML content
-                text_content = spec_content.contents[0]
-                from mcp import types
+            # Verify it contains YAML content
+            text_content = spec_content.contents[0]
+            from mcp import types
 
-                if isinstance(text_content, types.TextContent):
-                    assert "project:" in text_content.text
-                    assert "tasks:" in text_content.text
+            if isinstance(text_content, types.TextContent):
+                assert "project:" in text_content.text
+                assert "tasks:" in text_content.text
 
     @pytest.mark.anyio
     async def test_task_resource(self, test_repo):
         """Test accessing a specific task resource."""
         server_params = get_server_params(test_repo)
 
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        async with (
+            stdio_client(server_params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
 
-                # Read task resource
-                from mcp.types import AnyUrl
+            # Read task resource
+            from mcp.types import AnyUrl
 
-                task_content = await session.read_resource(AnyUrl("lodestar://task/INT-001"))
-                assert len(task_content.contents) > 0
+            task_content = await session.read_resource(AnyUrl("lodestar://task/INT-001"))
+            assert len(task_content.contents) > 0
 
-                # Verify it contains task details
-                text_content = task_content.contents[0]
-                from mcp import types
+            # Verify it contains task details
+            text_content = task_content.contents[0]
+            from mcp import types
 
-                if isinstance(text_content, types.TextContent):
-                    assert "INT-001" in text_content.text
-                    assert "First integration test task" in text_content.text
+            if isinstance(text_content, types.TextContent):
+                assert "INT-001" in text_content.text
+                assert "First integration test task" in text_content.text
