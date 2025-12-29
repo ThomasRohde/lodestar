@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -43,6 +44,11 @@ def init_command(
         False,
         "--explain",
         help="Show what this command does.",
+    ),
+    mcp: bool = typer.Option(
+        False,
+        "--mcp",
+        help="Create MCP configuration files for IDE/agent integration.",
     ),
 ) -> None:
     """Initialize a new Lodestar repository.
@@ -96,20 +102,29 @@ def init_command(
     spec = create_default_spec(name)
     save_spec(spec, root)
 
-    # Create AGENTS.md
+    # Create MCP config files if requested
+    mcp_files: list[str] = []
+    if mcp:
+        mcp_paths = _create_mcp_configs(root, force=force)
+        mcp_files = [str(p) for p in mcp_paths]
+
+    # Create AGENTS.md (use MCP version if --mcp)
     agents_md = root / "AGENTS.md"
     if not agents_md.exists() or force:
-        agents_md.write_text(_agents_md_content(name))
+        content = _agents_md_content_mcp(name) if mcp else _agents_md_content(name)
+        agents_md.write_text(content)
 
     # Build response
     result = {
         "initialized": True,
         "path": str(root),
         "project_name": name,
+        "mcp_enabled": mcp,
         "files_created": [
             str(lodestar_dir / "spec.yaml"),
             str(gitignore_path),
             str(agents_md),
+            *mcp_files,
         ],
     }
 
@@ -133,6 +148,9 @@ def init_command(
         console.print(f"  {LODESTAR_DIR}/spec.yaml")
         console.print(f"  {LODESTAR_DIR}/.gitignore")
         console.print("  AGENTS.md")
+        if mcp:
+            console.print("  .vscode/mcp.json")
+            console.print("  .mcp.json")
         console.print()
         console.print("[info]Next steps:[/info]")
         console.print("  1. Run [command]lodestar agent join[/command] to register")
@@ -151,10 +169,16 @@ def _show_explain(json_output: bool) -> None:
             ".lodestar/.gitignore - Excludes runtime files from git",
             "AGENTS.md - Quick reference for agents entering the repo",
         ],
+        "options": {
+            "--mcp": "Create MCP configuration files (.vscode/mcp.json, .mcp.json)",
+            "--force": "Overwrite existing .lodestar directory",
+            "--name": "Set project name (defaults to directory name)",
+        },
         "notes": [
             "Run this once per repository",
             "The spec.yaml should be committed to git",
             "Runtime files (SQLite) are auto-generated and gitignored",
+            "Use --mcp to enable MCP integration for IDE/agent tools",
         ],
     }
 
@@ -169,6 +193,10 @@ def _show_explain(json_output: bool) -> None:
         console.print("[muted]Creates:[/muted]")
         for item in explanation["creates"]:
             console.print(f"  - {item}")
+        console.print()
+        console.print("[muted]Options:[/muted]")
+        for opt, desc in explanation["options"].items():
+            console.print(f"  {opt}: {desc}")
         console.print()
 
 
@@ -350,4 +378,167 @@ lodestar <command> --explain # Understand what it does
 |------|---------|-----|
 | `.lodestar/spec.yaml` | Task definitions | Commit |
 | `.lodestar/runtime.sqlite` | Agent/lease state | Gitignored |
+"""
+
+
+def _create_mcp_configs(root: Path, force: bool = False) -> list[Path]:
+    """Create MCP configuration files. Returns list of created file paths."""
+    created = []
+
+    # VS Code / Copilot config
+    vscode_dir = root / ".vscode"
+    vscode_dir.mkdir(exist_ok=True)
+    vscode_mcp = vscode_dir / "mcp.json"
+    if not vscode_mcp.exists() or force:
+        vscode_mcp.write_text(
+            json.dumps(
+                {
+                    "servers": {
+                        "Lodestar": {
+                            "type": "stdio",
+                            "command": "lodestar",
+                            "args": ["mcp", "serve", "--repo", "."],
+                        }
+                    },
+                    "inputs": [],
+                },
+                indent=2,
+            )
+            + "\n"
+        )
+        created.append(vscode_mcp)
+
+    # Claude Code project-scoped config
+    claude_mcp = root / ".mcp.json"
+    if not claude_mcp.exists() or force:
+        claude_mcp.write_text(
+            json.dumps(
+                {
+                    "mcpServers": {
+                        "Lodestar": {
+                            "type": "stdio",
+                            "command": "lodestar",
+                            "args": ["mcp", "serve", "--repo", "."],
+                        }
+                    }
+                },
+                indent=2,
+            )
+            + "\n"
+        )
+        created.append(claude_mcp)
+
+    return created
+
+
+def _agents_md_content_mcp(project_name: str) -> str:
+    """Generate MCP-optimized AGENTS.md content."""
+    return f"""# {project_name} - Agent Coordination
+
+This repository uses [Lodestar](https://github.com/lodestar-cli/lodestar) for multi-agent coordination.
+
+## MCP Tools (Preferred)
+
+When connected via MCP, use the `lodestar_*` tools directly. MCP is the preferred method for agents.
+
+### Quick Start
+
+```
+lodestar_agent_join(name="Your Name")     # Register, SAVE the agentId
+lodestar_task_next()                       # Find available work
+lodestar_task_claim(task_id="F001", agent_id="YOUR_ID")
+```
+
+### Agent Workflow
+
+```
+1. JOIN      lodestar_agent_join()         -> Get your agentId
+2. FIND      lodestar_task_next()          -> Get claimable tasks
+3. CLAIM     lodestar_task_claim()         -> Create 15-min lease
+4. CONTEXT   lodestar_task_context()       -> Get PRD context
+5. WORK      (implement the task)
+6. DONE      lodestar_task_done()          -> Mark complete
+7. VERIFY    lodestar_task_verify()        -> Unblock dependents
+```
+
+### MCP Tool Reference
+
+| Category | Tool | Purpose |
+|----------|------|---------|
+| **Repo** | `lodestar_repo_status` | Get project status, task counts, next actions |
+| **Agent** | `lodestar_agent_join` | Register as agent (returns agentId) |
+| | `lodestar_agent_heartbeat` | Update presence (call every 5 min) |
+| | `lodestar_agent_leave` | Mark offline gracefully |
+| | `lodestar_agent_list` | List all registered agents |
+| **Task Query** | `lodestar_task_next` | Get claimable tasks (dependency-aware) |
+| | `lodestar_task_list` | List tasks with filtering |
+| | `lodestar_task_get` | Get full task details |
+| | `lodestar_task_context` | Get PRD context for a task |
+| **Task Mutation** | `lodestar_task_claim` | Claim task (15-min lease) |
+| | `lodestar_task_release` | Release claim (if blocked) |
+| | `lodestar_task_done` | Mark task complete |
+| | `lodestar_task_verify` | Verify task (unblocks deps) |
+| **Message** | `lodestar_message_send` | Send to agent or task thread |
+| | `lodestar_message_list` | Get inbox messages |
+| | `lodestar_message_ack` | Mark messages as read |
+| **Events** | `lodestar_events_pull` | Pull event stream |
+
+### Handoff Pattern
+
+When blocked or ending session before completion:
+
+```
+lodestar_task_release(task_id="F001", agent_id="YOUR_ID", reason="Blocked on API approval")
+lodestar_message_send(task_id="F001", from_agent_id="YOUR_ID", body="Progress: 60% complete. Tests passing.")
+```
+
+## CLI Commands (No MCP Equivalent)
+
+These operations require CLI:
+
+| Command | Purpose |
+|---------|---------|
+| `lodestar init` | Initialize repository |
+| `lodestar doctor` | Health check |
+| `lodestar task create` | Create new tasks |
+| `lodestar task update` | Update task fields |
+| `lodestar task delete` | Delete tasks (--cascade for deps) |
+| `lodestar task renew` | Extend lease duration |
+| `lodestar task graph` | Export dependency graph |
+| `lodestar export snapshot` | Export full state |
+
+### Creating Tasks (CLI Only)
+
+```bash
+lodestar task create \\
+    --id "F001" \\
+    --title "Add authentication" \\
+    --description "WHAT: Implement OAuth2. WHERE: src/auth/. ACCEPT: Tests pass." \\
+    --depends-on "F000" \\
+    --label feature \\
+    --priority 2
+```
+
+### Task with PRD References (CLI Only)
+
+```bash
+lodestar task create \\
+    --title "Implement caching" \\
+    --prd-source "PRD.md" \\
+    --prd-ref "#caching-requirements"
+```
+
+## Files
+
+| File | Purpose | Git |
+|------|---------|-----|
+| `.lodestar/spec.yaml` | Task definitions | Commit |
+| `.lodestar/runtime.sqlite` | Agent/lease state | Gitignored |
+
+## Help
+
+```bash
+lodestar <command> --help     # CLI options
+lodestar <command> --explain  # What it does
+```
 """
