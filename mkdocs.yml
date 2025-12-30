@@ -80,3 +80,4 @@ nav:
       - CI Integration: guides/ci-integration.md
   - Reference:
       - reference/index.md
+      - Schema Reference: reference/schema.md

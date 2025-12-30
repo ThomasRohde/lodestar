@@ -2,7 +2,13 @@
 
 Technical reference documentation for Lodestar.
 
-## Spec Schema
+## Documentation
+
+- [Schema Reference](schema.md) — Complete YAML and SQLite schema definitions for building tools on Lodestar
+
+## Quick Reference
+
+### Spec Schema
 
 The `.lodestar/spec.yaml` file follows this schema:
 
