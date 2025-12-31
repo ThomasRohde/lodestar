@@ -34,8 +34,17 @@ def is_windows_transient_error(error: Exception) -> bool:
     if not isinstance(error, OSError):
         return False
 
-    # Check if this is a Windows error we should retry
-    return hasattr(error, "winerror") and error.winerror in WINDOWS_TRANSIENT_ERRORS
+    # Try to extract winerror from the exception
+    winerror = None
+    
+    # First check if winerror attribute exists (set by Python on Windows)
+    if hasattr(error, "winerror") and error.winerror is not None:
+        winerror = error.winerror
+    # Otherwise check args tuple: OSError(errno, strerror, filename, winerror)
+    elif len(error.args) >= 4 and error.args[3] is not None:
+        winerror = error.args[3]
+    
+    return winerror in WINDOWS_TRANSIENT_ERRORS
 
 
 def retry_on_windows_error(
