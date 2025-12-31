@@ -13,50 +13,43 @@ from lodestar.util.retry import (
 def test_is_windows_transient_error_detects_winerror_5():
     """Test detection of WinError 5 (Access Denied)."""
     # Create a mock OSError with winerror attribute
-    error = OSError()
-    error.winerror = 5
+    error = OSError(5, "Access is denied", None, 5)
     assert is_windows_transient_error(error)
 
 
 def test_is_windows_transient_error_detects_winerror_32():
     """Test detection of WinError 32 (Sharing Violation)."""
-    error = OSError()
-    error.winerror = 32
+    error = OSError(32, "Sharing violation", None, 32)
     assert is_windows_transient_error(error)
 
 
 def test_is_windows_transient_error_detects_winerror_33():
     """Test detection of WinError 33 (Lock Violation)."""
-    error = OSError()
-    error.winerror = 33
+    error = OSError(33, "Lock violation", None, 33)
     assert is_windows_transient_error(error)
 
 
 def test_is_windows_transient_error_detects_winerror_110():
     """Test detection of WinError 110 (Open Failed)."""
-    error = OSError()
-    error.winerror = 110
+    error = OSError(110, "Open failed", None, 110)
     assert is_windows_transient_error(error)
 
 
 def test_is_windows_transient_error_detects_winerror_158():
     """Test detection of WinError 158 (Not Locked)."""
-    error = OSError()
-    error.winerror = 158
+    error = OSError(158, "Not locked", None, 158)
     assert is_windows_transient_error(error)
 
 
 def test_is_windows_transient_error_detects_winerror_183():
     """Test detection of WinError 183 (Already Exists)."""
-    error = OSError()
-    error.winerror = 183
+    error = OSError(183, "Already exists", None, 183)
     assert is_windows_transient_error(error)
 
 
 def test_is_windows_transient_error_rejects_other_winerrors():
     """Test that other WinErrors are not considered transient."""
-    error = OSError()
-    error.winerror = 2  # File not found - not transient
+    error = OSError(2, "File not found", None, 2)  # File not found - not transient
     assert not is_windows_transient_error(error)
 
 
@@ -88,8 +81,7 @@ def test_retry_succeeds_after_transient_errors():
         nonlocal call_count
         call_count += 1
         if call_count < 3:
-            error = OSError()
-            error.winerror = 5  # WinError 5
+            error = OSError(5, "Access is denied", None, 5)  # WinError 5
             raise error
         return "success"
 
@@ -105,8 +97,7 @@ def test_retry_fails_after_max_attempts():
     def always_fails():
         nonlocal call_count
         call_count += 1
-        error = OSError()
-        error.winerror = 5
+        error = OSError(5, "Access is denied", None, 5)
         raise error
 
     with pytest.raises(OSError) as exc_info:
@@ -139,8 +130,7 @@ def test_retry_fails_immediately_on_non_retriable_oserror():
     def raises_non_retriable():
         nonlocal call_count
         call_count += 1
-        error = OSError()
-        error.winerror = 2  # File not found - not transient
+        error = OSError(2, "File not found", None, 2)  # File not found - not transient
         raise error
 
     with pytest.raises(OSError) as exc_info:
@@ -160,8 +150,7 @@ def test_retry_exponential_backoff():
     def track_timing():
         call_times.append(time.time())
         if len(call_times) < 3:
-            error = OSError()
-            error.winerror = 5
+            error = OSError(5, "Access is denied", None, 5)
             raise error
         return "success"
 
@@ -193,8 +182,7 @@ def test_retry_with_jitter():
         def track_timing():
             call_times.append(time.time())
             if len(call_times) < 2:
-                error = OSError()
-                error.winerror = 5
+                error = OSError(5, "Access is denied", None, 5)
                 raise error
             return "success"
 
