@@ -201,11 +201,18 @@ def save_spec(spec: Spec, root: Path | None = None) -> None:
                 yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
             # Atomic rename with retry logic for Windows file system locks
+            # Use aggressive retry settings for fast agent workloads where
+            # antivirus/indexer interference is common
             def do_rename() -> None:
                 temp_path.replace(spec_path)
 
             try:
-                retry_on_windows_error(do_rename, max_attempts=3, base_delay_ms=50)
+                retry_on_windows_error(
+                    do_rename,
+                    max_attempts=5,
+                    base_delay_ms=100,
+                    jitter_factor=0.3,
+                )
             except (OSError, PermissionError) as e:
                 # If retry failed, raise as SpecFileAccessError with context
                 import os

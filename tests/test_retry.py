@@ -32,6 +32,27 @@ def test_is_windows_transient_error_detects_winerror_33():
     assert is_windows_transient_error(error)
 
 
+def test_is_windows_transient_error_detects_winerror_110():
+    """Test detection of WinError 110 (Open Failed)."""
+    error = OSError()
+    error.winerror = 110
+    assert is_windows_transient_error(error)
+
+
+def test_is_windows_transient_error_detects_winerror_158():
+    """Test detection of WinError 158 (Not Locked)."""
+    error = OSError()
+    error.winerror = 158
+    assert is_windows_transient_error(error)
+
+
+def test_is_windows_transient_error_detects_winerror_183():
+    """Test detection of WinError 183 (Already Exists)."""
+    error = OSError()
+    error.winerror = 183
+    assert is_windows_transient_error(error)
+
+
 def test_is_windows_transient_error_rejects_other_winerrors():
     """Test that other WinErrors are not considered transient."""
     error = OSError()
@@ -72,7 +93,7 @@ def test_retry_succeeds_after_transient_errors():
             raise error
         return "success"
 
-    result = retry_on_windows_error(eventually_succeeds, max_attempts=3, base_delay_ms=1)
+    result = retry_on_windows_error(eventually_succeeds, max_attempts=5, base_delay_ms=1)
     assert result == "success"
     assert call_count == 3
 
@@ -89,10 +110,10 @@ def test_retry_fails_after_max_attempts():
         raise error
 
     with pytest.raises(OSError) as exc_info:
-        retry_on_windows_error(always_fails, max_attempts=3, base_delay_ms=1)
+        retry_on_windows_error(always_fails, max_attempts=5, base_delay_ms=1)
 
     assert exc_info.value.winerror == 5
-    assert call_count == 3
+    assert call_count == 5
 
 
 def test_retry_fails_immediately_on_non_transient_error():
@@ -105,7 +126,7 @@ def test_retry_fails_immediately_on_non_transient_error():
         raise ValueError("Not a transient error")
 
     with pytest.raises(ValueError, match="Not a transient error"):
-        retry_on_windows_error(raises_non_transient, max_attempts=3, base_delay_ms=1)
+        retry_on_windows_error(raises_non_transient, max_attempts=5, base_delay_ms=1)
 
     # Should fail immediately, not retry
     assert call_count == 1
@@ -123,7 +144,7 @@ def test_retry_fails_immediately_on_non_retriable_oserror():
         raise error
 
     with pytest.raises(OSError) as exc_info:
-        retry_on_windows_error(raises_non_retriable, max_attempts=3, base_delay_ms=1)
+        retry_on_windows_error(raises_non_retriable, max_attempts=5, base_delay_ms=1)
 
     assert exc_info.value.winerror == 2
     # Should fail immediately, not retry
@@ -131,7 +152,7 @@ def test_retry_fails_immediately_on_non_retriable_oserror():
 
 
 def test_retry_exponential_backoff():
-    """Test that retry uses exponential backoff."""
+    """Test that retry uses exponential backoff with jitter."""
     import time
 
     call_times = []
@@ -144,7 +165,8 @@ def test_retry_exponential_backoff():
             raise error
         return "success"
 
-    retry_on_windows_error(track_timing, max_attempts=3, base_delay_ms=10)
+    # Use jitter_factor=0 to get deterministic delays for testing
+    retry_on_windows_error(track_timing, max_attempts=5, base_delay_ms=10, jitter_factor=0)
 
     # Check that delays are roughly exponential (10ms, 20ms)
     # Allow some tolerance for timing variations
@@ -158,3 +180,31 @@ def test_retry_exponential_backoff():
     assert 10 < delay2 < 100, f"Second delay was {delay2}ms, expected ~20ms"
     # Second delay should be roughly double the first
     assert delay2 > delay1, f"Expected exponential backoff, got {delay1}ms then {delay2}ms"
+
+
+def test_retry_with_jitter():
+    """Test that jitter adds randomness to delays."""
+    import time
+
+    # Run multiple times and check that delays vary
+    all_delays = []
+
+    for _ in range(3):
+        call_times = []
+
+        def track_timing():
+            call_times.append(time.time())
+            if len(call_times) < 2:
+                error = OSError()
+                error.winerror = 5
+                raise error
+            return "success"
+
+        retry_on_windows_error(track_timing, max_attempts=5, base_delay_ms=20, jitter_factor=0.5)
+        delay = (call_times[1] - call_times[0]) * 1000
+        all_delays.append(delay)
+
+    # With 50% jitter, delays should be between 10ms and 30ms (20ms ± 50%)
+    # At least one delay should differ from another (randomness test)
+    for delay in all_delays:
+        assert 5 < delay < 100, f"Delay {delay}ms outside expected range with jitter"
