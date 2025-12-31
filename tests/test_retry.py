@@ -186,10 +186,8 @@ def test_retry_with_jitter():
     """Test that jitter adds randomness to delays."""
     import time
 
-    # Run multiple times and check that delays vary
-    all_delays = []
-
-    for _ in range(3):
+    def run_single_test() -> float:
+        """Run a single retry test and return the delay."""
         call_times = []
 
         def track_timing():
@@ -201,8 +199,10 @@ def test_retry_with_jitter():
             return "success"
 
         retry_on_windows_error(track_timing, max_attempts=5, base_delay_ms=20, jitter_factor=0.5)
-        delay = (call_times[1] - call_times[0]) * 1000
-        all_delays.append(delay)
+        return (call_times[1] - call_times[0]) * 1000
+
+    # Run multiple times and check that delays vary
+    all_delays = [run_single_test() for _ in range(3)]
 
     # With 50% jitter, delays should be between 10ms and 30ms (20ms ± 50%)
     # At least one delay should differ from another (randomness test)

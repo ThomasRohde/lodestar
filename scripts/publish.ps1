@@ -51,6 +51,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Set UTF-8 encoding for Unicode output (fixes ✓, ✗, etc. on Windows)
+$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
+
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 function Write-Step {
