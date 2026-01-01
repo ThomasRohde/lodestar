@@ -502,8 +502,18 @@ class TestStressScenarios:
             """Repeatedly read the spec."""
             try:
                 for _ in range(5):
-                    load_spec(root)
-                    results["reads"] += 1
+                    # Add retry logic for Windows file locking
+                    max_attempts = 3
+                    for attempt in range(max_attempts):
+                        try:
+                            load_spec(root)
+                            results["reads"] += 1
+                            break
+                        except (OSError, PermissionError):
+                            if attempt < max_attempts - 1:
+                                time.sleep(0.05)  # Brief delay before retry
+                            else:
+                                raise
                     time.sleep(0.01)
             except Exception as e:
                 results["errors"].append({"operation": "read", "error": str(e)})

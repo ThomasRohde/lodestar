@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, Field
-
-T = TypeVar("T")
 
 
 class NextAction(BaseModel):
@@ -17,7 +15,7 @@ class NextAction(BaseModel):
     description: str | None = Field(default=None, description="Human-readable description")
 
 
-class Envelope(BaseModel, Generic[T]):
+class Envelope[T](BaseModel):
     """Standard JSON envelope for all command outputs.
 
     All --json output follows this structure for consistency.
