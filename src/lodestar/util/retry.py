@@ -36,14 +36,14 @@ def is_windows_transient_error(error: Exception) -> bool:
 
     # Try to extract winerror from the exception
     winerror = None
-    
+
     # First check if winerror attribute exists (set by Python on Windows)
     if hasattr(error, "winerror") and error.winerror is not None:
         winerror = error.winerror
     # Otherwise check args tuple: OSError(errno, strerror, filename, winerror)
     elif len(error.args) >= 4 and error.args[3] is not None:
         winerror = error.args[3]
-    
+
     return winerror in WINDOWS_TRANSIENT_ERRORS
 
 
