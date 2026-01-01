@@ -11,14 +11,6 @@ AGENTS_MD_CLI_TEMPLATE = """# {project_name} - Agent Coordination
 
 This repository uses [Lodestar](https://github.com/lodestar-cli/lodestar) for multi-agent coordination.
 
-The CLI is self-documenting. Run these commands to see workflows:
-
-```bash
-lodestar agent     # Agent registration workflow
-lodestar task      # Task management workflow
-lodestar msg       # Messaging workflow
-```
-
 ## Quick Start
 
 ```bash
@@ -27,33 +19,184 @@ lodestar agent join --name "Your Name" # Register, SAVE the agent ID
 lodestar task next                     # Find available work
 ```
 
-## Finding Work
+---
+
+## Task Design Principles
+
+**Every task must be completable within a 15-minute lease.** This is non-negotiable.
+
+### The INVEST Criteria
+
+Good tasks follow INVEST:
+
+| Criterion | Meaning | Example |
+|-----------|---------|---------|
+| **I**ndependent | Can be completed without waiting for others | OK: "Add login form" not BAD: "Add login after auth service" |
+| **N**egotiable | Details can be refined during execution | Specify WHAT, not HOW |
+| **V**aluable | Delivers user or developer value | Clear business reason |
+| **E**stimable | Scope is clear enough to estimate | Bounded file changes |
+| **S**mall | Fits in 15-minute lease | Split large work |
+| **T**estable | Has verifiable acceptance criteria | "Tests pass", "Endpoint returns 200" |
+
+### Mandatory PRD References
+
+If a PRD or spec file exists in this repository, **all tasks MUST reference it**:
 
 ```bash
-# Get next claimable task (status=ready, all deps verified, no active lease)
-lodestar task next
-
-# Get multiple options to choose from
-lodestar task next --count 5
-
-# Browse all tasks
-lodestar task list
-
-# Filter by status or label
-lodestar task list --status ready
-lodestar task list --label feature
-lodestar task list --status done
-
-# View deleted tasks
-lodestar task list --include-deleted
-lodestar task list --status deleted
-
-# Get full task details
-lodestar task show F001
-lodestar task show F001 --json    # For programmatic access
+lodestar task create \\
+    --title "Implement feature X" \\
+    --prd-source "PRD.md" \\
+    --prd-ref "#feature-x-requirements"
 ```
 
-## Complete Workflow Example
+This creates traceability and ensures executing agents have context.
+
+---
+
+## Task Description Format
+
+Use this structured format for task descriptions:
+
+```
+WHAT:   [Concise statement of what to build/fix]
+WHERE:  [File paths or modules to modify]
+WHY:    [Business context - link to PRD section]
+SCOPE:  [Explicit boundaries - what NOT to do]
+ACCEPT: [Testable acceptance criteria - numbered]
+REFS:   [Related tasks, docs, code patterns]
+```
+
+### Example: Well-Structured Task
+
+```bash
+lodestar task create \\
+    --id "F042" \\
+    --title "Add email validation to signup form" \\
+    --description "WHAT: Add client-side email format validation.
+WHERE: src/components/SignupForm.tsx, src/utils/validation.ts
+WHY: Users submit invalid emails causing bounce issues (PRD #signup-requirements)
+SCOPE: Client-side only. Do NOT add server validation (separate task F043).
+ACCEPT: 1) Invalid emails show error message 2) Valid emails pass 3) Tests cover edge cases
+REFS: Follow pattern in src/utils/validation.ts, see F041 for form structure" \\
+    --prd-source "PRD.md" \\
+    --prd-ref "#signup-requirements" \\
+    --accept "Invalid emails show inline error" \\
+    --accept "Valid emails pass validation" \\
+    --accept "Unit tests cover: empty, missing @, missing domain" \\
+    --lock "src/components/SignupForm.tsx" \\
+    --lock "src/utils/validation.ts" \\
+    --depends-on "F041" \\
+    --label feature \\
+    --priority 2
+```
+
+---
+
+## Task Decomposition Patterns
+
+Large work must be split into 15-minute tasks. Use these patterns:
+
+### Vertical Slicing (Preferred)
+
+End-to-end thin features that deliver value:
+
+```
+F001: Add /health endpoint (returns 200)
+F002: Add /health checks database connection
+F003: Add /health checks cache connection
+```
+
+### Horizontal Layering
+
+Infrastructure -> Logic -> Interface:
+
+```
+F001: Add User model and migration
+F002: Add UserService with CRUD operations
+F003: Add /users API endpoints
+F004: Add user list UI component
+```
+
+### Test-First Approach
+
+Write tests, then implementation:
+
+```
+F001: Add tests for email validation
+F002: Implement email validation to pass tests
+```
+
+---
+
+## Acceptance Criteria Best Practices
+
+Acceptance criteria MUST be:
+
+| Quality | Bad Example | Good Example |
+|---------|-------------|--------------|
+| **Testable** | "Works correctly" | "Returns 200 OK with JSON body" |
+| **Specific** | "Handles errors" | "Returns 400 for invalid input with error message" |
+| **Independent** | "And also does X" | Separate criterion for each check |
+| **Complete** | Only happy path | Include: happy path, edge cases, error cases |
+
+### Using --accept for Structured Criteria
+
+```bash
+lodestar task create \\
+    --title "Add rate limiting" \\
+    --accept "Requests over 100/min return 429" \\
+    --accept "Rate limit headers included in response" \\
+    --accept "Existing tests still pass" \\
+    --accept "New tests cover rate limit scenarios"
+```
+
+---
+
+## Multi-Agent File Coordination
+
+Declare file ownership with `--lock` to prevent conflicts:
+
+```bash
+lodestar task create \\
+    --title "Refactor auth module" \\
+    --lock "src/auth/**" \\
+    --lock "tests/auth/**"
+```
+
+When claiming, you'll see warnings if locks overlap:
+
+```bash
+$ lodestar task claim F002 --agent A1234ABCD
+Claimed task F002
+WARNING: Lock 'src/auth/**' overlaps with 'src/**' (task F001, agent A9876WXYZ)
+```
+
+Use `--force` when intentionally coordinating with another agent.
+
+---
+
+## Complete Task Options Reference
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--id` | | Task ID (auto-generated as T001, T002... if omitted) |
+| `--title` | `-t` | Task title (required) |
+| `--description` | `-d` | Full description (WHAT/WHERE/WHY/SCOPE/ACCEPT/REFS format) |
+| `--accept` | `-a` | Acceptance criterion (repeatable) |
+| `--priority` | `-p` | Lower = higher priority (default: 100) |
+| `--status` | `-s` | Initial status (default: ready) |
+| `--depends-on` | | Task IDs this depends on (repeatable) |
+| `--label` | `-l` | Labels for categorization (repeatable) |
+| `--lock` | | File glob patterns for ownership (repeatable) |
+| `--prd-source` | | Path to PRD file (e.g., "PRD.md") |
+| `--prd-ref` | | PRD section anchors (repeatable, e.g., "#feature-x") |
+| `--prd-excerpt` | | Frozen PRD text to embed directly |
+| `--validate-prd` | | Validate PRD exists and anchors resolve (default) |
+| `--no-validate-prd` | | Skip PRD validation |
+
+---
+
+## Working on Tasks
 
 ```bash
 # 1. Register as an agent (save your ID!)
@@ -67,7 +210,7 @@ lodestar task next --count 3
 lodestar task claim F001 --agent A1234ABCD
 
 # 4. Do the work...
-#    If it takes longer than 10 min, renew the lease:
+#    Renew if taking longer than 10 min:
 lodestar task renew F001 --agent A1234ABCD
 
 # 5. Complete the task
@@ -75,107 +218,25 @@ lodestar task done F001
 lodestar task verify F001
 
 # Alternative: Release if you can't complete
-lodestar task release F001
+lodestar task release F001 --agent A1234ABCD --reason "Blocked on API approval"
 ```
 
-## Creating Tasks
-
-Write **detailed descriptions** so executing agents have full context.
-
-### Basic Task
-
-```bash
-lodestar task create --title "Fix login bug" --label bug --priority 1
-```
-
-### Full Task with Dependencies
-
-```bash
-lodestar task create \\
-    --id "F001" \\
-    --title "Add user authentication" \\
-    --description "WHAT: Implement OAuth2 login. WHERE: src/auth/. WHY: Users need SSO. ACCEPT: Tests pass, login works." \\
-    --depends-on "F000" \\
-    --label feature \\
-    --priority 2
-```
-
-### Task with PRD References
-
-```bash
-# Reference sections in a PRD file
-lodestar task create \\
-    --title "Implement caching layer" \\
-    --prd-source "PRD.md" \\
-    --prd-ref "#caching-requirements" \\
-    --prd-ref "#performance-targets"
-
-# Or embed a frozen excerpt directly
-lodestar task create \\
-    --title "Add rate limiting" \\
-    --prd-excerpt "Rate limit: 100 req/min per user. Use Redis for distributed counting."
-```
-
-### Task Options Reference
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--id` | | Task ID (auto-generated if omitted) |
-| `--title` | `-t` | Task title (required) |
-| `--description` | `-d` | WHAT/WHERE/WHY/ACCEPT format recommended |
-| `--priority` | `-p` | Lower number = higher priority (default: 100) |
-| `--status` | `-s` | Initial status (default: ready) |
-| `--depends-on` | | Task IDs this depends on (repeatable) |
-| `--label` | `-l` | Labels for categorization (repeatable) |
-| `--prd-source` | | Path to PRD file |
-| `--prd-ref` | | PRD section anchors (repeatable) |
-| `--prd-excerpt` | | Frozen PRD text to embed |
-
-## Multi-Agent File Coordination
-
-When multiple agents work concurrently, use the `locks` field to declare file ownership:
-
-```yaml
-# In spec.yaml
-F001:
-  title: Implement auth
-  locks:
-    - src/auth/**
-    - tests/auth/**
-```
-
-When claiming a task, you'll see warnings if locks overlap with other claimed tasks:
-
-```bash
-$ lodestar task claim F002 --agent A1234ABCD
-Claimed task F002
-WARNING: Lock 'src/auth/**' overlaps with 'src/**' (task F001, claimed by A9876WXYZ)
-
-Use --force to bypass lock conflict warnings
-```
-
-Use `--force` when you intentionally coordinate with another agent.
+---
 
 ## CLI Quick Reference
 
-| Command | Key Options |
-|---------|-------------|
-| `task list` | `--status`, `--label`, `--include-deleted` |
-| `task next` | `--count` |
-| `task show <id>` | `--json` |
-| `task create` | `--title`, `--description`, `--priority`, `--depends-on`, `--label`, `--prd-source`, `--prd-ref`, `--prd-excerpt` |
-| `task claim <id>` | `--agent`, `--force` |
-| `task renew <id>` | `--agent` |
-| `task done <id>` | |
-| `task verify <id>` | |
-| `task delete <id>` | `--cascade` |
-
-## Get Help
-
-```bash
-lodestar <command> --help    # See all options
-lodestar <command> --explain # Understand what it does
-```
+| Command | Purpose |
+|---------|---------|
+| `lodestar doctor` | Health check |
+| `lodestar status` | Overview with next actions |
+| `lodestar agent join` | Register as agent |
+| `lodestar task next` | Find claimable tasks |
+| `lodestar task list` | List all tasks |
+| `lodestar task show <id>` | Task details |
+| `lodestar task create` | Create task (planning) |
+| `lodestar task claim <id>` | Claim with lease |
+| `lodestar task done <id>` | Mark complete |
+| `lodestar task verify <id>` | Verify (unblocks deps) |
 
 ## Files
 
@@ -183,6 +244,14 @@ lodestar <command> --explain # Understand what it does
 |------|---------|-----|
 | `.lodestar/spec.yaml` | Task definitions | Commit |
 | `.lodestar/runtime.sqlite` | Agent/lease state | Gitignored |
+| `PRD.md` (if exists) | Product requirements | Commit |
+
+## Help
+
+```bash
+lodestar <command> --help    # All options
+lodestar <command> --explain # What it does
+```
 """
 
 # MCP-enabled AGENTS.md template
