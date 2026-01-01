@@ -3303,11 +3303,13 @@ tasks:
     - refactor
     locks: []
     priority: 1
-    status: done
+    status: verified
     created_at: '2026-01-01T08:49:09.183019+00:00'
-    updated_at: '2026-01-01T08:56:43.135433+00:00'
+    updated_at: '2026-01-01T08:56:56.707460+00:00'
     completed_by: ABF1D05AD
     completed_at: 2026-01-01 08:56:43.135446+00:00
+    verified_by: ABF1D05AD
+    verified_at: 2026-01-01 08:56:56.707472+00:00
     prd:
       source: docs/prd/task-creation-guidance.md
       refs:
@@ -3339,9 +3341,11 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: done
     created_at: '2026-01-01T08:49:17.591387+00:00'
-    updated_at: '2026-01-01T08:49:17.591390+00:00'
+    updated_at: '2026-01-01T08:58:36.908700+00:00'
+    completed_by: ABF1D05AD
+    completed_at: 2026-01-01 08:58:36.908713+00:00
     prd:
       source: docs/prd/task-creation-guidance.md
       refs:
@@ -3636,6 +3640,19 @@ tasks:
         lines: null
       excerpt: null
       prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TEST-LOCK:
+    title: Test lock option
+    description: ''
+    acceptance_criteria: []
+    depends_on: []
+    labels: []
+    locks:
+    - src/test/**
+    - tests/unit/**
+    priority: 100
+    status: deleted
+    created_at: '2026-01-01T08:58:14.725974+00:00'
+    updated_at: '2026-01-01T08:58:19.028733+00:00'
 features:
   m0-skeleton:
   - F001

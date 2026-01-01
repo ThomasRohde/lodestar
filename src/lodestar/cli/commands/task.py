@@ -451,6 +451,11 @@ def task_create(
         "-l",
         help="Labels for the task.",
     ),
+    locks: list[str] | None = typer.Option(
+        None,
+        "--lock",
+        help="File lock glob patterns for multi-agent coordination (e.g., 'src/auth/**'). Can specify multiple.",
+    ),
     prd_source: str | None = typer.Option(
         None,
         "--prd-source",
@@ -575,6 +580,7 @@ def task_create(
         status=task_status,
         depends_on=depends_on or [],
         labels=labels or [],
+        locks=locks or [],
         prd=prd_context,
     )
 
