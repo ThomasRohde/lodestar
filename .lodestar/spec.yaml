@@ -3493,11 +3493,13 @@ tasks:
     - docs
     locks: []
     priority: 2
-    status: done
+    status: verified
     created_at: '2026-01-01T08:49:50.533448+00:00'
-    updated_at: '2026-01-01T09:17:14.566602+00:00'
+    updated_at: '2026-01-01T09:17:26.973886+00:00'
     completed_by: ABF1D05AD
     completed_at: 2026-01-01 09:17:14.566619+00:00
+    verified_by: ABF1D05AD
+    verified_at: 2026-01-01 09:17:26.973898+00:00
     prd:
       source: docs/prd/task-creation-guidance.md
       refs:
@@ -3535,9 +3537,9 @@ tasks:
     - docs
     locks: []
     priority: 2
-    status: ready
+    status: done
     created_at: '2026-01-01T08:49:58.198160+00:00'
-    updated_at: '2026-01-01T08:49:58.198163+00:00'
+    updated_at: '2026-01-01T09:36:02.737407+00:00'
     prd:
       source: docs/prd/task-creation-guidance.md
       refs:

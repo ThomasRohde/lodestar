@@ -259,9 +259,9 @@ AGENTS_MD_MCP_TEMPLATE = """# {project_name} - Agent Coordination
 
 This repository uses [Lodestar](https://github.com/lodestar-cli/lodestar) for multi-agent coordination.
 
-## MCP Tools (Preferred)
+## MCP Tools (Preferred for Task Execution)
 
-When connected via MCP, use the `lodestar_*` tools directly. MCP is the preferred method for agents.
+When connected via MCP, use the `lodestar_*` tools directly for **executing** tasks.
 
 ### Quick Start
 
@@ -283,7 +283,110 @@ lodestar_task_claim(task_id="F001", agent_id="YOUR_ID")
 7. VERIFY    lodestar_task_verify()        -> Unblock dependents
 ```
 
-### MCP Tool Reference
+---
+
+## IMPORTANT: Task Creation Requires CLI
+
+**Task creation is CLI-only.** MCP tools are for task execution, not task planning.
+
+A planning agent (or human) must use CLI to create well-structured tasks.
+
+### Why CLI-Only for Task Creation?
+
+- Task design requires thoughtful INVEST-compliant decomposition
+- PRD validation needs file system access
+- Lock patterns need careful consideration
+- This separation enforces a plan-then-execute workflow
+
+---
+
+## Task Design Principles (For Planning Agents)
+
+**Every task must be completable within a 15-minute lease.**
+
+### The INVEST Criteria
+
+| Criterion | Meaning | Example |
+|-----------|---------|---------|
+| **I**ndependent | No waiting for others | "Add login form" not "Add login after auth" |
+| **N**egotiable | Details refined during execution | Specify WHAT, not HOW |
+| **V**aluable | Delivers user/developer value | Clear business reason |
+| **E**stimable | Scope is clear | Bounded file changes |
+| **S**mall | Fits in 15-minute lease | Split large work |
+| **T**estable | Verifiable acceptance criteria | "Tests pass", "Returns 200" |
+
+### Mandatory PRD References
+
+If a PRD exists, **all tasks MUST reference it**:
+
+```bash
+lodestar task create \\
+    --title "Implement feature X" \\
+    --prd-source "PRD.md" \\
+    --prd-ref "#feature-x-requirements"
+```
+
+### Task Description Format
+
+Use this structured format:
+
+```
+WHAT:   [Concise statement of what to build/fix]
+WHERE:  [File paths or modules to modify]
+WHY:    [Business context - link to PRD section]
+SCOPE:  [Explicit boundaries - what NOT to do]
+ACCEPT: [Testable acceptance criteria - numbered]
+REFS:   [Related tasks, docs, code patterns]
+```
+
+### Example: Well-Structured Task
+
+```bash
+lodestar task create \\
+    --id "F042" \\
+    --title "Add email validation to signup form" \\
+    --description "WHAT: Add client-side email format validation.
+WHERE: src/components/SignupForm.tsx, src/utils/validation.ts
+WHY: Users submit invalid emails causing bounce issues (PRD #signup-requirements)
+SCOPE: Client-side only. Do NOT add server validation (separate task F043).
+ACCEPT: 1) Invalid emails show error 2) Valid emails pass 3) Tests cover edge cases
+REFS: Follow pattern in validation.ts, see F041 for form structure" \\
+    --prd-source "PRD.md" \\
+    --prd-ref "#signup-requirements" \\
+    --accept "Invalid emails show inline error" \\
+    --accept "Valid emails pass validation" \\
+    --accept "Unit tests cover: empty, missing @, missing domain" \\
+    --lock "src/components/SignupForm.tsx" \\
+    --lock "src/utils/validation.ts" \\
+    --depends-on "F041" \\
+    --label feature \\
+    --priority 2
+```
+
+---
+
+## Complete Task Options Reference (CLI)
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--id` | | Task ID (auto-generated if omitted) |
+| `--title` | `-t` | Task title (required) |
+| `--description` | `-d` | Full description (WHAT/WHERE/WHY/SCOPE/ACCEPT/REFS) |
+| `--accept` | `-a` | Acceptance criterion (repeatable) |
+| `--priority` | `-p` | Lower = higher priority (default: 100) |
+| `--status` | `-s` | Initial status (default: ready) |
+| `--depends-on` | | Task IDs this depends on (repeatable) |
+| `--label` | `-l` | Labels for categorization (repeatable) |
+| `--lock` | | File glob patterns for ownership (repeatable) |
+| `--prd-source` | | Path to PRD file |
+| `--prd-ref` | | PRD section anchors (repeatable) |
+| `--prd-excerpt` | | Frozen PRD text to embed |
+| `--validate-prd` | | Validate PRD exists (default) |
+| `--no-validate-prd` | | Skip PRD validation |
+
+---
+
+## MCP Tool Reference
 
 | Category | Tool | Purpose |
 |----------|------|---------|
@@ -305,50 +408,33 @@ lodestar_task_claim(task_id="F001", agent_id="YOUR_ID")
 | | `lodestar_message_ack` | Mark messages as read |
 | **Events** | `lodestar_events_pull` | Pull event stream |
 
-### Handoff Pattern
+---
+
+## Handoff Pattern
 
 When blocked or ending session before completion:
 
 ```
 lodestar_task_release(task_id="F001", agent_id="YOUR_ID", reason="Blocked on API approval")
-lodestar_message_send(task_id="F001", from_agent_id="YOUR_ID", body="Progress: 60% complete. Tests passing.")
+lodestar_message_send(task_id="F001", from_agent_id="YOUR_ID", body="Progress: 60% complete. Tests passing. Next: finish validation.")
 ```
 
-## CLI Commands (No MCP Equivalent)
+---
 
-These operations require CLI:
+## CLI Commands (No MCP Equivalent)
 
 | Command | Purpose |
 |---------|---------|
 | `lodestar init` | Initialize repository |
 | `lodestar doctor` | Health check |
-| `lodestar task create` | Create new tasks |
+| `lodestar task create` | Create new tasks (planning) |
 | `lodestar task update` | Update task fields |
 | `lodestar task delete` | Delete tasks (--cascade for deps) |
 | `lodestar task renew` | Extend lease duration |
 | `lodestar task graph` | Export dependency graph |
 | `lodestar export snapshot` | Export full state |
 
-### Creating Tasks (CLI Only)
-
-```bash
-lodestar task create \\
-    --id "F001" \\
-    --title "Add authentication" \\
-    --description "WHAT: Implement OAuth2. WHERE: src/auth/. ACCEPT: Tests pass." \\
-    --depends-on "F000" \\
-    --label feature \\
-    --priority 2
-```
-
-### Task with PRD References (CLI Only)
-
-```bash
-lodestar task create \\
-    --title "Implement caching" \\
-    --prd-source "PRD.md" \\
-    --prd-ref "#caching-requirements"
-```
+---
 
 ## Files
 
@@ -356,6 +442,7 @@ lodestar task create \\
 |------|---------|-----|
 | `.lodestar/spec.yaml` | Task definitions | Commit |
 | `.lodestar/runtime.sqlite` | Agent/lease state | Gitignored |
+| `PRD.md` (if exists) | Product requirements | Commit |
 
 ## Help
 
