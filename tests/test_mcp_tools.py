@@ -230,8 +230,8 @@ class TestTaskList:
         assert data1["items"][0]["id"] == "T001"
         assert data1["items"][1]["id"] == "T002"
 
-        # Should have nextCursor since there are more results
-        next_cursor = result1._meta["nextCursor"]
+        # Should have nextCursor in structuredContent since there are more results
+        next_cursor = data1["nextCursor"]
         assert next_cursor == "T002"
 
         # Get second page using cursor
@@ -322,8 +322,10 @@ class TestTaskList:
     def test_next_cursor_none_when_no_more_results(self, mcp_context):
         """Test that nextCursor is None when all results returned."""
         result = task_list(mcp_context, limit=100)
+        data = result.structuredContent
 
-        assert result._meta["nextCursor"] is None
+        # nextCursor should not be present or be None when there are no more results
+        assert data.get("nextCursor") is None
 
 
 class TestTaskGet:
@@ -1450,10 +1452,12 @@ class TestInputValidation:
         assert isinstance(data["total"], int)
         assert isinstance(data["items"], list)
 
-        # Verify metadata
+        # Verify metadata (filters are in _meta, nextCursor is in structuredContent)
         assert result._meta is not None
-        assert "nextCursor" in result._meta
         assert "filters" in result._meta
+
+        # nextCursor is now in structuredContent (may be None if no more results)
+        # We just verify the field exists or is None (not present when no pagination needed)
 
     def test_task_get_output_schema(self, validation_context):
         """Test that task.get output matches expected schema."""

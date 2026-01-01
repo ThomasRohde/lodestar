@@ -56,13 +56,8 @@ class LeaseRepository:
             orm_lease = lease_to_orm(lease)
             session.add(orm_lease)
 
-            log_event(
-                session,
-                EventType.TASK_CLAIM,
-                agent_id=lease.agent_id,
-                task_id=lease.task_id,
-                data={"lease_id": lease.lease_id},
-            )
+            # Note: Event emission is handled by the MCP layer (task_mutations.py)
+            # to avoid duplicate events and to include additional context like ttl_seconds
 
             return lease
 

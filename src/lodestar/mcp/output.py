@@ -112,6 +112,7 @@ def with_list(
     summary: str,
     items: list[dict[str, Any]],
     total: int | None = None,
+    next_cursor: str | None = None,
     meta: dict[str, Any] | None = None,
 ) -> CallToolResult:
     """
@@ -121,6 +122,7 @@ def with_list(
         summary: Human-readable description (e.g., "Found 5 tasks")
         items: List of structured items
         total: Total count if different from len(items) (for pagination)
+        next_cursor: Cursor for fetching next page of results (optional)
         meta: Hidden metadata for client applications (optional)
 
     Returns:
@@ -134,6 +136,7 @@ def with_list(
         ...         {"id": "T002", "title": "Second"},
         ...     ],
         ...     total=10,  # If showing page 1 of multiple pages
+        ...     next_cursor="T002",  # Use this to get the next page
         ... )
     """
     structured_data: dict[str, Any] = {
@@ -143,6 +146,9 @@ def with_list(
 
     if total is not None:
         structured_data["total"] = total
+
+    if next_cursor is not None:
+        structured_data["nextCursor"] = next_cursor
 
     result = CallToolResult(
         content=[TextContent(type="text", text=summary)],

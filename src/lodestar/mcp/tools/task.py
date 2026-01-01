@@ -135,9 +135,8 @@ def task_list(
         filter_desc,
     )
 
-    # Build metadata with pagination and filter info
+    # Build metadata with filter info (nextCursor now in main response)
     meta = {
-        "nextCursor": next_cursor,
         "filters": {
             "status": status if status else None,
             "label": label if label else None,
@@ -148,6 +147,7 @@ def task_list(
         summary,
         items=task_summaries,
         total=len(context.spec.tasks),
+        next_cursor=next_cursor,
         meta=meta,
     )
 
