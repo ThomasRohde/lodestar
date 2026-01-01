@@ -74,5 +74,22 @@ uv run lodestar task claim --explain
 ## Project-Specific Notes
 
 - All commands use `uv run lodestar` prefix
-- Pre-commit checks required: `uv run ruff check src tests && uv run pytest`
 - Task IDs: F=feature, D=docs, B=bug, T=test
+
+## Pre-Commit Hooks (Enforced)
+
+This repo uses pre-commit to enforce CI checks locally:
+
+```bash
+# One-time setup (after uv sync)
+uv run pre-commit install
+uv run pre-commit install --hook-type pre-push
+
+# Run all checks manually
+uv run pre-commit run --all-files
+```
+
+**On every commit:** ruff check + format, mypy
+**On every push:** pytest, mkdocs build, lodestar doctor
+
+If pre-commit isn't installed, install hooks before working.

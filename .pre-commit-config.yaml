@@ -1,0 +1,58 @@
+# Pre-commit hooks to enforce CI checks locally
+# Install: uv run pre-commit install
+# Run manually: uv run pre-commit run --all-files
+
+repos:
+  # Ruff - linting and formatting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        name: ruff check
+        args: [--fix]
+      - id: ruff-format
+        name: ruff format
+
+  # Type checking with mypy
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        types: [python]
+        args: [src/lodestar]
+        pass_filenames: false
+
+  # Run tests (only on push, not on every commit)
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
+        args: [--tb=short, -q]
+
+  # Build docs to catch broken links/syntax
+  - repo: local
+    hooks:
+      - id: mkdocs-build
+        name: mkdocs build
+        entry: uv run mkdocs build
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        args: [--strict]
+
+  # Lodestar health check
+  - repo: local
+    hooks:
+      - id: lodestar-doctor
+        name: lodestar doctor
+        entry: uv run lodestar doctor
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

@@ -63,9 +63,7 @@ def extract_prd_section(
         # Second, try implicit anchor (heading text matches anchor)
         # Replace dashes with pattern that matches either space or dash
         implicit_pattern_text = anchor_text.replace("-", "[ -]")
-        implicit_pattern = re.compile(
-            rf"^(#{{1,6}})\s+{implicit_pattern_text}", re.IGNORECASE
-        )
+        implicit_pattern = re.compile(rf"^(#{{1,6}})\s+{implicit_pattern_text}", re.IGNORECASE)
 
         start_line = None
         heading_level = None

@@ -36,9 +36,11 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-anyio>=0.0.0",
     "ruff>=0.8.0",
     "mypy>=1.0.0",
     "types-PyYAML>=6.0.0",
+    "pre-commit>=4.0.0",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -71,7 +73,6 @@ ignore = [
     "B904",    # Raise from in except (not always needed for typer.Exit)
     "ARG001",  # Unused function argument (CLI options are intentional)
     "ARG002",  # Unused method argument (database params may be for future use)
-    "UP046",   # Generic class style (Pydantic compatibility)
 ]
 
 [tool.ruff.format]
