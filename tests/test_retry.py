@@ -103,7 +103,7 @@ def test_retry_fails_after_max_attempts():
     with pytest.raises(OSError) as exc_info:
         retry_on_windows_error(always_fails, max_attempts=5, base_delay_ms=1)
 
-    assert exc_info.value.winerror == 5
+    assert getattr(exc_info.value, "winerror", exc_info.value.errno) == 5
     assert call_count == 5
 
 
@@ -136,7 +136,7 @@ def test_retry_fails_immediately_on_non_retriable_oserror():
     with pytest.raises(OSError) as exc_info:
         retry_on_windows_error(raises_non_retriable, max_attempts=5, base_delay_ms=1)
 
-    assert exc_info.value.winerror == 2
+    assert getattr(exc_info.value, "winerror", exc_info.value.errno) == 2
     # Should fail immediately, not retry
     assert call_count == 1
 
