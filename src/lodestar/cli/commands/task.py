@@ -456,6 +456,12 @@ def task_create(
         "--lock",
         help="File lock glob patterns for multi-agent coordination (e.g., 'src/auth/**'). Can specify multiple.",
     ),
+    acceptance_criteria: list[str] | None = typer.Option(
+        None,
+        "--accept",
+        "-a",
+        help="Acceptance criteria (e.g., 'Tests pass', 'No regressions'). Can specify multiple.",
+    ),
     prd_source: str | None = typer.Option(
         None,
         "--prd-source",
@@ -576,6 +582,7 @@ def task_create(
         id=task_id,
         title=title,
         description=description,
+        acceptance_criteria=acceptance_criteria or [],
         priority=priority,
         status=task_status,
         depends_on=depends_on or [],
