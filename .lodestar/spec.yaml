@@ -3278,6 +3278,362 @@ tasks:
     completed_at: 2025-12-29 18:38:15.825418+00:00
     verified_by: AEB8F7DF9
     verified_at: 2025-12-29 18:39:56.775289+00:00
+  TASK-001:
+    title: Create templates module and extract AGENTS.md templates
+    description: 'WHAT: Create src/lodestar/cli/templates/agents_md.py module with
+      AGENTS_MD_CLI_TEMPLATE and AGENTS_MD_MCP_TEMPLATE f-string constants.
+
+      WHERE: src/lodestar/cli/templates/agents_md.py (new), src/lodestar/cli/commands/init.py
+
+      WHY: Templates exceed 200 lines; extracting improves maintainability (see PRD
+      #template-extraction)
+
+      SCOPE: Only extract existing templates; do NOT add new content yet. Create __init__.py
+      for templates package.
+
+      ACCEPT: 1) Templates module exists with both constants 2) init.py imports from
+      templates 3) lodestar init still works 4) Tests pass
+
+      REFS: Current templates in init.py lines 192-475
+
+      LOCKS: src/lodestar/cli/templates/**, src/lodestar/cli/commands/init.py'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - refactor
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2026-01-01T08:49:09.183019+00:00'
+    updated_at: '2026-01-01T08:49:09.183021+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#template-extraction'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-002:
+    title: Add --lock option to task create CLI
+    description: 'WHAT: Add repeatable --lock option to lodestar task create command.
+
+      WHERE: src/lodestar/cli/commands/task.py (create_command function)
+
+      WHY: Enable file ownership declaration at task creation (see PRD #cli-options)
+
+      SCOPE: Only add --lock option and wire to Task.locks field. Do NOT add --accept
+      or --validate-prd yet.
+
+      ACCEPT: 1) --lock accepts glob patterns 2) Multiple --lock flags work 3) Task
+      saved with locks field 4) Help text is clear 5) Tests pass
+
+      REFS: Task model has locks: list[str] field in models/spec.py
+
+      LOCKS: src/lodestar/cli/commands/task.py'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-001
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2026-01-01T08:49:17.591387+00:00'
+    updated_at: '2026-01-01T08:49:17.591390+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#cli-options'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-003:
+    title: Add --accept option to task create CLI
+    description: 'WHAT: Add repeatable --accept option to lodestar task create command.
+
+      WHERE: src/lodestar/cli/commands/task.py (create_command function)
+
+      WHY: Enable acceptance criteria at task creation (see PRD #cli-options)
+
+      SCOPE: Only add --accept option and wire to Task.acceptance_criteria field.
+      Do NOT add --validate-prd yet.
+
+      ACCEPT: 1) --accept accepts strings 2) Multiple --accept flags work 3) Task
+      saved with acceptance_criteria 4) Help text is clear 5) Tests pass
+
+      REFS: Task model has acceptance_criteria: list[str] field in models/spec.py
+
+      LOCKS: src/lodestar/cli/commands/task.py'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-002
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2026-01-01T08:49:23.647110+00:00'
+    updated_at: '2026-01-01T08:49:23.647113+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#cli-options'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-004:
+    title: Add --validate-prd flag to task create CLI
+    description: 'WHAT: Add --validate-prd/--no-validate-prd flags to lodestar task
+      create.
+
+      WHERE: src/lodestar/cli/commands/task.py (create_command function)
+
+      WHY: Catch PRD reference errors early at task creation (see PRD #cli-options)
+
+      SCOPE: 1) Verify --prd-source file exists 2) Verify --prd-ref anchors exist
+      in file 3) Default: validate 4) --no-validate-prd skips checks
+
+      ACCEPT: 1) Missing PRD file fails with clear error 2) Invalid anchor fails with
+      clear error 3) --no-validate-prd bypasses checks 4) Success case still works
+      5) Tests cover all cases
+
+      REFS: PRD anchor format is {#anchor-name} in markdown headers
+
+      LOCKS: src/lodestar/cli/commands/task.py'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-003
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2026-01-01T08:49:32.075356+00:00'
+    updated_at: '2026-01-01T08:49:32.075360+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#cli-options'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-005:
+    title: Add locks parameter to MCP task tools
+    description: 'WHAT: Add locks parameter to relevant MCP task tools for file ownership.
+
+      WHERE: src/lodestar/mcp/tools/ (task-related tool files)
+
+      WHY: MCP agents need lock conflict warnings same as CLI (see PRD #mcp-tools)
+
+      SCOPE: 1) Add locks to task claim tool if not present 2) Ensure lock conflict
+      warnings work via MCP 3) Document that task create is CLI-only
+
+      ACCEPT: 1) MCP task_claim shows lock warnings 2) Lock conflicts detected same
+      as CLI 3) Tests cover MCP lock scenarios
+
+      REFS: CLI lock warning behavior in task.py claim_command
+
+      LOCKS: src/lodestar/mcp/tools/**'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-002
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2026-01-01T08:49:40.636369+00:00'
+    updated_at: '2026-01-01T08:49:40.636373+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#mcp-tools'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-006:
+    title: Rewrite CLI AGENTS.md template with task guidance
+    description: 'WHAT: Rewrite AGENTS_MD_CLI_TEMPLATE with comprehensive task creation
+      guidance.
+
+      WHERE: src/lodestar/cli/templates/agents_md.py
+
+      WHY: AI agents need structured guidance for well-formed tasks (see PRD #agents-md)
+
+      SCOPE: Add Task Design Principles, Task Description Format (WHAT/WHERE/WHY/SCOPE/ACCEPT/REFS),
+      Decomposition Patterns, Acceptance Criteria Writing. Include new --lock, --accept,
+      --validate-prd options.
+
+      ACCEPT: 1) Template exceeds 200 lines 2) All new CLI options documented 3) INVEST
+      criteria explained 4) 15-minute rule emphasized 5) Examples use proper format
+
+      REFS: PRD sections #task-principles, #task-format, #decomposition, #acceptance-criteria
+
+      LOCKS: src/lodestar/cli/templates/agents_md.py'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-004
+    labels:
+    - docs
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2026-01-01T08:49:50.533448+00:00'
+    updated_at: '2026-01-01T08:49:50.533450+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#agents-md'
+        lines: null
+      - anchor: '#task-principles'
+        lines: null
+      - anchor: '#task-format'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-007:
+    title: Rewrite MCP AGENTS.md template with task guidance
+    description: 'WHAT: Rewrite AGENTS_MD_MCP_TEMPLATE with comprehensive task creation
+      guidance.
+
+      WHERE: src/lodestar/cli/templates/agents_md.py
+
+      WHY: MCP agents need same guidance, emphasis on CLI-only task creation (see
+      PRD #agents-md)
+
+      SCOPE: Mirror CLI template guidance but emphasize: task creation is CLI-only,
+      use lodestar_task_context() for PRD, MCP tool reference table.
+
+      ACCEPT: 1) Template exceeds 200 lines 2) CLI-only task creation clearly stated
+      3) lodestar_task_context usage documented 4) Same guidance quality as CLI template
+
+      REFS: TASK-006 for CLI template pattern
+
+      LOCKS: src/lodestar/cli/templates/agents_md.py'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-006
+    labels:
+    - docs
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2026-01-01T08:49:58.198160+00:00'
+    updated_at: '2026-01-01T08:49:58.198163+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#agents-md'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-008:
+    title: Create PRD authoring guide documentation
+    description: 'WHAT: Create docs/guides/prd-authoring.md documenting how AI agents
+      should structure PRDs.
+
+      WHERE: docs/guides/prd-authoring.md (new file)
+
+      WHY: Well-structured PRDs enable better task decomposition and context delivery
+      (see PRD #prd-authoring)
+
+      SCOPE: Cover: Section Anchoring syntax, Task-aligned structure, Scope bounding
+      for 15-min leases, Drift-resistant writing, Cross-referencing. Include examples.
+
+      ACCEPT: 1) File created with all sections 2) Anchor syntax documented with examples
+      3) Task-aligned structure explained 4) Actionable patterns provided
+
+      REFS: PRD sections #prd-anchoring, #prd-structure, #prd-scope, #prd-drift
+
+      LOCKS: docs/guides/prd-authoring.md'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-001
+    labels:
+    - docs
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2026-01-01T08:50:07.525080+00:00'
+    updated_at: '2026-01-01T08:50:07.525082+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#prd-authoring'
+        lines: null
+      - anchor: '#prd-anchoring'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-009:
+    title: Update mkdocs.yml and guides index for PRD authoring
+    description: 'WHAT: Add PRD authoring guide to mkdocs navigation and guides index.
+
+      WHERE: mkdocs.yml, docs/guides/index.md
+
+      WHY: New guide must be discoverable in documentation (see PRD #implementation-order)
+
+      SCOPE: 1) Add ''PRD Authoring'' to nav under Guides 2) Add link and description
+      in guides/index.md
+
+      ACCEPT: 1) mkdocs.yml nav includes prd-authoring.md 2) guides/index.md lists
+      the new guide 3) mkdocs build succeeds 4) Guide appears in rendered docs
+
+      REFS: Existing guide structure in mkdocs.yml
+
+      LOCKS: mkdocs.yml, docs/guides/index.md'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-008
+    labels:
+    - docs
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2026-01-01T08:50:15.492553+00:00'
+    updated_at: '2026-01-01T08:50:15.492556+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#implementation-order'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TASK-010:
+    title: Add lodestar task validate command (deferred)
+    description: 'WHAT: Create lodestar task validate command for CI integration.
+
+      WHERE: src/lodestar/cli/commands/task.py (new validate_command)
+
+      WHY: Validate task quality: PRD refs exist, acceptance criteria present, scope
+      estimates (see PRD #non-goals deferral)
+
+      SCOPE: Check all tasks for: 1) PRD reference if PRD exists 2) Non-empty acceptance_criteria
+      3) Description follows format 4) Warn on issues
+
+      ACCEPT: 1) Command exists 2) Checks for PRD refs 3) Checks for acceptance criteria
+      4) Returns exit code 1 on failures 5) --json output works
+
+      REFS: Related to --validate-prd but for all tasks post-hoc
+
+      LOCKS: src/lodestar/cli/commands/task.py'
+    acceptance_criteria: []
+    depends_on:
+    - TASK-004
+    labels:
+    - feature
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2026-01-01T08:50:24.758022+00:00'
+    updated_at: '2026-01-01T08:50:24.758026+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#non-goals'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
 features:
   m0-skeleton:
   - F001
