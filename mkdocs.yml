@@ -76,6 +76,7 @@ nav:
       - guides/index.md
       - Agent Workflow: guides/agent-workflow.md
       - Agent Coordination: guides/agent-coordination.md
+      - PRD Authoring: guides/prd-authoring.md
       - Error Handling: guides/error-handling.md
       - CI Integration: guides/ci-integration.md
   - Reference:

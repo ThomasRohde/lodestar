@@ -23,6 +23,15 @@ How multiple agents coordinate work on shared repositories:
 - Multi-agent workflow examples
 - Best practices for agent-to-agent communication
 
+### [PRD Authoring](prd-authoring.md)
+
+How to write PRDs optimized for Lodestar task decomposition:
+
+- Using explicit anchors for stable references
+- Structuring sections for 15-minute tasks
+- Writing drift-resistant content
+- PRD templates and AI agent guidelines
+
 ### [Error Handling](error-handling.md)
 
 How to handle errors when using Lodestar's MCP server:
