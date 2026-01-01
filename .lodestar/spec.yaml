@@ -3379,11 +3379,13 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: done
+    status: verified
     created_at: '2026-01-01T08:49:23.647110+00:00'
-    updated_at: '2026-01-01T08:59:46.858968+00:00'
+    updated_at: '2026-01-01T08:59:50.995066+00:00'
     completed_by: ABF1D05AD
     completed_at: 2026-01-01 08:59:46.858982+00:00
+    verified_by: ABF1D05AD
+    verified_at: 2026-01-01 08:59:50.995080+00:00
     prd:
       source: docs/prd/task-creation-guidance.md
       refs:
@@ -3417,9 +3419,11 @@ tasks:
     - feature
     locks: []
     priority: 1
-    status: ready
+    status: done
     created_at: '2026-01-01T08:49:32.075356+00:00'
-    updated_at: '2026-01-01T08:49:32.075360+00:00'
+    updated_at: '2026-01-01T09:04:55.422829+00:00'
+    completed_by: ABF1D05AD
+    completed_at: 2026-01-01 09:04:55.422845+00:00
     prd:
       source: docs/prd/task-creation-guidance.md
       refs:
@@ -3671,6 +3675,40 @@ tasks:
     status: deleted
     created_at: '2026-01-01T08:59:34.138834+00:00'
     updated_at: '2026-01-01T08:59:39.505050+00:00'
+  TEST-VAL-3:
+    title: Test valid anchor
+    description: ''
+    acceptance_criteria: []
+    depends_on: []
+    labels: []
+    locks: []
+    priority: 100
+    status: deleted
+    created_at: '2026-01-01T09:04:07.742699+00:00'
+    updated_at: '2026-01-01T09:04:19.271100+00:00'
+    prd:
+      source: docs/prd/task-creation-guidance.md
+      refs:
+      - anchor: '#cli-options'
+        lines: null
+      excerpt: null
+      prd_hash: 3788e3b88586fa3016513b2bf439dd560218967de39b43494c5817a774667a4e
+  TEST-VAL-4:
+    title: Test skip validation
+    description: ''
+    acceptance_criteria: []
+    depends_on: []
+    labels: []
+    locks: []
+    priority: 100
+    status: deleted
+    created_at: '2026-01-01T09:04:13.656067+00:00'
+    updated_at: '2026-01-01T09:04:20.696968+00:00'
+    prd:
+      source: nonexistent.md
+      refs: []
+      excerpt: null
+      prd_hash: null
 features:
   m0-skeleton:
   - F001

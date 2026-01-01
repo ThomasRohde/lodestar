@@ -32,7 +32,9 @@ def extract_prd_section(
 
     Args:
         path: Path to the PRD file.
-        anchor: Section anchor (e.g., "#task-claiming"). Extracts from heading to next same-level heading.
+        anchor: Section anchor (e.g., "#task-claiming"). Supports both:
+            - Explicit anchors: `## Heading {#anchor-id}`
+            - Implicit anchors: heading text with dashes/spaces matching
         lines: Optional (start, end) line range (1-indexed, inclusive).
 
     Returns:
@@ -51,17 +53,32 @@ def extract_prd_section(
         return "\n".join(all_lines[max(0, start - 1) : end])
 
     if anchor:
-        # Convert anchor to heading text
-        # Replace dashes with pattern that matches either space or dash
         anchor_text = anchor.lstrip("#")
-        pattern_text = anchor_text.replace("-", "[ -]")
-        heading_pattern = re.compile(rf"^(#{{1,6}})\s+{pattern_text}", re.IGNORECASE)
+
+        # First, try explicit anchor syntax: `## Heading {#anchor-id}`
+        explicit_pattern = re.compile(
+            rf"^(#{{1,6}})\s+.+\{{#{re.escape(anchor_text)}\}}", re.IGNORECASE
+        )
+
+        # Second, try implicit anchor (heading text matches anchor)
+        # Replace dashes with pattern that matches either space or dash
+        implicit_pattern_text = anchor_text.replace("-", "[ -]")
+        implicit_pattern = re.compile(
+            rf"^(#{{1,6}})\s+{implicit_pattern_text}", re.IGNORECASE
+        )
 
         start_line = None
         heading_level = None
 
         for i, line in enumerate(all_lines):
-            match = heading_pattern.match(line)
+            # Try explicit anchor first
+            match = explicit_pattern.match(line)
+            if match:
+                start_line = i
+                heading_level = len(match.group(1))
+                break
+            # Try implicit anchor
+            match = implicit_pattern.match(line)
             if match:
                 start_line = i
                 heading_level = len(match.group(1))

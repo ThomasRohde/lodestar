@@ -477,6 +477,11 @@ def task_create(
         "--prd-excerpt",
         help="Frozen PRD excerpt to attach to task.",
     ),
+    validate_prd: bool = typer.Option(
+        True,
+        "--validate-prd/--no-validate-prd",
+        help="Validate PRD file exists and anchors are resolvable (default: validate).",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -560,13 +565,51 @@ def task_create(
     # Build PRD context if provided
     prd_context = None
     if prd_source:
-        import contextlib
-
-        from lodestar.util.prd import compute_prd_hash
+        from lodestar.util.prd import compute_prd_hash, extract_prd_section
 
         prd_path = root / prd_source
+
+        # Validate PRD file exists if validation enabled
+        if validate_prd and not prd_path.exists():
+            if json_output:
+                print_json(
+                    Envelope.error(
+                        f"PRD file not found: {prd_source}. Use --no-validate-prd to skip."
+                    ).model_dump()
+                )
+            else:
+                console.print(f"[error]PRD file not found: {prd_source}[/error]")
+                console.print("[muted]Use --no-validate-prd to skip validation.[/muted]")
+            raise typer.Exit(1)
+
+        # Validate PRD anchors if validation enabled
+        if validate_prd and prd_refs and prd_path.exists():
+            invalid_anchors = []
+            for ref in prd_refs:
+                try:
+                    extract_prd_section(prd_path, anchor=ref)
+                except ValueError:
+                    invalid_anchors.append(ref)
+
+            if invalid_anchors:
+                if json_output:
+                    print_json(
+                        Envelope.error(
+                            f"PRD anchors not found: {invalid_anchors}. "
+                            f"Use --no-validate-prd to skip."
+                        ).model_dump()
+                    )
+                else:
+                    console.print(f"[error]PRD anchors not found: {invalid_anchors}[/error]")
+                    console.print(f"[muted]File: {prd_source}[/muted]")
+                    console.print("[muted]Use --no-validate-prd to skip validation.[/muted]")
+                raise typer.Exit(1)
+
+        # Compute hash if file exists
         prd_hash = None
         if prd_path.exists():
+            import contextlib
+
             with contextlib.suppress(Exception):
                 prd_hash = compute_prd_hash(prd_path)
 
