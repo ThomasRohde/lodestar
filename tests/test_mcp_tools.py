@@ -1594,6 +1594,121 @@ class TestInputValidation:
         assert isinstance(lease["ttlSeconds"], int)
         assert isinstance(lease["createdAt"], str)
 
+    @pytest.mark.anyio
+    async def test_task_claim_lock_conflict_warning(self, tmp_path):
+        """Test that task.claim returns warnings for overlapping locks."""
+        from lodestar.mcp.server import LodestarContext
+        from lodestar.mcp.tools.task_mutations import task_claim
+        from lodestar.models.spec import Project, Spec, Task, TaskStatus
+        from lodestar.spec.loader import save_spec
+
+        # Set up repository with two tasks that have overlapping locks
+        lodestar_dir = tmp_path / ".lodestar"
+        lodestar_dir.mkdir()
+
+        spec = Spec(
+            project=Project(name="test-project"),
+            tasks={
+                "T001": Task(
+                    id="T001",
+                    title="Task 1",
+                    status=TaskStatus.READY,
+                    locks=["src/**"],
+                ),
+                "T002": Task(
+                    id="T002",
+                    title="Task 2",
+                    status=TaskStatus.READY,
+                    locks=["src/auth/**"],  # Overlaps with src/**
+                ),
+            },
+        )
+        save_spec(spec, tmp_path)
+
+        # Create context using proper initialization
+        context = LodestarContext(repo_root=tmp_path)
+
+        # Claim first task
+        result1 = await task_claim(
+            context=context,
+            task_id="T001",
+            agent_id="AGENT-1",
+        )
+        assert result1.isError is None or result1.isError is False
+        data1 = result1.structuredContent
+        assert data1["ok"] is True
+        # First claim should have no warnings (no other claimed tasks)
+        assert len(data1["warnings"]) == 0
+
+        # Claim second task - should show lock conflict warning
+        result2 = await task_claim(
+            context=context,
+            task_id="T002",
+            agent_id="AGENT-1",
+        )
+        assert result2.isError is None or result2.isError is False
+        data2 = result2.structuredContent
+        assert data2["ok"] is True
+        # Second claim should have a warning about overlapping locks
+        assert len(data2["warnings"]) >= 1
+        warning = data2["warnings"][0]
+        assert warning["type"] == "LOCK_CONFLICT"
+        assert "overlap" in warning["message"].lower()
+
+    @pytest.mark.anyio
+    async def test_task_claim_force_bypasses_lock_warning(self, tmp_path):
+        """Test that force=True bypasses lock conflict warnings."""
+        from lodestar.mcp.server import LodestarContext
+        from lodestar.mcp.tools.task_mutations import task_claim
+        from lodestar.models.spec import Project, Spec, Task, TaskStatus
+        from lodestar.spec.loader import save_spec
+
+        # Set up repository with two tasks that have overlapping locks
+        lodestar_dir = tmp_path / ".lodestar"
+        lodestar_dir.mkdir()
+
+        spec = Spec(
+            project=Project(name="test-project"),
+            tasks={
+                "T001": Task(
+                    id="T001",
+                    title="Task 1",
+                    status=TaskStatus.READY,
+                    locks=["src/**"],
+                ),
+                "T002": Task(
+                    id="T002",
+                    title="Task 2",
+                    status=TaskStatus.READY,
+                    locks=["src/auth/**"],  # Overlaps with src/**
+                ),
+            },
+        )
+        save_spec(spec, tmp_path)
+
+        # Create context using proper initialization
+        context = LodestarContext(repo_root=tmp_path)
+
+        # Claim first task
+        await task_claim(
+            context=context,
+            task_id="T001",
+            agent_id="AGENT-1",
+        )
+
+        # Claim second task with force=True - should NOT have warnings
+        result = await task_claim(
+            context=context,
+            task_id="T002",
+            agent_id="AGENT-1",
+            force=True,
+        )
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        assert data["ok"] is True
+        # With force=True, there should be no warnings
+        assert len(data["warnings"]) == 0
+
 
 class TestTaskComplete:
     """Tests for the task.complete MCP tool (atomic done + verify).
