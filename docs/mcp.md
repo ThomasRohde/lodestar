@@ -36,7 +36,12 @@ lodestar mcp serve --help
 
 ## Running the MCP Server
 
-### Basic Usage
+Lodestar's MCP server supports two transports:
+
+- **stdio** (default): Server runs as a subprocess, communicating via stdin/stdout. Best for single-agent use with Claude Desktop, VS Code, etc.
+- **streamable-http**: Server runs as an HTTP service on localhost. Enables **multiple agents** in parallel coding sessions to connect to a single server.
+
+### Stdio Transport (Default)
 
 The MCP server runs as a subprocess and communicates via stdio (JSON-RPC over standard input/output):
 
@@ -51,12 +56,41 @@ This will:
 - Log diagnostics to stderr
 - Wait for MCP protocol messages on stdin
 
+### HTTP Transport (Multi-Agent)
+
+Run the MCP server as an HTTP service to support multiple concurrent agent sessions:
+
+```bash
+lodestar mcp serve --transport streamable-http
+```
+
+This will:
+
+- Start an HTTP server on `http://127.0.0.1:8000/mcp`
+- Accept multiple concurrent MCP client connections
+- Use connection pooling for efficient database access
+- Gracefully handle shutdown with proper resource cleanup
+
+**Custom host and port:**
+
+```bash
+lodestar mcp serve -t streamable-http --host 127.0.0.1 --port 9000
+```
+
+!!! tip "Multi-Agent Use Case"
+    Use HTTP transport when you have multiple VS Code windows or Claude instances that need to coordinate through a shared Lodestar server. Each agent can claim tasks, send messages, and see real-time updates from other agents.
+
+!!! warning "Security: Localhost Only"
+    The HTTP server binds to `127.0.0.1` by default, which only accepts connections from the local machine. This is intentional for security. Do not expose the MCP server to the network.
+
 ### Command Options
 
 | Option | Description |
 |--------|-------------|
+| `--transport`, `-t` | Transport type: `stdio` (default) or `streamable-http` |
+| `--host` | HTTP bind address (default: `127.0.0.1`, streamable-http only) |
+| `--port` | HTTP port (default: `8000`, streamable-http only) |
 | `--repo PATH` | Explicit repository path (default: auto-discover) |
-| `--stdio` / `--no-stdio` | Use stdio transport (default: true, currently only option) |
 | `--log-file PATH` | Write logs to file in addition to stderr |
 | `--json-logs` | Use JSON format for logs |
 | `--dev` | Enable development mode |
@@ -77,9 +111,13 @@ Logs will be written to both `stderr` and `mcp-server.log`.
 
 ## Host Configuration
 
-MCP hosts launch `lodestar mcp serve` as a subprocess. Here are example configurations for common hosts:
+MCP hosts can connect to Lodestar using either stdio (subprocess) or HTTP transport.
 
-### VS Code
+### Stdio Configuration (Single Agent)
+
+For single-agent use, hosts launch `lodestar mcp serve` as a subprocess:
+
+### VS Code (stdio)
 
 Add to your VS Code MCP configuration (typically in `.vscode/mcp.json` or user settings):
 
@@ -153,13 +191,63 @@ Replace `/absolute/path/to/your/repo` with the actual path to your Lodestar-init
     }
     ```
 
-### Other MCP Hosts
+### Other MCP Hosts (stdio)
 
 Any MCP-compatible host that supports stdio transport can connect to Lodestar. The server:
 
 - Writes protocol messages to stdout
 - Reads protocol messages from stdin
 - Logs diagnostics to stderr
+
+### HTTP Configuration (Multi-Agent)
+
+For multi-agent scenarios, first start the HTTP server in a terminal:
+
+```bash
+lodestar mcp serve --transport streamable-http --port 8000
+```
+
+Then configure clients to connect via HTTP:
+
+### VS Code (HTTP)
+
+```json
+{
+  "mcpServers": {
+    "lodestar": {
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+### Claude Desktop (HTTP)
+
+```json
+{
+  "mcpServers": {
+    "lodestar": {
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+### Multiple Agents Example
+
+To run multiple agents (e.g., in different VS Code windows) all coordinating through the same server:
+
+1. **Start the shared server** (once, in a dedicated terminal):
+   ```bash
+   lodestar mcp serve -t streamable-http --port 8000 --repo /path/to/repo
+   ```
+
+2. **Configure each client** to connect to `http://127.0.0.1:8000/mcp`
+
+3. **Each agent** calls `agent.join` to register, then can claim tasks, send messages, and see each other's activity
+
+!!! tip "Server Lifecycle"
+    Keep the HTTP server running as long as agents need to coordinate. The server handles graceful shutdown on Ctrl+C, cleaning up database connections properly.
 
 ## MCP Tools Reference
 
@@ -759,6 +847,37 @@ Returns detailed task information (same data as `lodestar.task.get` tool).
 pip install 'lodestar-cli[mcp]'
 # or
 uv add 'lodestar-cli[mcp]'
+```
+
+---
+
+### HTTP Transport Issues
+
+**Error:** `Address already in use` or `port already in use`
+
+**Solution:** Another process is using the port. Either:
+
+- Stop the other process, or
+- Use a different port: `--port 9000`
+
+---
+
+**Error:** Connection refused when connecting to HTTP server
+
+**Solution:** Check that:
+
+1. The server is running (`lodestar mcp serve -t streamable-http`)
+2. You're connecting to the correct host and port (default: `127.0.0.1:8000`)
+3. The URL includes `/mcp` path (e.g., `http://127.0.0.1:8000/mcp`)
+
+---
+
+**Issue:** HTTP client receives "Not Acceptable" error
+
+**Solution:** The MCP streamable HTTP transport requires clients to accept both JSON and SSE. Ensure your client sends:
+
+```
+Accept: application/json, text/event-stream
 ```
 
 ---
