@@ -157,12 +157,16 @@ def reset_command(
     if not runtime_deleted:
         warnings.append("Runtime database not found or already deleted")
 
-    # Hard reset: clear tasks from spec
+    # Hard reset: clear tasks and features from spec
     tasks_deleted = 0
     if hard:
         spec.tasks = {}
+        spec.features = {}
         save_spec(spec, root)
         tasks_deleted = task_count
+
+    # Delete lock files (after save_spec to clean up any lingering locks)
+    _delete_lock_files(root)
 
     # Build result
     result = {
@@ -216,6 +220,18 @@ def _delete_runtime_files(runtime_path: Path) -> bool:
             deleted = True
 
     return deleted
+
+
+def _delete_lock_files(root: Path) -> None:
+    """Delete lock files from .lodestar directory."""
+    from lodestar.util.paths import get_lodestar_dir
+
+    lodestar_dir = get_lodestar_dir(root)
+
+    # Delete spec.lock and any other .lock files
+    for lock_file in lodestar_dir.glob("*.lock"):
+        if lock_file.exists():
+            lock_file.unlink()
 
 
 def _show_explain(json_output: bool) -> None:
