@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,15 +26,16 @@ class LodestarContext:
     for use by tools and resources.
     """
 
-    def __init__(self, repo_root: Path):
+    def __init__(self, repo_root: Path, use_pool: bool = False):
         """Initialize the Lodestar context.
 
         Args:
             repo_root: Path to the repository root.
+            use_pool: Whether to use connection pooling (for HTTP transport).
         """
         self.repo_root = repo_root
         self.db_path = get_runtime_db_path(repo_root)
-        self.db = RuntimeDatabase(self.db_path)
+        self.db = RuntimeDatabase(self.db_path, use_pool=use_pool)
 
         # Clean up any stale temp files from previous crashed/interrupted operations
         cleanup_stale_temp_files(repo_root)
@@ -44,6 +47,12 @@ class LodestarContext:
 
         self.spec = load_spec(repo_root)
         logger.info(f"Initialized context for repository: {repo_root}")
+
+    def dispose(self) -> None:
+        """Clean up resources on shutdown."""
+        if self.db:
+            self.db.dispose()
+            logger.info("Database connections closed")
 
     def reload_spec(self) -> None:
         """Reload the spec from disk."""
@@ -89,12 +98,48 @@ class LodestarContext:
             )
 
 
-def create_server(repo_root: Path | None = None) -> FastMCP:
+def _create_lifespan(
+    context: LodestarContext,
+) -> Any:
+    """Create a lifespan context manager for the MCP server.
+
+    This wraps an already-created LodestarContext to provide proper
+    shutdown cleanup when the server exits.
+
+    Args:
+        context: The LodestarContext to manage.
+
+    Returns:
+        An async context manager for FastMCP's lifespan.
+    """
+
+    @asynccontextmanager
+    async def lifespan(server: FastMCP) -> AsyncIterator[LodestarContext]:
+        """Manage MCP server lifecycle - startup and shutdown.
+
+        On startup:
+        - Yields the pre-initialized LodestarContext
+
+        On shutdown:
+        - Disposes database connections cleanly
+        """
+        logger.info("MCP server ready")
+        try:
+            yield context
+        finally:
+            logger.info("MCP server shutting down")
+            context.dispose()
+
+    return lifespan
+
+
+def create_server(repo_root: Path | None = None, use_pool: bool = False) -> FastMCP:
     """
     Create and configure the FastMCP server for Lodestar.
 
     Args:
         repo_root: Path to the repository root. If None, will be discovered.
+        use_pool: Whether to use connection pooling (recommended for HTTP transport).
 
     Returns:
         Configured FastMCP server instance.
@@ -119,11 +164,12 @@ def create_server(repo_root: Path | None = None) -> FastMCP:
         if not is_valid:
             raise ValueError(error_msg)
 
-    # Initialize context
-    context = LodestarContext(repo_root)
+    # Initialize context (handles orphaned lease cleanup and temp file cleanup)
+    context = LodestarContext(repo_root, use_pool=use_pool)
 
-    # Create FastMCP server
-    mcp = FastMCP("lodestar")
+    # Create FastMCP server with lifespan for proper shutdown cleanup
+    lifespan = _create_lifespan(context)
+    mcp = FastMCP("lodestar", lifespan=lifespan)
 
     # Store context in server dependencies for tools/resources to access
     # FastMCP uses dependency injection, so we can add the context as a dependency

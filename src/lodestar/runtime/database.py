@@ -29,14 +29,16 @@ class RuntimeDatabase:
     actual operations to AgentRepository, LeaseRepository, and MessageRepository.
     """
 
-    def __init__(self, db_path: Path | None = None):
+    def __init__(self, db_path: Path | None = None, use_pool: bool = False):
         """Initialize the runtime database.
 
         Args:
             db_path: Path to the database file. If None, uses default location.
+            use_pool: Whether to use connection pooling. Set True for HTTP transport
+                (handles concurrent sessions), False for stdio (CLI default).
         """
         self.db_path = db_path or get_runtime_db_path()
-        self._engine = create_runtime_engine(self.db_path)
+        self._engine = create_runtime_engine(self.db_path, use_pool=use_pool)
         self._session_factory = create_session_factory(self._engine)
         self._ensure_initialized()
 

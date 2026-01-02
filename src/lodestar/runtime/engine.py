@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 
 
 def _enable_wal_mode(dbapi_connection: object, connection_record: object) -> None:
@@ -23,11 +23,13 @@ def _enable_wal_mode(dbapi_connection: object, connection_record: object) -> Non
     cursor.close()
 
 
-def create_runtime_engine(db_path: Path) -> Engine:
+def create_runtime_engine(db_path: Path, use_pool: bool = False) -> Engine:
     """Create SQLAlchemy engine with WAL mode for concurrent access.
 
     Args:
         db_path: Path to the SQLite database file.
+        use_pool: Whether to use connection pooling. Set True for HTTP transport
+            (handles concurrent sessions), False for stdio (CLI default).
 
     Returns:
         SQLAlchemy Engine configured for the runtime database.
@@ -35,13 +37,22 @@ def create_runtime_engine(db_path: Path) -> Engine:
     # Ensure parent directory exists
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    engine = create_engine(
-        f"sqlite:///{db_path}",
-        echo=False,
-        # Disable connection pooling for CLI tool
-        # NullPool ensures connections are closed immediately after use
-        poolclass=NullPool,
-    )
+    if use_pool:
+        # QueuePool for HTTP transport - handles concurrent sessions efficiently
+        engine = create_engine(
+            f"sqlite:///{db_path}",
+            echo=False,
+            poolclass=QueuePool,
+            pool_size=5,
+            max_overflow=10,
+        )
+    else:
+        # NullPool for CLI - connections closed immediately after use
+        engine = create_engine(
+            f"sqlite:///{db_path}",
+            echo=False,
+            poolclass=NullPool,
+        )
 
     # Register event listener for WAL mode
     event.listen(engine, "connect", _enable_wal_mode)

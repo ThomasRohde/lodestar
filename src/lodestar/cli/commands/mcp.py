@@ -169,9 +169,11 @@ def serve_command(
         logger.info("Development mode enabled")
 
     # Create and run the MCP server
+    # Use connection pooling for HTTP transport (handles concurrent sessions)
     from lodestar.mcp.server import create_server
 
-    mcp_server = create_server(repo_root)
+    use_pool = transport == "streamable-http"
+    mcp_server = create_server(repo_root, use_pool=use_pool)
 
     # Run the server with selected transport
     try:
