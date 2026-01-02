@@ -91,13 +91,25 @@ async def task_claim(
     verified = context.spec.get_verified_tasks()
     if not task.is_claimable(verified):
         unmet_deps = [d for d in task.depends_on if d not in verified]
+
+        # Build helpful error message
+        if unmet_deps:
+            error_msg = (
+                f"Task {validated_task_id} is not claimable because {len(unmet_deps)} "
+                f"{'dependency' if len(unmet_deps) == 1 else 'dependencies'} must be verified first. "
+                f"Note: Dependencies must be marked as 'verified' (not just 'done') to unblock dependent tasks."
+            )
+        else:
+            error_msg = f"Task {validated_task_id} is not claimable (status: {task.status.value})"
+
         return error(
-            f"Task {validated_task_id} is not claimable (status: {task.status.value})",
+            error_msg,
             error_code="TASK_NOT_CLAIMABLE",
             details={
                 "task_id": validated_task_id,
                 "status": task.status.value,
                 "unmet_dependencies": unmet_deps,
+                "note": "Dependencies must be verified before dependent tasks become claimable. Use task.verify after task.done.",
             },
         )
 
@@ -469,6 +481,21 @@ async def task_done(
     # Notify clients of task update
     await notify_task_updated(ctx, validated_task_id)
 
+    # Check if this task has dependents waiting
+    context.reload_spec()
+    dependents = [t for t in context.spec.tasks.values() if validated_task_id in t.depends_on]
+    if dependents:
+        waiting_count = len([d for d in dependents if d.status == TaskStatus.READY])
+        if waiting_count > 0:
+            warnings.append(
+                {
+                    "type": "DEPENDENTS_WAITING",
+                    "message": f"{waiting_count} dependent task(s) are waiting for verification of this task",
+                    "severity": "info",
+                    "note": f"Use task.verify to mark as verified and unblock {waiting_count} dependent task(s)",
+                }
+            )
+
     # Build summary
     summary = format_summary(
         "Done",
@@ -482,6 +509,9 @@ async def task_done(
         "taskId": validated_task_id,
         "status": "done",
         "warnings": warnings,
+        "nextStep": "Use task.verify to mark as verified and unblock dependent tasks"
+        if dependents
+        else None,
     }
 
     if note:
