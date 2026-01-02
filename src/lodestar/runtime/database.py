@@ -83,6 +83,10 @@ class RuntimeDatabase:
         """Mark an agent as offline gracefully."""
         return self._agents.mark_offline(agent_id, reason)
 
+    def agent_exists(self, agent_id: str) -> bool:
+        """Check if an agent exists in the registry."""
+        return self._agents.exists(agent_id)
+
     # Lease operations (delegate to LeaseRepository)
 
     def create_lease(self, lease: Lease) -> Lease | None:
@@ -108,6 +112,17 @@ class RuntimeDatabase:
     def release_lease(self, task_id: str, agent_id: str) -> bool:
         """Release a lease (set expires_at to now)."""
         return self._leases.release(task_id, agent_id)
+
+    def cleanup_orphaned_leases(self) -> int:
+        """Clean up leases held by non-existent agents.
+
+        Returns:
+            Number of leases cleaned up.
+        """
+        # Get all valid agent IDs
+        agents = self._agents.list_all()
+        valid_agent_ids = {a.agent_id for a in agents}
+        return self._leases.cleanup_orphaned(valid_agent_ids)
 
     # Message operations (delegate to MessageRepository)
 

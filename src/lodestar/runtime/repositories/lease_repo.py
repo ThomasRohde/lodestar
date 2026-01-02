@@ -183,3 +183,28 @@ class LeaseRepository:
                 return True
 
             return False
+
+    def cleanup_orphaned(self, valid_agent_ids: set[str]) -> int:
+        """Remove active leases held by non-existent agents.
+
+        Args:
+            valid_agent_ids: Set of agent IDs that exist in the registry.
+
+        Returns:
+            Number of leases cleaned up.
+        """
+        now = _utc_now()
+
+        with get_session(self._session_factory) as session:
+            # Find active leases with invalid agent_ids
+            stmt = select(LeaseModel).where(LeaseModel.expires_at > now.isoformat())
+            active_leases = session.execute(stmt).scalars().all()
+
+            count = 0
+            for lease in active_leases:
+                if lease.agent_id not in valid_agent_ids:
+                    # Expire the lease immediately
+                    lease.expires_at = now.isoformat()
+                    count += 1
+
+            return count

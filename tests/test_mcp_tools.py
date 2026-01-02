@@ -1632,6 +1632,10 @@ class TestInputValidation:
         # Create context using proper initialization
         context = LodestarContext(repo_root=tmp_path)
 
+        # Register the agent
+        agent = Agent(display_name="Agent 1", role="worker", agent_id="AGENT-1")
+        context.db.register_agent(agent)
+
         # Claim first task
         result1 = await task_claim(
             context=context,
@@ -1692,6 +1696,10 @@ class TestInputValidation:
 
         # Create context using proper initialization
         context = LodestarContext(repo_root=tmp_path)
+
+        # Register the agent
+        agent = Agent(display_name="Agent 1", role="worker", agent_id="AGENT-1")
+        context.db.register_agent(agent)
 
         # Claim first task
         await task_claim(
@@ -2171,3 +2179,220 @@ class TestTaskNextFiltering:
 
         # But totalClaimable shows how many matched the filter
         assert data["totalClaimable"] >= len(data["candidates"])
+
+
+class TestAgentValidation:
+    """Tests for agent validation on task claims."""
+
+    @pytest.fixture
+    def validation_context(self, tmp_path):
+        """Create a test context for agent validation tests."""
+        from lodestar.models.spec import Project, Spec
+
+        lodestar_dir = tmp_path / ".lodestar"
+        lodestar_dir.mkdir()
+
+        spec = Spec(
+            project=Project(name="test-project"),
+            tasks={
+                "T001": Task(
+                    id="T001",
+                    title="Ready task",
+                    description="Task ready to claim",
+                    status=TaskStatus.READY,
+                    priority=1,
+                    labels=["feature"],
+                ),
+            },
+        )
+
+        save_spec(spec, tmp_path)
+        context = LodestarContext(tmp_path)
+
+        # Register a valid agent
+        agent = Agent(display_name="Valid Agent", role="tester", agent_id="VALID-AGENT")
+        context.db.register_agent(agent)
+
+        return context
+
+    @pytest.mark.anyio
+    async def test_task_claim_rejects_unregistered_agent(self, validation_context):
+        """Test that claiming with an unregistered agent fails."""
+        from lodestar.mcp.tools.task_mutations import task_claim
+
+        # Attempt to claim with a non-existent agent
+        result = await task_claim(
+            context=validation_context,
+            task_id="T001",
+            agent_id="UNREGISTERED-AGENT",
+            ttl_seconds=900,
+            ctx=None,
+        )
+
+        # Should fail with AGENT_NOT_REGISTERED error
+        assert result.isError is True
+        data = result.structuredContent
+        assert data["error_code"] == "AGENT_NOT_REGISTERED"
+        assert "not registered" in data["error"].lower()
+        assert "lodestar_agent_join" in data["error"].lower()
+        assert "details" in data
+        assert data["details"]["agent_id"] == "UNREGISTERED-AGENT"
+
+    @pytest.mark.anyio
+    async def test_task_claim_accepts_registered_agent(self, validation_context):
+        """Test that claiming with a registered agent succeeds."""
+        from lodestar.mcp.tools.task_mutations import task_claim
+
+        # Claim with the registered agent
+        result = await task_claim(
+            context=validation_context,
+            task_id="T001",
+            agent_id="VALID-AGENT",
+            ttl_seconds=900,
+            ctx=None,
+        )
+
+        # Should succeed
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+        assert data["ok"] is True
+        assert data["lease"]["agentId"] == "VALID-AGENT"
+        assert data["lease"]["taskId"] == "T001"
+
+    @pytest.mark.anyio
+    async def test_task_claim_validation_before_claimability_check(self, validation_context):
+        """Test that agent validation happens before checking task claimability."""
+        from lodestar.mcp.tools.task_mutations import task_claim
+
+        # Create a non-claimable task (with unmet dependencies)
+        validation_context.spec.tasks["T002"] = Task(
+            id="T002",
+            title="Blocked task",
+            description="Task with unmet dependencies",
+            status=TaskStatus.READY,
+            priority=2,
+            labels=["feature"],
+            depends_on=["T001"],  # T001 is not verified yet
+        )
+        validation_context.save_spec()
+        validation_context.reload_spec()
+
+        # Attempt to claim with unregistered agent
+        result = await task_claim(
+            context=validation_context,
+            task_id="T002",
+            agent_id="UNREGISTERED-AGENT",
+            ttl_seconds=900,
+            ctx=None,
+        )
+
+        # Should fail with agent validation error, NOT claimability error
+        assert result.isError is True
+        data = result.structuredContent
+        assert data["error_code"] == "AGENT_NOT_REGISTERED"
+        # Should NOT be TASK_NOT_CLAIMABLE
+
+    @pytest.mark.anyio
+    async def test_orphaned_lease_cleanup_on_startup(self, tmp_path):
+        """Test that orphaned leases are cleaned up when MCP server starts."""
+        from lodestar.models.spec import Project, Spec
+
+        # Create a repository with a task
+        lodestar_dir = tmp_path / ".lodestar"
+        lodestar_dir.mkdir()
+
+        spec = Spec(
+            project=Project(name="test-project"),
+            tasks={
+                "T001": Task(
+                    id="T001",
+                    title="Task with orphaned lease",
+                    status=TaskStatus.READY,
+                    priority=1,
+                ),
+            },
+        )
+        save_spec(spec, tmp_path)
+
+        # Create a context and manually add an orphaned lease
+        context1 = LodestarContext(tmp_path)
+
+        # Create a lease for a non-existent agent
+        orphaned_lease = Lease(
+            task_id="T001",
+            agent_id="ORPHANED-AGENT",
+            expires_at=datetime.now(UTC) + timedelta(minutes=15),
+        )
+        context1.db.create_lease(orphaned_lease)
+
+        # Verify the lease exists
+        active_lease = context1.db.get_active_lease("T001")
+        assert active_lease is not None
+        assert active_lease.agent_id == "ORPHANED-AGENT"
+
+        # Dispose the first context
+        context1.db.dispose()
+
+        # Create a new context (simulates server restart)
+        # This should trigger cleanup of orphaned leases
+        context2 = LodestarContext(tmp_path)
+
+        # Verify the orphaned lease was cleaned up
+        active_lease_after = context2.db.get_active_lease("T001")
+        assert active_lease_after is None
+
+    @pytest.mark.anyio
+    async def test_cleanup_preserves_valid_leases(self, tmp_path):
+        """Test that cleanup only removes orphaned leases, not valid ones."""
+        from lodestar.models.spec import Project, Spec
+
+        # Create a repository
+        lodestar_dir = tmp_path / ".lodestar"
+        lodestar_dir.mkdir()
+
+        spec = Spec(
+            project=Project(name="test-project"),
+            tasks={
+                "T001": Task(id="T001", title="Task 1", status=TaskStatus.READY, priority=1),
+                "T002": Task(id="T002", title="Task 2", status=TaskStatus.READY, priority=2),
+            },
+        )
+        save_spec(spec, tmp_path)
+
+        # Create a context and register an agent
+        context1 = LodestarContext(tmp_path)
+        agent = Agent(display_name="Valid Agent", role="worker", agent_id="VALID-AGENT")
+        context1.db.register_agent(agent)
+
+        # Create a valid lease and an orphaned lease
+        valid_lease = Lease(
+            task_id="T001",
+            agent_id="VALID-AGENT",
+            expires_at=datetime.now(UTC) + timedelta(minutes=15),
+        )
+        orphaned_lease = Lease(
+            task_id="T002",
+            agent_id="ORPHANED-AGENT",
+            expires_at=datetime.now(UTC) + timedelta(minutes=15),
+        )
+        context1.db.create_lease(valid_lease)
+        context1.db.create_lease(orphaned_lease)
+
+        # Verify both leases exist
+        assert context1.db.get_active_lease("T001") is not None
+        assert context1.db.get_active_lease("T002") is not None
+
+        # Dispose the first context
+        context1.db.dispose()
+
+        # Create a new context (triggers cleanup)
+        context2 = LodestarContext(tmp_path)
+
+        # Verify valid lease is preserved
+        valid_lease_after = context2.db.get_active_lease("T001")
+        assert valid_lease_after is not None
+        assert valid_lease_after.agent_id == "VALID-AGENT"
+
+        # Verify orphaned lease is removed
+        orphaned_lease_after = context2.db.get_active_lease("T002")
+        assert orphaned_lease_after is None

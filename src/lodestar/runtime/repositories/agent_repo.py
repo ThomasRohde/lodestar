@@ -55,6 +55,24 @@ class AgentRepository:
 
             return orm_to_agent(result)
 
+    def exists(self, agent_id: str) -> bool:
+        """Check if an agent exists in the registry.
+
+        Args:
+            agent_id: Agent ID to check.
+
+        Returns:
+            True if the agent exists, False otherwise.
+        """
+        with get_session(self._session_factory) as session:
+            from sqlalchemy import func
+
+            stmt = (
+                select(func.count()).select_from(AgentModel).where(AgentModel.agent_id == agent_id)
+            )
+            count = session.execute(stmt).scalar()
+            return bool(count and count > 0)
+
     def list_all(self, active_only: bool = False) -> list[Agent]:
         """List all registered agents."""
         with get_session(self._session_factory) as session:

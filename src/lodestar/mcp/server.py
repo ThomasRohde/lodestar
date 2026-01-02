@@ -37,6 +37,11 @@ class LodestarContext:
         # Clean up any stale temp files from previous crashed/interrupted operations
         cleanup_stale_temp_files(repo_root)
 
+        # Clean up orphaned leases from unregistered agents
+        cleaned = self.db.cleanup_orphaned_leases()
+        if cleaned > 0:
+            logger.info(f"Cleaned up {cleaned} orphaned lease(s) from unregistered agents")
+
         self.spec = load_spec(repo_root)
         logger.info(f"Initialized context for repository: {repo_root}")
 

@@ -59,6 +59,14 @@ async def task_claim(
             error_code="INVALID_AGENT_ID",
         )
 
+    # Validate agent exists in registry
+    if not context.db.agent_exists(agent_id.strip()):
+        return error(
+            f"Agent '{agent_id}' is not registered. Use lodestar_agent_join first.",
+            error_code="AGENT_NOT_REGISTERED",
+            details={"agent_id": agent_id},
+        )
+
     # Validate and clamp TTL (default 15min = 900s, min 60s, max 86400s = 24h)
     if ttl_seconds is None:
         ttl_seconds = 900  # 15 minutes

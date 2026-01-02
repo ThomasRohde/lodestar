@@ -884,6 +884,20 @@ def task_claim(
             console.print("[error]Not a Lodestar repository[/error]")
         raise typer.Exit(1)
 
+    # Validate agent exists
+    db = RuntimeDatabase(get_runtime_db_path(root))
+    if not db.agent_exists(agent_id):
+        if json_output:
+            print_json(
+                Envelope.error(
+                    f"Agent '{agent_id}' is not registered. Use 'lodestar agent join' first."
+                ).model_dump()
+            )
+        else:
+            console.print(f"[error]Agent '{agent_id}' is not registered[/error]")
+            console.print("  Use [command]lodestar agent join --name YOUR_NAME[/command] first")
+        raise typer.Exit(1)
+
     try:
         spec = load_spec(root)
     except SpecNotFoundError:
