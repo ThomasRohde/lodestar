@@ -13,7 +13,7 @@ if sys.platform == "win32" and not sys.stdout.encoding.lower().startswith("utf")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 from lodestar import __version__
-from lodestar.cli.commands import agent, doctor, export, init, mcp, msg, status, task
+from lodestar.cli.commands import agent, doctor, export, init, mcp, msg, reset, status, task
 
 # Main app
 app = typer.Typer(
@@ -32,6 +32,7 @@ app.add_typer(export.app, name="export", help="Export repository state")
 
 # Register top-level commands
 app.command(name="init")(init.init_command)
+app.command(name="reset")(reset.reset_command)
 app.command(name="status")(status.status_command)
 app.command(name="doctor")(doctor.doctor_command)
 

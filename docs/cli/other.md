@@ -121,6 +121,167 @@ $ lodestar status --json
 
 ---
 
+## reset
+
+Reset .lodestar to clean state.
+
+```bash
+lodestar reset [OPTIONS]
+```
+
+Clears runtime data (agents, leases, messages) and optionally tasks to enable starting fresh. Only modifies files inside `.lodestar` directory—does not touch repository code or git history.
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--force` | `-f` | Skip confirmation prompt (required for non-interactive use) |
+| `--hard` | | Also delete all tasks from spec.yaml (keeps project metadata) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
+
+### Reset Modes
+
+#### Soft Reset (Default)
+
+Deletes runtime data only. Tasks are preserved.
+
+```bash
+$ lodestar reset
+⚠ Reset .lodestar to clean state
+
+Reset type: SOFT
+
+Will delete:
+  • Runtime data: 2 agents, 1 leases, 5 messages
+  • Tasks: None (spec.yaml preserved)
+
+Continue? [y/N]: y
+
+✓ Reset complete
+
+Deleted:
+  • Runtime data: 2 agents, 1 leases, 5 messages
+
+Next steps:
+  1. lodestar agent join - Register as agent
+  3. lodestar status - See overview
+```
+
+**Use when:** You want to clear agents and leases but keep task definitions.
+
+#### Hard Reset
+
+Deletes runtime data AND all tasks from spec.yaml. Project metadata is preserved.
+
+```bash
+$ lodestar reset --hard --force
+✓ Reset complete
+
+Deleted:
+  • Runtime data: 2 agents, 1 leases, 5 messages
+  • Tasks: 15 tasks from spec.yaml
+
+Next steps:
+  1. lodestar agent join - Register as agent
+  2. lodestar task create - Add tasks
+  3. lodestar status - See overview
+```
+
+**Use when:** Starting completely fresh with no tasks.
+
+### Non-Interactive Mode
+
+Use `--force` to skip confirmation (required for automation/CI/agents):
+
+```bash
+$ lodestar reset --force
+✓ Reset complete
+```
+
+In JSON mode, `--force` is always required:
+
+```bash
+$ lodestar reset --json
+{
+  "ok": false,
+  "error": "Confirmation required. Use --force to proceed without prompt.",
+  "data": {
+    "reset_type": "soft",
+    "tasks_to_delete": 0,
+    "agents_to_clear": 2,
+    "leases_to_clear": 1,
+    "messages_to_clear": 5
+  },
+  "next": [],
+  "warnings": []
+}
+```
+
+### JSON Output
+
+```bash
+$ lodestar reset --force --json
+{
+  "ok": true,
+  "data": {
+    "reset_type": "soft",
+    "runtime_deleted": true,
+    "tasks_deleted": 0,
+    "agents_cleared": 2,
+    "leases_cleared": 1,
+    "messages_cleared": 5
+  },
+  "next": [
+    {"intent": "agent.join", "cmd": "lodestar agent join"},
+    {"intent": "status", "cmd": "lodestar status"}
+  ],
+  "warnings": []
+}
+```
+
+### Hard Reset JSON
+
+```bash
+$ lodestar reset --hard --force --json
+{
+  "ok": true,
+  "data": {
+    "reset_type": "hard",
+    "runtime_deleted": true,
+    "tasks_deleted": 15,
+    "agents_cleared": 2,
+    "leases_cleared": 1,
+    "messages_cleared": 5
+  },
+  "next": [
+    {"intent": "agent.join", "cmd": "lodestar agent join"},
+    {"intent": "status", "cmd": "lodestar status"}
+  ],
+  "warnings": []
+}
+```
+
+### Safety
+
+- **Confirmation required:** Interactive prompt unless `--force` is used
+- **Scope limited:** Only modifies `.lodestar/` directory
+- **Git safe:** Does not affect repository code or git history
+- **Project preserved:** Hard reset keeps project name and metadata
+
+### Files Deleted
+
+#### Soft Reset
+- `runtime.sqlite` (agents, leases, messages)
+- `runtime.sqlite-wal` (write-ahead log)
+- `runtime.sqlite-shm` (shared memory)
+
+#### Hard Reset
+- All runtime files (above)
+- Tasks cleared from `spec.yaml` (project metadata preserved)
+
+---
+
 ## doctor
 
 Check repository health and diagnose issues.

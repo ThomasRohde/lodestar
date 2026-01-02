@@ -1023,3 +1023,166 @@ class TestIgnoredAgentParameter:
         # Should be identical (except timestamps might differ slightly)
         assert data1["data"]["count"] == data2["data"]["count"]
         assert data1["data"]["tasks"][0]["id"] == data2["data"]["tasks"][0]["id"]
+
+
+class TestReset:
+    """Test reset command."""
+
+    def test_reset_not_initialized(self, temp_repo):
+        """Test reset fails when not initialized."""
+        result = runner.invoke(app, ["reset", "--force"])
+        assert result.exit_code == 1
+        assert "Not a Lodestar" in result.stdout
+
+    def test_reset_soft_clears_runtime(self, temp_repo):
+        """Test soft reset clears runtime but preserves tasks."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task 1"])
+        runner.invoke(app, ["task", "create", "--title", "Task 2"])
+        runner.invoke(app, ["agent", "join", "--json"])
+
+        # Verify runtime exists
+        runtime_path = Path.cwd() / ".lodestar" / "runtime.sqlite"
+        assert runtime_path.exists()
+
+        # Soft reset with --force to skip confirmation
+        result = runner.invoke(app, ["reset", "--force"])
+        assert result.exit_code == 0
+        assert "complete" in result.stdout.lower()
+
+        # Runtime should be deleted
+        assert not runtime_path.exists()
+
+        # Tasks should still exist
+        task_result = runner.invoke(app, ["task", "list", "--json"])
+        data = json.loads(task_result.stdout)
+        assert data["data"]["count"] == 2
+
+    def test_reset_hard_clears_tasks(self, temp_repo):
+        """Test hard reset clears both runtime and tasks."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task 1"])
+        runner.invoke(app, ["task", "create", "--title", "Task 2"])
+        runner.invoke(app, ["agent", "join"])
+
+        # Hard reset
+        result = runner.invoke(app, ["reset", "--hard", "--force"])
+        assert result.exit_code == 0
+
+        # Both runtime and tasks should be cleared
+        runtime_path = Path.cwd() / ".lodestar" / "runtime.sqlite"
+        assert not runtime_path.exists()
+
+        task_result = runner.invoke(app, ["task", "list", "--json"])
+        data = json.loads(task_result.stdout)
+        assert data["data"]["count"] == 0
+
+    def test_reset_json_output(self, temp_repo):
+        """Test reset with JSON output."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task 1"])
+        runner.invoke(app, ["agent", "join"])
+
+        result = runner.invoke(app, ["reset", "--force", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert data["data"]["reset_type"] == "soft"
+        assert data["data"]["runtime_deleted"] is True
+        assert data["data"]["tasks_deleted"] == 0
+
+    def test_reset_hard_json_output(self, temp_repo):
+        """Test hard reset with JSON output."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task 1"])
+        runner.invoke(app, ["task", "create", "--title", "Task 2"])
+
+        result = runner.invoke(app, ["reset", "--hard", "--force", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert data["data"]["reset_type"] == "hard"
+        assert data["data"]["tasks_deleted"] == 2
+
+    def test_reset_requires_confirmation_without_force(self, temp_repo):
+        """Test reset requires confirmation in non-JSON mode."""
+        runner.invoke(app, ["init"])
+
+        # Without --force, should fail in non-interactive mode
+        result = runner.invoke(app, ["reset"], input="n\n")
+        assert result.exit_code == 0
+        assert "Aborted" in result.stdout
+
+    def test_reset_json_requires_force(self, temp_repo):
+        """Test reset in JSON mode requires --force flag."""
+        runner.invoke(app, ["init"])
+
+        result = runner.invoke(app, ["reset", "--json"])
+        assert result.exit_code == 1
+        data = json.loads(result.stdout)
+        assert data["ok"] is False
+        assert "--force" in data["data"]["error"]
+
+    def test_reset_preserves_project_metadata(self, temp_repo):
+        """Test that reset preserves project metadata in spec.yaml."""
+        runner.invoke(app, ["init", "--name", "MyProject"])
+        runner.invoke(app, ["task", "create", "--title", "Task 1"])
+
+        # Hard reset should preserve project name
+        runner.invoke(app, ["reset", "--hard", "--force"])
+
+        status_result = runner.invoke(app, ["status", "--json"])
+        data = json.loads(status_result.stdout)
+        assert data["data"]["project"]["name"] == "MyProject"
+
+    def test_reset_counts_runtime_stats(self, temp_repo):
+        """Test that reset reports accurate counts of deleted data."""
+        runner.invoke(app, ["init"])
+        agent1 = runner.invoke(app, ["agent", "join", "--json"])
+        agent1_id = json.loads(agent1.stdout)["data"]["agent_id"]
+        agent2 = runner.invoke(app, ["agent", "join", "--json"])
+        agent2_id = json.loads(agent2.stdout)["data"]["agent_id"]
+
+        runner.invoke(app, ["task", "create", "--title", "Task 1"])
+        runner.invoke(app, ["task", "claim", "T001", "--agent", agent1_id])
+        runner.invoke(
+            app,
+            ["msg", "send", "--to", f"agent:{agent2_id}", "--text", "Hello", "--from", agent1_id],
+        )
+
+        result = runner.invoke(app, ["reset", "--force", "--json"])
+        data = json.loads(result.stdout)
+        assert data["data"]["agents_cleared"] == 2
+        assert data["data"]["leases_cleared"] == 1
+        assert data["data"]["messages_cleared"] == 1
+
+    def test_reset_with_no_runtime(self, temp_repo):
+        """Test reset when runtime database doesn't exist."""
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["task", "create", "--title", "Task 1"])
+
+        # Don't create any agents, so runtime won't exist
+        result = runner.invoke(app, ["reset", "--force", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert len(data["warnings"]) > 0
+        assert "not found" in data["warnings"][0].lower()
+
+    def test_reset_explain(self, temp_repo):
+        """Test reset --explain shows command documentation."""
+        result = runner.invoke(app, ["reset", "--explain"])
+        assert result.exit_code == 0
+        assert "reset" in result.stdout.lower()
+        assert "soft" in result.stdout.lower()
+        assert "hard" in result.stdout.lower()
+
+    def test_reset_explain_json(self, temp_repo):
+        """Test reset --explain with JSON output."""
+        result = runner.invoke(app, ["reset", "--explain", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert "command" in data
+        assert "modes" in data
+        assert "soft (default)" in data["modes"]
+        assert "hard (--hard)" in data["modes"]
