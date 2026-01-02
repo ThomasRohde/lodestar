@@ -63,10 +63,21 @@ def serve_command(
         "--repo",
         help="Path to Lodestar repository (default: auto-discover)",
     ),
-    stdio: bool = typer.Option(
-        True,
-        "--stdio/--no-stdio",
-        help="Use stdio transport (default: true)",
+    transport: str = typer.Option(
+        "stdio",
+        "--transport",
+        "-t",
+        help="Transport type: 'stdio' or 'streamable-http'",
+    ),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="HTTP bind address (streamable-http only)",
+    ),
+    port: int = typer.Option(
+        8000,
+        "--port",
+        help="HTTP port (streamable-http only)",
     ),
     log_file: Path | None = typer.Option(
         None,
@@ -141,6 +152,18 @@ def serve_command(
                 console.print(f"[error]{error_msg}[/error]")
             raise typer.Exit(1)
 
+    # Validate transport option
+    valid_transports = ("stdio", "streamable-http")
+    if transport not in valid_transports:
+        error_msg = (
+            f"Invalid transport '{transport}'. Must be one of: {', '.join(valid_transports)}"
+        )
+        if json_output:
+            print_json(Envelope.error(error_msg).model_dump())
+        else:
+            console.print(f"[error]{error_msg}[/error]")
+        raise typer.Exit(1)
+
     logger.info(f"Starting Lodestar MCP server for repository: {repo_root}")
     if dev:
         logger.info("Development mode enabled")
@@ -150,18 +173,16 @@ def serve_command(
 
     mcp_server = create_server(repo_root)
 
-    if not stdio:
-        error_msg = "Only stdio transport is currently supported"
-        if json_output:
-            print_json(Envelope.error(error_msg).model_dump())
-        else:
-            console.print(f"[error]{error_msg}[/error]")
-        raise typer.Exit(1)
-
-    # Run the server with stdio transport
+    # Run the server with selected transport
     try:
-        logger.info("MCP server starting on stdio transport")
-        mcp_server.run(transport="stdio")
+        if transport == "streamable-http":
+            logger.info(f"MCP server starting on http://{host}:{port}/mcp")
+            mcp_server.settings.host = host
+            mcp_server.settings.port = port
+            mcp_server.run(transport="sse")
+        else:
+            logger.info("MCP server starting on stdio transport")
+            mcp_server.run(transport="stdio")
     except KeyboardInterrupt:
         logger.info("MCP server stopped by user")
     except Exception as e:
@@ -176,16 +197,24 @@ def _show_explain(json_output: bool) -> None:
         "purpose": "Start the Lodestar MCP server for client integration.",
         "options": [
             "--repo PATH: Specify repository path (default: auto-discover)",
-            "--stdio: Use stdio transport (default: true)",
+            "--transport, -t: Transport type: 'stdio' (default) or 'streamable-http'",
+            "--host: HTTP bind address, default 127.0.0.1 (streamable-http only)",
+            "--port: HTTP port, default 8000 (streamable-http only)",
             "--log-file PATH: Write logs to file in addition to stderr",
             "--json-logs: Use JSON format for logs",
             "--dev: Enable development mode",
         ],
+        "examples": [
+            "lodestar mcp serve  # stdio transport (default)",
+            "lodestar mcp serve -t streamable-http  # HTTP on localhost:8000",
+            "lodestar mcp serve -t streamable-http --port 9000  # HTTP on port 9000",
+        ],
         "notes": [
             "Server logs go to stderr by default",
-            "Protocol messages are written to stdout",
+            "Protocol messages are written to stdout (stdio) or HTTP responses",
             "Use --log-file to also log to a file",
             "Requires 'lodestar-cli[mcp]' to be installed",
+            "HTTP transport binds to localhost only for security",
         ],
     }
 
@@ -200,6 +229,10 @@ def _show_explain(json_output: bool) -> None:
         console.print("[bold]Options:[/bold]")
         for opt in explanation["options"]:
             console.print(f"  {opt}")
+        console.print()
+        console.print("[bold]Examples:[/bold]")
+        for ex in explanation["examples"]:
+            console.print(f"  {ex}")
         console.print()
         console.print("[bold]Notes:[/bold]")
         for note in explanation["notes"]:
@@ -219,7 +252,11 @@ def mcp_callback(ctx: typer.Context) -> None:
         console.print("[bold]MCP Commands[/bold]")
         console.print()
         console.print("  [command]lodestar mcp serve[/command]")
-        console.print("      Start the MCP server with stdio transport")
+        console.print("      Start the MCP server (stdio by default)")
+        console.print()
+        console.print("  [command]lodestar mcp serve -t streamable-http[/command]")
+        console.print("      Start HTTP server on localhost:8000")
         console.print()
         console.print("Run [command]lodestar mcp serve --help[/command] for more options.")
+        console.print()
         console.print()

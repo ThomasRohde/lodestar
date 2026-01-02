@@ -4,3 +4,276 @@ project:
   conventions:
     commit_style: conventional
     test_framework: pytest
+tasks:
+  HTTP-01:
+    title: Add transport CLI options to mcp serve
+    description: 'WHAT: Add --transport (-t), --host, and --port CLI options to the
+      ''lodestar mcp serve'' command.
+
+
+      WHERE: src/lodestar/cli/commands/mcp.py
+
+
+      WHY: Enable users to choose between stdio and streamable-http transports.
+
+
+      ACCEPT:
+
+      1. --transport accepts ''stdio'' (default) or ''streamable-http''
+
+      2. --host defaults to ''127.0.0.1'', only used for streamable-http
+
+      3. --port defaults to 8000, only used for streamable-http
+
+      4. Remove the ''Only stdio transport is currently supported'' guard
+
+      5. Pass transport/host/port to server startup function
+
+
+      CONTEXT: See TR-1 in docs/prd/HTTP-PRD.md. Current CLI is in mcp.py with hardcoded
+      stdio.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: done
+    created_at: '2026-01-02T07:55:38.297719+00:00'
+    updated_at: '2026-01-02T08:01:37.765049+00:00'
+    completed_by: A217E5B89
+    completed_at: 2026-01-02 08:01:37.765075+00:00
+    prd:
+      source: docs/prd/HTTP-PRD.md
+      refs:
+      - anchor: TR-1
+        lines: null
+      excerpt: null
+      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
+  HTTP-02:
+    title: Implement lifespan context manager
+    description: 'WHAT: Add async lifespan context manager for MCP server startup/shutdown
+      lifecycle.
+
+
+      WHERE: src/lodestar/mcp/server.py
+
+
+      WHY: Ensure proper resource initialization on startup and cleanup on shutdown.
+
+
+      ACCEPT:
+
+      1. On startup: Initialize shared McpContext, run cleanup_orphaned_leases(),
+      run cleanup_temp_files(), log server ready
+
+      2. On shutdown: Call context.db.dispose() to close DB connections
+
+      3. Graceful handling of SIGTERM and SIGINT
+
+      4. No orphaned database connections after shutdown
+
+      5. Wire lifespan into FastMCP server
+
+
+      CONTEXT: See TR-2 in docs/prd/HTTP-PRD.md. Currently no lifespan management
+      - cleanup only runs at startup, no shutdown hook.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2026-01-02T07:55:59.299143+00:00'
+    updated_at: '2026-01-02T07:55:59.299146+00:00'
+    prd:
+      source: docs/prd/HTTP-PRD.md
+      refs:
+      - anchor: TR-2
+        lines: null
+      excerpt: null
+      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
+  HTTP-03:
+    title: Add connection pooling option for HTTP mode
+    description: 'WHAT: Add optional connection pooling to RuntimeDatabase for HTTP
+      transport mode.
+
+
+      WHERE: src/lodestar/runtime/database.py
+
+
+      WHY: HTTP mode has concurrent sessions; QueuePool handles this better than NullPool.
+
+
+      ACCEPT:
+
+      1. Add optional ''use_pool'' parameter to RuntimeDatabase.__init__()
+
+      2. When use_pool=False (default): Use NullPool (current behavior for stdio)
+
+      3. When use_pool=True: Use QueuePool with pool_size=5, max_overflow=10
+
+      4. WAL mode and busy_timeout still configured on all connections
+
+      5. Existing CLI commands work unchanged (NullPool default)
+
+
+      CONTEXT: See TR-3 in docs/prd/HTTP-PRD.md. Current implementation uses NullPool
+      exclusively.'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - feature
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2026-01-02T07:56:07.938345+00:00'
+    updated_at: '2026-01-02T07:56:07.938348+00:00'
+    prd:
+      source: docs/prd/HTTP-PRD.md
+      refs:
+      - anchor: TR-3
+        lines: null
+      excerpt: null
+      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
+  HTTP-04:
+    title: Wire up transport branching in server
+    description: 'WHAT: Implement transport selection logic in MCP server startup.
+
+
+      WHERE: src/lodestar/mcp/server.py, src/lodestar/cli/commands/mcp.py
+
+
+      WHY: Enable the server to run in either stdio or streamable-http mode based
+      on CLI options.
+
+
+      ACCEPT:
+
+      1. Add run_server(transport, host, port, repo_root, log_level) function
+
+      2. For streamable-http: Configure mcp.settings.host and mcp.settings.port
+
+      3. Call mcp.run(transport=transport) with appropriate transport string
+
+      4. CLI command calls run_server() with parsed options
+
+      5. Server logs listening URL when using HTTP transport
+
+      6. Works with lifespan context manager from HTTP-02
+
+
+      CONTEXT: See TR-4 in docs/prd/HTTP-PRD.md. FastMCP supports transport parameter
+      in run().'
+    acceptance_criteria: []
+    depends_on:
+    - HTTP-01
+    - HTTP-02
+    - HTTP-03
+    labels:
+    - feature
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2026-01-02T07:56:17.462588+00:00'
+    updated_at: '2026-01-02T07:56:17.462591+00:00'
+    prd:
+      source: docs/prd/HTTP-PRD.md
+      refs:
+      - anchor: TR-4
+        lines: null
+      excerpt: null
+      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
+  HTTP-05:
+    title: Update MCP documentation for HTTP transport
+    description: 'WHAT: Update docs/mcp.md with HTTP transport usage and configuration.
+
+
+      WHERE: docs/mcp.md
+
+
+      WHY: Users need documentation to configure and use the new transport.
+
+
+      ACCEPT:
+
+      1. Add HTTP transport section with usage examples
+
+      2. Document --transport, --host, --port options
+
+      3. Add VS Code and Claude Desktop client configuration examples
+
+      4. Document multi-agent access patterns
+
+      5. Add security notes (localhost binding, no auth)
+
+      6. Add troubleshooting section (port in use, connection refused)
+
+
+      CONTEXT: See TR-5 in docs/prd/HTTP-PRD.md. Current docs only cover stdio.'
+    acceptance_criteria: []
+    depends_on:
+    - HTTP-04
+    labels:
+    - docs
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2026-01-02T07:56:24.996871+00:00'
+    updated_at: '2026-01-02T07:56:24.996874+00:00'
+    prd:
+      source: docs/prd/HTTP-PRD.md
+      refs:
+      - anchor: TR-5
+        lines: null
+      excerpt: null
+      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
+  HTTP-06:
+    title: Add concurrent access integration test
+    description: 'WHAT: Add integration test verifying thread-safety under concurrent
+      HTTP access.
+
+
+      WHERE: tests/test_mcp_http.py (new file)
+
+
+      WHY: Ensure multiple agents can safely use the MCP server simultaneously.
+
+
+      ACCEPT:
+
+      1. Start MCP server with streamable-http transport in test fixture
+
+      2. Spawn 3+ parallel HTTP clients using httpx
+
+      3. Each client makes simultaneous tool calls (agent.list, task.list, task.claim)
+
+      4. Verify all responses are correct (no cross-talk between sessions)
+
+      5. Verify no database errors or deadlocks
+
+      6. Test completes in <30 seconds
+
+      7. Test is not flaky (run 5x to verify)
+
+
+      CONTEXT: See TR-6 in docs/prd/HTTP-PRD.md. Use pytest-asyncio for async test.
+      httpx is bundled with mcp package.'
+    acceptance_criteria: []
+    depends_on:
+    - HTTP-04
+    labels:
+    - test
+    locks: []
+    priority: 3
+    status: ready
+    created_at: '2026-01-02T07:56:34.392396+00:00'
+    updated_at: '2026-01-02T07:56:34.392399+00:00'
+    prd:
+      source: docs/prd/HTTP-PRD.md
+      refs:
+      - anchor: TR-6
+        lines: null
+      excerpt: null
+      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
