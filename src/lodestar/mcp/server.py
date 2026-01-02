@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 from lodestar.mcp.utils import find_repo_root, validate_repo_root
 from lodestar.runtime.database import RuntimeDatabase
 from lodestar.spec.loader import load_spec, save_spec
-from lodestar.util.paths import get_runtime_db_path
+from lodestar.util.paths import cleanup_stale_temp_files, get_runtime_db_path
 
 logger = logging.getLogger("lodestar.mcp")
 
@@ -33,6 +33,10 @@ class LodestarContext:
         self.repo_root = repo_root
         self.db_path = get_runtime_db_path(repo_root)
         self.db = RuntimeDatabase(self.db_path)
+
+        # Clean up any stale temp files from previous crashed/interrupted operations
+        cleanup_stale_temp_files(repo_root)
+
         self.spec = load_spec(repo_root)
         logger.info(f"Initialized context for repository: {repo_root}")
 

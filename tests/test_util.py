@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from lodestar.mcp.utils import validate_repo_root
+from lodestar.util.paths import cleanup_stale_temp_files
 from lodestar.util.time import format_duration, parse_duration
 
 
@@ -129,3 +130,96 @@ class TestPathNormalization:
             if sys.platform == "win32":
                 normalized = os.path.normpath(lodestar_dir)
                 assert normalized in error_msg
+
+
+class TestTempFileCleanup:
+    """Test stale temp file cleanup utilities."""
+
+    def test_cleanup_removes_old_tmp_files(self):
+        """Test that cleanup removes .tmp files older than max_age."""
+        import time
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            lodestar_dir = root / ".lodestar"
+            lodestar_dir.mkdir()
+
+            # Create some temp files
+            old_tmp = lodestar_dir / "spec.tmp"
+            old_tmp.write_text("old content")
+
+            new_tmp = lodestar_dir / "recent.tmp"
+            new_tmp.write_text("new content")
+
+            # Set old file's mtime to 10 minutes ago
+            old_time = time.time() - 600
+            os.utime(old_tmp, (old_time, old_time))
+
+            # Cleanup with 5 minute threshold
+            cleaned = cleanup_stale_temp_files(root, max_age_seconds=300)
+
+            # Old file should be cleaned
+            assert cleaned == 1
+            assert not old_tmp.exists()
+
+            # New file should remain
+            assert new_tmp.exists()
+
+    def test_cleanup_handles_missing_lodestar_dir(self):
+        """Test that cleanup handles missing .lodestar directory gracefully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            # No .lodestar directory
+
+            # Should return 0, not raise
+            cleaned = cleanup_stale_temp_files(root)
+            assert cleaned == 0
+
+    def test_cleanup_ignores_locked_files(self):
+        """Test that cleanup ignores files that can't be deleted."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            lodestar_dir = root / ".lodestar"
+            lodestar_dir.mkdir()
+
+            # Create a temp file
+            tmp_file = lodestar_dir / "locked.tmp"
+            tmp_file.write_text("content")
+
+            # Set old mtime
+            import time
+
+            old_time = time.time() - 600
+            os.utime(tmp_file, (old_time, old_time))
+
+            # Open file to simulate lock (on Windows this would prevent deletion)
+            # On Unix, this doesn't actually prevent deletion, but we're testing
+            # that the cleanup doesn't raise if it can't delete
+            with open(tmp_file):
+                # Cleanup should still work (may or may not delete depending on OS)
+                cleanup_stale_temp_files(root, max_age_seconds=300)
+
+            # No assertion on result - just verify no exception
+
+    def test_cleanup_removes_atomicwrites_temp_files(self):
+        """Test that cleanup also removes tmp* pattern files from atomicwrites."""
+        import time
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            lodestar_dir = root / ".lodestar"
+            lodestar_dir.mkdir()
+
+            # Create atomicwrites-style temp file
+            atomic_tmp = lodestar_dir / "tmpabcd1234"
+            atomic_tmp.write_text("atomic content")
+
+            # Set old mtime
+            old_time = time.time() - 600
+            os.utime(atomic_tmp, (old_time, old_time))
+
+            # Cleanup
+            cleaned = cleanup_stale_temp_files(root, max_age_seconds=300)
+
+            assert cleaned == 1
+            assert not atomic_tmp.exists()

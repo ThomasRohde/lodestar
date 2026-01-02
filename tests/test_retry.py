@@ -47,6 +47,24 @@ def test_is_windows_transient_error_detects_winerror_183():
     assert is_windows_transient_error(error)
 
 
+def test_is_windows_transient_error_detects_winerror_6():
+    """Test detection of WinError 6 (Invalid Handle)."""
+    error = OSError(6, "Invalid handle", None, 6)
+    assert is_windows_transient_error(error)
+
+
+def test_is_windows_transient_error_detects_winerror_87():
+    """Test detection of WinError 87 (Invalid Parameter)."""
+    error = OSError(87, "Invalid parameter", None, 87)
+    assert is_windows_transient_error(error)
+
+
+def test_is_windows_transient_error_detects_winerror_206():
+    """Test detection of WinError 206 (Filename Exceeded Range)."""
+    error = OSError(206, "Filename exceeded range", None, 206)
+    assert is_windows_transient_error(error)
+
+
 def test_is_windows_transient_error_rejects_other_winerrors():
     """Test that other WinErrors are not considered transient."""
     error = OSError(2, "File not found", None, 2)  # File not found - not transient

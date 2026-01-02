@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import portalocker
 import yaml
+from atomicwrites import atomic_write
 from pydantic import ValidationError
 
 from lodestar.models.spec import Project, Spec, Task, TaskStatus
@@ -120,6 +122,8 @@ def _serialize_task(task: Task) -> dict[str, Any]:
 def load_spec(root: Path | None = None) -> Spec:
     """Load and validate the spec from disk.
 
+    Acquires a shared lock to prevent reading during concurrent writes.
+
     Args:
         root: Repository root. If None, searches for it.
 
@@ -129,23 +133,34 @@ def load_spec(root: Path | None = None) -> Spec:
     Raises:
         SpecNotFoundError: If spec.yaml doesn't exist.
         SpecValidationError: If the spec is invalid.
+        SpecLockError: If the read lock cannot be acquired.
     """
     spec_path = get_spec_path(root)
+    lock_path = spec_path.with_suffix(".lock")
 
     if not spec_path.exists():
-        import os
-
         raise SpecNotFoundError(f"Spec not found: {os.path.normpath(spec_path)}")
 
     try:
-        with open(spec_path, encoding="utf-8") as f:
+        # Acquire shared lock for reading (allows multiple readers, blocks during writes)
+        with (
+            portalocker.Lock(
+                lock_path,
+                timeout=10,
+                flags=portalocker.LOCK_SH,
+            ) as _,
+            open(spec_path, encoding="utf-8") as f,
+        ):
             raw = yaml.safe_load(f)
+    except portalocker.LockException as e:
+        raise SpecLockError(f"Failed to acquire spec read lock: {e}", timeout=10.0) from e
     except yaml.YAMLError as e:
         raise SpecValidationError(f"Invalid YAML: {e}") from e
 
     if raw is None:
         raw = {}
 
+    # Parsing happens outside the lock - it's CPU-bound, not I/O-bound
     try:
         # Parse project
         project_data = raw.get("project", {})
@@ -170,6 +185,9 @@ def load_spec(root: Path | None = None) -> Spec:
 def save_spec(spec: Spec, root: Path | None = None) -> None:
     """Save the spec to disk atomically with file locking.
 
+    Uses atomicwrites for robust atomic file operations on Windows,
+    with portalocker for cross-process coordination.
+
     Args:
         spec: The Spec object to save.
         root: Repository root. If None, searches for it.
@@ -192,38 +210,33 @@ def save_spec(spec: Spec, root: Path | None = None) -> None:
     if spec.features:
         data["features"] = spec.features
 
-    # Atomic write with file locking
+    def do_atomic_write() -> None:
+        """Perform atomic write using atomicwrites library.
+
+        atomicwrites uses MoveFileEx on Windows with proper flags,
+        handles unique temp file names, and cleans up on failure.
+        """
+        with atomic_write(str(spec_path), mode="w", overwrite=True) as f:
+            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
     try:
-        with portalocker.Lock(lock_path, timeout=5) as _:
-            # Write to temp file first
-            temp_path = spec_path.with_suffix(".tmp")
-            with open(temp_path, "w", encoding="utf-8") as f:
-                yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-
-            # Atomic rename with retry logic for Windows file system locks
-            # Use a slightly longer retry window for Windows file locks where
-            # antivirus/indexer interference can outlast the default backoff.
-            def do_rename() -> None:
-                temp_path.replace(spec_path)
-
-            try:
-                retry_on_windows_error(
-                    do_rename,
-                    max_attempts=8,
-                    base_delay_ms=100,
-                    jitter_factor=0.3,
-                )
-            except (OSError, PermissionError) as e:
-                # If retry failed, raise as SpecFileAccessError with context
-                import os
-
-                raise SpecFileAccessError(
-                    f"Failed to save spec to {os.path.normpath(spec_path)} after retries: {e}",
-                    operation="atomic rename",
-                ) from e
-
+        # Acquire exclusive lock with extended timeout for Windows
+        with portalocker.Lock(lock_path, timeout=10) as _:
+            # Retry the entire atomic write operation (not just rename)
+            # Extended retry window for Windows Defender / antivirus interference
+            retry_on_windows_error(
+                do_atomic_write,
+                max_attempts=10,
+                base_delay_ms=150,
+                jitter_factor=0.3,
+            )
     except portalocker.LockException as e:
-        raise SpecLockError(f"Failed to acquire spec lock: {e}") from e
+        raise SpecLockError(f"Failed to acquire spec lock: {e}", timeout=10.0) from e
+    except (OSError, PermissionError) as e:
+        raise SpecFileAccessError(
+            f"Failed to save spec to {os.path.normpath(spec_path)} after retries: {e}",
+            operation="atomic write",
+        ) from e
 
 
 def create_default_spec(project_name: str) -> Spec:

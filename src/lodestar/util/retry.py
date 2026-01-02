@@ -14,11 +14,14 @@ T = TypeVar("T", default=None)
 # that briefly hold file handles during rename/write operations
 WINDOWS_TRANSIENT_ERRORS = {
     5,  # ERROR_ACCESS_DENIED - File is locked by another process
+    6,  # ERROR_INVALID_HANDLE - Can occur during rename race
     32,  # ERROR_SHARING_VIOLATION - File is being used by another process
     33,  # ERROR_LOCK_VIOLATION - File region is locked
+    87,  # ERROR_INVALID_PARAMETER - Transient during file operations
     110,  # ERROR_OPEN_FAILED - System cannot open the file
     158,  # ERROR_NOT_LOCKED - Segment already unlocked (race condition)
     183,  # ERROR_ALREADY_EXISTS - Can occur during atomic rename race
+    206,  # ERROR_FILENAME_EXCED_RANGE - Path too long (can be transient with temp files)
 }
 
 

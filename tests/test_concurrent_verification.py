@@ -7,6 +7,7 @@ locking can cause transient errors.
 
 from __future__ import annotations
 
+import contextlib
 import tempfile
 import threading
 import time
@@ -14,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
+import atomicwrites
 import pytest
 
 from lodestar.models.runtime import Agent, Lease
@@ -315,11 +317,12 @@ class TestRetryLogic:
         spec = load_spec(root)
         spec.tasks["T001"].status = TaskStatus.DONE
 
-        # Simulate Windows file locking error
+        # Simulate Windows file locking error during atomic_write
         call_count = {"value": 0}
-        original_replace = Path.replace
+        original_atomic_write = atomicwrites.atomic_write
 
-        def mock_replace_with_transient_error(self, target):
+        @contextlib.contextmanager
+        def mock_atomic_write_with_transient_error(*args, **kwargs):
             """Mock that fails first 2 times with WinError 5."""
             call_count["value"] += 1
             if call_count["value"] < 3:
@@ -328,9 +331,11 @@ class TestRetryLogic:
                 error.winerror = 5
                 raise error
             # Third time succeeds
-            return original_replace(self, target)
+            with original_atomic_write(*args, **kwargs) as f:
+                yield f
 
-        with patch.object(Path, "replace", mock_replace_with_transient_error):
+        # Patch in the loader module where atomic_write is imported
+        with patch("lodestar.spec.loader.atomic_write", mock_atomic_write_with_transient_error):
             # This should succeed after retries
             save_spec(spec, root)
 
@@ -349,19 +354,23 @@ class TestRetryLogic:
         spec = load_spec(root)
         spec.tasks["T001"].status = TaskStatus.DONE
 
-        # Mock replace to always fail
-        def mock_replace_always_fails(self, target):
+        # Mock atomic_write to always fail
+        @contextlib.contextmanager
+        def mock_atomic_write_always_fails(*args, **kwargs):
             error = OSError("Access is denied")
             error.winerror = 5
             raise error
+            yield  # Never reached, but needed for generator  # noqa: RET503
 
-        with patch.object(Path, "replace", mock_replace_always_fails):
+        # Patch in the loader module where atomic_write is imported
+        with patch("lodestar.spec.loader.atomic_write", mock_atomic_write_always_fails):
             # Should fail after max attempts
             with pytest.raises(SpecFileAccessError) as exc_info:
                 save_spec(spec, root)
 
             # Verify error is marked as retriable
             assert exc_info.value.retriable is True
+            assert exc_info.value.suggested_action is not None
             assert "retry" in exc_info.value.suggested_action.lower()
 
     def test_non_transient_errors_fail_immediately(self, temp_repo):
@@ -373,16 +382,19 @@ class TestRetryLogic:
 
         call_count = {"value": 0}
 
-        def mock_replace_with_non_transient_error(self, target):
+        @contextlib.contextmanager
+        def mock_atomic_write_with_non_transient_error(*args, **kwargs):
             """Mock that raises a non-retriable error."""
             call_count["value"] += 1
             # WinError 2 is "File not found" - not transient
             error = OSError("File not found")
             error.winerror = 2
             raise error
+            yield  # Never reached, but needed for generator  # noqa: RET503
 
+        # Patch in the loader module where atomic_write is imported
         with (
-            patch.object(Path, "replace", mock_replace_with_non_transient_error),
+            patch("lodestar.spec.loader.atomic_write", mock_atomic_write_with_non_transient_error),
             pytest.raises(SpecFileAccessError),
         ):
             save_spec(spec, root)

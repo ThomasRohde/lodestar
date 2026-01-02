@@ -30,6 +30,7 @@ dependencies = [
     "portalocker>=2.0.0",
     "sqlalchemy>=2.0.0",
     "alembic>=1.13.0",
+    "atomicwrites>=1.4.0",
 ]
 
 [project.optional-dependencies]
@@ -88,6 +89,11 @@ python_version = "3.13"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+
+# atomicwrites library doesn't have type stubs
+[[tool.mypy.overrides]]
+module = "atomicwrites"
+ignore_missing_imports = true
 
 # Relax strictness for MCP module due to incomplete type stubs in mcp SDK
 [[tool.mypy.overrides]]
