@@ -233,11 +233,13 @@ tasks:
     - docs
     locks: []
     priority: 3
-    status: done
+    status: verified
     created_at: '2026-01-02T07:56:24.996871+00:00'
-    updated_at: '2026-01-02T08:12:16.599785+00:00'
+    updated_at: '2026-01-02T08:12:36.646285+00:00'
     completed_by: A217E5B89
     completed_at: 2026-01-02 08:12:16.599852+00:00
+    verified_by: A217E5B89
+    verified_at: 2026-01-02 08:12:36.646338+00:00
     prd:
       source: docs/prd/HTTP-PRD.md
       refs:
@@ -283,9 +285,13 @@ tasks:
     - test
     locks: []
     priority: 3
-    status: ready
+    status: verified
     created_at: '2026-01-02T07:56:34.392396+00:00'
-    updated_at: '2026-01-02T07:56:34.392399+00:00'
+    updated_at: '2026-01-02T09:02:53.036765+00:00'
+    completed_by: A-51bb89
+    completed_at: 2026-01-02 09:02:48.458888+00:00
+    verified_by: A-51bb89
+    verified_at: 2026-01-02 09:02:53.036790+00:00
     prd:
       source: docs/prd/HTTP-PRD.md
       refs:
