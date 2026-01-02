@@ -181,7 +181,7 @@ def serve_command(
             logger.info(f"MCP server starting on http://{host}:{port}/mcp")
             mcp_server.settings.host = host
             mcp_server.settings.port = port
-            mcp_server.run(transport="sse")
+            mcp_server.run(transport="streamable-http")
         else:
             logger.info("MCP server starting on stdio transport")
             mcp_server.run(transport="stdio")
