@@ -134,6 +134,10 @@ uv sync --extra mcp
 
 ### Starting the MCP Server
 
+The MCP server supports two transport modes: stdio (for Claude Desktop) and HTTP (for multiple agents).
+
+#### Stdio Transport (Default)
+
 Run the MCP server from within a Lodestar repository:
 
 ```bash
@@ -150,7 +154,24 @@ lodestar mcp serve --log-file mcp.log
 lodestar mcp serve --log-file mcp.log --json-logs
 ```
 
-The server uses stdio transport by default, making it compatible with MCP clients like Claude Desktop.
+The stdio transport is compatible with MCP clients like Claude Desktop.
+
+#### HTTP Transport (Multi-Agent)
+
+For multiple agents working in parallel coding sessions, use HTTP transport:
+
+```bash
+# Start HTTP server on default port (8000)
+lodestar mcp serve --transport streamable-http
+
+# Specify custom host and port
+lodestar mcp serve -t streamable-http --host 127.0.0.1 --port 8080
+
+# With logging
+lodestar mcp serve -t streamable-http --log-file mcp-http.log
+```
+
+The HTTP transport enables multiple agents to connect simultaneously, each with their own session.
 
 ### Configuring with Claude Desktop
 
@@ -159,6 +180,8 @@ Add Lodestar as an MCP server in Claude Desktop's configuration file:
 **macOS/Linux:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
+**For single agent (stdio):**
+
 ```json
 {
   "mcpServers": {
@@ -166,6 +189,18 @@ Add Lodestar as an MCP server in Claude Desktop's configuration file:
       "command": "lodestar",
       "args": ["mcp", "serve", "--repo", "/absolute/path/to/your/repository"],
       "env": {}
+    }
+  }
+}
+```
+
+**For multiple parallel agents (HTTP):**
+
+```json
+{
+  "mcpServers": {
+    "lodestar": {
+      "url": "http://127.0.0.1:8000/mcp"
     }
   }
 }
