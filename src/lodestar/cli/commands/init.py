@@ -8,7 +8,7 @@ from typing import Any
 
 import typer
 
-from lodestar.cli.templates import render_agents_md_cli, render_agents_md_mcp
+from lodestar.cli.templates import render_agents_md_cli, render_agents_md_mcp, render_prd_prompt
 from lodestar.models.envelope import (
     NEXT_ACTION_AGENT_JOIN,
     NEXT_ACTION_STATUS,
@@ -51,6 +51,11 @@ def init_command(
         False,
         "--mcp",
         help="Create MCP configuration files for IDE/agent integration.",
+    ),
+    prd: bool = typer.Option(
+        False,
+        "--prd",
+        help="Create PRD-PROMPT.md with instructions for generating a PRD.",
     ),
 ) -> None:
     """Initialize a new Lodestar repository.
@@ -110,24 +115,37 @@ def init_command(
         mcp_paths = _create_mcp_configs(root, force=force)
         mcp_files = [str(p) for p in mcp_paths]
 
+    # Create PRD-PROMPT.md if requested
+    prd_prompt_path: str | None = None
+    if prd:
+        prd_prompt_file = root / "PRD-PROMPT.md"
+        if not prd_prompt_file.exists() or force:
+            prd_prompt_file.write_text(render_prd_prompt(name), encoding="utf-8")
+            prd_prompt_path = str(prd_prompt_file)
+
     # Create AGENTS.md (use MCP version if --mcp)
     agents_md = root / "AGENTS.md"
     if not agents_md.exists() or force:
         content = render_agents_md_mcp(name) if mcp else render_agents_md_cli(name)
-        agents_md.write_text(content)
+        agents_md.write_text(content, encoding="utf-8")
 
     # Build response
+    files_created = [
+        str(lodestar_dir / "spec.yaml"),
+        str(gitignore_path),
+        str(agents_md),
+        *mcp_files,
+    ]
+    if prd_prompt_path:
+        files_created.append(prd_prompt_path)
+
     result = {
         "initialized": True,
         "path": str(root),
         "project_name": name,
         "mcp_enabled": mcp,
-        "files_created": [
-            str(lodestar_dir / "spec.yaml"),
-            str(gitignore_path),
-            str(agents_md),
-            *mcp_files,
-        ],
+        "prd_prompt_created": prd_prompt_path is not None,
+        "files_created": files_created,
     }
 
     next_actions = [
@@ -139,6 +157,17 @@ def init_command(
         ),
         NEXT_ACTION_STATUS,
     ]
+
+    # Add PRD generation hint if --prd was used
+    if prd:
+        next_actions.insert(
+            0,
+            NextAction(
+                intent="prd.generate",
+                cmd="Use PRD-PROMPT.md to generate PRD.md",
+                description="Generate a PRD using the prompt instructions",
+            ),
+        )
 
     if json_output:
         print_json(Envelope.success(result, next_actions=next_actions).model_dump())
@@ -153,11 +182,19 @@ def init_command(
         if mcp:
             console.print("  .vscode/mcp.json")
             console.print("  .mcp.json")
+        if prd:
+            console.print("  PRD-PROMPT.md")
         console.print()
         console.print("[info]Next steps:[/info]")
-        console.print("  1. Run [command]lodestar agent join[/command] to register")
-        console.print("  2. Run [command]lodestar task create[/command] to add tasks")
-        console.print("  3. Run [command]lodestar status[/command] to see overview")
+        if prd:
+            console.print("  1. Use [command]PRD-PROMPT.md[/command] to generate a PRD.md")
+            console.print("  2. Run [command]lodestar agent join[/command] to register")
+            console.print("  3. Run [command]lodestar task create[/command] to add tasks")
+            console.print("  4. Run [command]lodestar status[/command] to see overview")
+        else:
+            console.print("  1. Run [command]lodestar agent join[/command] to register")
+            console.print("  2. Run [command]lodestar task create[/command] to add tasks")
+            console.print("  3. Run [command]lodestar status[/command] to see overview")
         console.print()
 
 
@@ -173,6 +210,7 @@ def _show_explain(json_output: bool) -> None:
         ],
         "options": {
             "--mcp": "Create MCP configuration files (.vscode/mcp.json, .mcp.json)",
+            "--prd": "Create PRD-PROMPT.md with instructions for generating a PRD",
             "--force": "Overwrite existing .lodestar directory",
             "--name": "Set project name (defaults to directory name)",
         },
@@ -181,6 +219,7 @@ def _show_explain(json_output: bool) -> None:
             "The spec.yaml should be committed to git",
             "Runtime files (SQLite) are auto-generated and gitignored",
             "Use --mcp to enable MCP integration for IDE/agent tools",
+            "Use --prd to generate a prompt for AI-assisted PRD creation",
         ],
     }
 

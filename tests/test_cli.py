@@ -59,6 +59,32 @@ class TestInit:
         result = runner.invoke(app, ["init"])
         assert result.exit_code == 1
 
+    def test_init_prd_creates_prompt_file(self, temp_repo):
+        result = runner.invoke(app, ["init", "--prd"])
+        assert result.exit_code == 0
+        assert (temp_repo / "PRD-PROMPT.md").exists()
+        content = (temp_repo / "PRD-PROMPT.md").read_text(encoding="utf-8")
+        assert "PRD Generation Instructions" in content
+        assert "{#" in content  # Has anchor syntax examples
+        assert "Acceptance Criteria" in content
+
+    def test_init_prd_json_output(self, temp_repo):
+        result = runner.invoke(app, ["init", "--prd", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["ok"] is True
+        assert data["data"]["prd_prompt_created"] is True
+        # Check PRD-PROMPT.md is in files_created
+        files = data["data"]["files_created"]
+        assert any("PRD-PROMPT.md" in f for f in files)
+
+    def test_init_prd_and_mcp_combinable(self, temp_repo):
+        result = runner.invoke(app, ["init", "--prd", "--mcp"])
+        assert result.exit_code == 0
+        assert (temp_repo / "PRD-PROMPT.md").exists()
+        assert (temp_repo / ".vscode" / "mcp.json").exists()
+        assert (temp_repo / ".mcp.json").exists()
+
 
 class TestStatus:
     """Test status command."""

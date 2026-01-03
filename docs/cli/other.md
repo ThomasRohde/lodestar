@@ -24,6 +24,8 @@ Creates the `.lodestar` directory with spec.yaml and runtime database configurat
 |--------|-------|-------------|
 | `--name TEXT` | `-n` | Project name (default: directory name) |
 | `--force` | `-f` | Overwrite existing .lodestar directory |
+| `--mcp` | | Create MCP configuration files for IDE/agent integration |
+| `--prd` | | Create PRD-PROMPT.md with instructions for generating a PRD |
 | `--json` | | Output in JSON format |
 | `--explain` | | Show what this command does |
 
@@ -50,6 +52,21 @@ Initialized Lodestar repository: My Project
 ```bash
 $ lodestar init /path/to/project
 ```
+
+### Initialize with PRD Prompt
+
+```bash
+$ lodestar init --prd
+Initialized Lodestar repository
+
+Created:
+  .lodestar/spec.yaml - Task definitions (commit this)
+  .lodestar/.gitignore - Ignores runtime files
+  AGENTS.md
+  PRD-PROMPT.md
+```
+
+The `PRD-PROMPT.md` file contains instructions for AI agents to generate a well-structured `PRD.md` that works with Lodestar's task creation and PRD context features.
 
 ---
 
