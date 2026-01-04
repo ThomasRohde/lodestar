@@ -147,7 +147,7 @@ def load_spec(root: Path | None = None) -> Spec:
             portalocker.Lock(
                 lock_path,
                 timeout=10,
-                flags=portalocker.LOCK_SH,
+                flags=portalocker.LOCK_SH | portalocker.LOCK_NB,
             ) as _,
             open(spec_path, encoding="utf-8") as f,
         ):
@@ -221,7 +221,9 @@ def save_spec(spec: Spec, root: Path | None = None) -> None:
 
     try:
         # Acquire exclusive lock with extended timeout for Windows
-        with portalocker.Lock(lock_path, timeout=10) as _:
+        with portalocker.Lock(
+            lock_path, timeout=10, flags=portalocker.LOCK_EX | portalocker.LOCK_NB
+        ) as _:
             # Retry the entire atomic write operation (not just rename)
             # Extended retry window for Windows Defender / antivirus interference
             retry_on_windows_error(
