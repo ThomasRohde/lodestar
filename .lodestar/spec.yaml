@@ -353,9 +353,13 @@ tasks:
     - refactor
     locks: []
     priority: 1
-    status: ready
+    status: verified
     created_at: '2026-01-04T04:20:37.469291+00:00'
-    updated_at: '2026-01-04T04:20:37.469295+00:00'
+    updated_at: '2026-01-04T04:31:15.938082+00:00'
+    completed_by: A96CBCB48
+    completed_at: 2026-01-04 04:31:11.724940+00:00
+    verified_by: A96CBCB48
+    verified_at: 2026-01-04 04:31:15.938096+00:00
   MSG-MCP:
     title: Update MCP message tools for task-only messaging
     description: 'Refactor MCP message tools to support only task-targeted messaging:
