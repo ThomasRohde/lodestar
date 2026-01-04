@@ -553,9 +553,10 @@ def agent_brief(
     if json_output:
         print_json(Envelope.success(brief).model_dump())
     else:
-        # Print the formatted brief directly (no Rich styling to preserve format)
+        # Print the formatted brief as plain text (no Rich syntax highlighting)
         console.print()
-        console.print(formatted_brief)
+        # Use print() directly to avoid Rich auto-detecting XML/markdown syntax
+        print(formatted_brief)
         console.print()
         console.print("[muted]Get your agent ID from 'lodestar agent join'[/muted]")
         console.print()
