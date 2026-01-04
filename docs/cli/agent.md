@@ -301,7 +301,7 @@ CONTEXT:
 
 COMMANDS:
   Claim:    lodestar task claim F002 --agent YOUR_AGENT_ID
-  Progress: lodestar msg send --to task:F002 --from YOUR_AGENT_ID --text 'Update'
+  Progress: lodestar msg send --task F002 --from YOUR_AGENT_ID --text 'Update'
   Done:     lodestar task done F002
 ```
 
@@ -321,7 +321,7 @@ $ lodestar agent brief --task F002 --format claude
 
 <instructions>
   1. Claim task: lodestar task claim F002 --agent YOUR_AGENT_ID
-  2. Report progress: lodestar msg send --to task:F002 --from YOUR_AGENT_ID --text 'Update'
+  2. Report progress: lodestar msg send --task F002 --from YOUR_AGENT_ID --text 'Update'
   3. Mark complete: lodestar task done F002
 </instructions>
 ```
@@ -347,7 +347,7 @@ Implement email-based password reset flow with secure token generation.
 lodestar task claim F002 --agent YOUR_AGENT_ID
 
 # Report progress
-lodestar msg send --to task:F002 --from YOUR_AGENT_ID --text 'Progress update'
+lodestar msg send --task F002 --from YOUR_AGENT_ID --text 'Progress update'
 
 # Mark complete
 lodestar task done F002

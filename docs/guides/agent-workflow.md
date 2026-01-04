@@ -231,7 +231,7 @@ Released task F002
 
 # Leave context for the next agent
 $ lodestar msg send \
-    --to task:F002 \
+    --task F002 \
     --from A1234ABCD \
     --text "60% done. Token generation works. Blocked on email template approval."
 ```

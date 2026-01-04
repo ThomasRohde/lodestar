@@ -133,7 +133,7 @@ lodestar msg send \
 
 ```bash
 lodestar msg send \
-    --to task:F002 \
+    --task F002 \
     --from YOUR_AGENT_ID \
     --text "Requirements confirmed:
 - Token expiry: 24 hours
@@ -180,7 +180,7 @@ $ lodestar task release F002
 
 # Leave detailed context
 lodestar msg send \
-    --to task:F002 \
+    --task F002 \
     --from YOUR_AGENT_ID \
     --text "Blocked: Need SMTP credentials for email service.
 Progress:

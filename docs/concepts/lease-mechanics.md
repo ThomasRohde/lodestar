@@ -126,7 +126,7 @@ Released task F001
 After releasing, leave a message for the next agent:
 
 ```bash
-$ lodestar msg send --to task:F001 --from A1234ABCD \
+$ lodestar msg send --task F001 --from A1234ABCD \
     --text "Released: blocked on API credentials"
 ```
 
