@@ -145,15 +145,12 @@ class Lease(BaseModel):
         return not self.is_expired(now)
 
 
-class MessageType(str, Enum):
-    """Type of message recipient."""
-
-    AGENT = "agent"
-    TASK = "task"
-
-
 class Message(BaseModel):
-    """A message in the runtime plane."""
+    """A task-targeted message in the runtime plane.
+
+    Messages are sent to tasks (not agents) and provide context handoff
+    between agents working on the same task.
+    """
 
     message_id: str = Field(
         default_factory=generate_message_id,
@@ -164,14 +161,13 @@ class Message(BaseModel):
         description="When the message was sent",
     )
     from_agent_id: str = Field(description="Sender agent ID")
-    to_type: MessageType = Field(description="Recipient type (agent or task)")
-    to_id: str = Field(description="Recipient ID (agent_id or task_id)")
+    task_id: str = Field(description="Target task ID")
     text: str = Field(description="Message content")
     meta: dict[str, Any] = Field(
         default_factory=dict,
-        description="Additional message metadata",
+        description="Additional message metadata (subject, severity, etc.)",
     )
-    read_at: datetime | None = Field(
-        default=None,
-        description="When the message was read (None if unread)",
+    read_by: list[str] = Field(
+        default_factory=list,
+        description="List of agent IDs who have read this message",
     )

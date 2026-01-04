@@ -59,14 +59,14 @@ def status_command(
 
     # Check runtime stats
     runtime_stats = {"agents": 0, "active_leases": 0, "total_messages": 0}
-    agent_message_counts = {}
+    task_message_counts = {}
     runtime_path = get_runtime_db_path(root)
     if runtime_path.exists():
         from lodestar.runtime.database import RuntimeDatabase
 
         db = RuntimeDatabase(runtime_path)
         runtime_stats = db.get_stats()
-        agent_message_counts = db.get_agent_message_counts()
+        task_message_counts = db.get_task_message_summary()
 
     # Get claimable tasks
     claimable = spec.get_claimable_tasks()
@@ -86,7 +86,7 @@ def status_command(
         },
         "messages": {
             "total": runtime_stats["total_messages"],
-            "by_agent": agent_message_counts,
+            "by_task": task_message_counts,
         },
     }
 
@@ -146,10 +146,10 @@ def status_command(
     console.print(f"  Agents registered: {runtime_stats['agents']}")
     console.print(f"  Active claims: {runtime_stats['active_leases']}")
     console.print(f"  Total messages: {runtime_stats['total_messages']}")
-    if agent_message_counts:
-        console.print("  Messages per agent:")
-        for agent_id, count in sorted(agent_message_counts.items()):
-            console.print(f"    {agent_id}: {count}")
+    if task_message_counts:
+        console.print("  Messages per task:")
+        for task_id, count in sorted(task_message_counts.items()):
+            console.print(f"    {task_id}: {count}")
 
     # Next actions
     console.print()

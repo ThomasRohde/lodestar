@@ -83,7 +83,7 @@ class LeaseModel(Base):
 
 
 class MessageModel(Base):
-    """SQLAlchemy model for messages table."""
+    """SQLAlchemy model for messages table (task-targeted only)."""
 
     __tablename__ = "messages"
 
@@ -92,17 +92,16 @@ class MessageModel(Base):
     from_agent_id: Mapped[str] = mapped_column(
         String, ForeignKey("agents.agent_id"), nullable=False
     )
-    to_type: Mapped[str] = mapped_column(String, nullable=False)
-    to_id: Mapped[str] = mapped_column(String, nullable=False)
+    task_id: Mapped[str] = mapped_column(String, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     meta: Mapped[dict[str, Any]] = mapped_column(JSONField, default=dict)
-    read_at: Mapped[str | None] = mapped_column(String, nullable=True)  # ISO format or NULL
+    read_by: Mapped[list[str]] = mapped_column(JSONField, default=list)  # Agent IDs who read this
 
     # Relationship
     sender: Mapped[AgentModel] = relationship("AgentModel", back_populates="sent_messages")
 
     __table_args__ = (
-        Index("idx_messages_to", "to_type", "to_id"),
+        Index("idx_messages_task", "task_id"),
         Index("idx_messages_from", "from_agent_id"),
         Index("idx_messages_created", "created_at"),
     )

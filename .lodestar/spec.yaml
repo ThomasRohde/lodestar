@@ -299,3 +299,185 @@ tasks:
         lines: null
       excerpt: null
       prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
+  MSG-CLI:
+    title: Update CLI msg commands for task-only messaging
+    description: 'Complete the refactoring of CLI msg commands to support only task-targeted
+      messaging:
+
+
+      WHAT: Update msg.py CLI commands to match new task-only architecture
+
+      WHERE: src/lodestar/cli/commands/msg.py
+
+      WHY: Agent-to-agent messaging deprecated, only task threads supported now
+
+
+      TASKS:
+
+      - Remove or update ''inbox'' command (no longer applicable)
+
+      - Update ''thread'' command to work with new schema (task_id, read_by array)
+
+      - Update ''search'' command to work with new Message model
+
+      - Add ''mark-read'' command for marking task messages as read
+
+      - Update all help text and examples
+
+      - Ensure JSON output matches new envelope structure
+
+
+      CONTEXT:
+
+      - Message model now has: message_id, created_at, from_agent_id, task_id, text,
+      meta, read_by (array)
+
+      - See message_repo.py for new methods: get_task_thread(), get_task_unread_messages(),
+      mark_task_messages_read()
+
+      - Database facade in database.py has matching methods
+
+      - No more MessageType enum or to_type/to_id fields
+
+
+      ACCEPTANCE:
+
+      1. All msg commands work with new schema
+
+      2. No references to agent messaging remain
+
+      3. Commands compile without errors'
+    acceptance_criteria: []
+    depends_on: []
+    labels:
+    - refactor
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2026-01-04T04:20:37.469291+00:00'
+    updated_at: '2026-01-04T04:20:37.469295+00:00'
+  MSG-MCP:
+    title: Update MCP message tools for task-only messaging
+    description: 'Refactor MCP message tools to support only task-targeted messaging:
+
+
+      WHAT: Update MCP message tools in mcp/tools/
+
+      WHERE: src/lodestar/mcp/tools/message.py (or wherever message tools are defined)
+
+      WHY: Agent-to-agent messaging deprecated, align with new architecture
+
+
+      TASKS:
+
+      - Find and update lodestar_message_send tool (change to task-only)
+
+      - Update lodestar_message_list tool (task threads only, add unread_by param)
+
+      - Update lodestar_message_ack tool (use mark_task_messages_read)
+
+      - Remove any agent inbox functionality
+
+      - Update tool docstrings and parameter descriptions
+
+      - Update MCP tool registration
+
+      - Ensure tools match CLI behavior
+
+
+      CONTEXT:
+
+      - Message model: message_id, created_at, from_agent_id, task_id, text, meta,
+      read_by[]
+
+      - RuntimeDatabase methods: get_task_thread(), mark_task_messages_read()
+
+      - task_claim tool already updated with handoffMessage support
+
+      - See CLI msg.py for reference implementation
+
+
+      ACCEPTANCE:
+
+      1. All MCP message tools work with new schema
+
+      2. Tool parameters match new Message model
+
+      3. No agent messaging references
+
+      4. Tools compile and pass type checks'
+    acceptance_criteria: []
+    depends_on:
+    - MSG-CLI
+    labels:
+    - refactor
+    locks: []
+    priority: 1
+    status: ready
+    created_at: '2026-01-04T04:20:46.390193+00:00'
+    updated_at: '2026-01-04T04:20:46.390196+00:00'
+  MSG-TEST:
+    title: Update tests for new task-only messaging model
+    description: 'Fix and update all tests to work with the new messaging architecture:
+
+
+      WHAT: Update test suite for task-only messaging with read tracking
+
+      WHERE: tests/test_runtime.py, tests/test_mcp_tools.py, tests/test_cli.py, others
+
+      WHY: Tests currently fail due to Message model changes
+
+
+      TASKS:
+
+      - Fix tests that import MessageType (removed)
+
+      - Update Message construction to use task_id instead of to_type/to_id
+
+      - Update assertions for read_by array instead of read_at timestamp
+
+      - Add tests for new functionality: unread_count, handoff_message in claim
+
+      - Update MCP tool tests for new message tool signatures
+
+      - Add tests for mark_task_messages_read()
+
+      - Test migration script (003_task_only_messages.py)
+
+      - Ensure test fixtures create valid task-only messages
+
+
+      CONTEXT:
+
+      - Message model: message_id, created_at, from_agent_id, task_id, text, meta,
+      read_by[]
+
+      - Task claim now returns handoffMessage and unreadCount
+
+      - No more agent inboxes or agent-to-agent messaging
+
+      - Database migration in runtime/alembic/versions/003_task_only_messages.py
+
+
+      ACCEPTANCE:
+
+      1. All tests pass (uv run pytest)
+
+      2. No MessageType import errors
+
+      3. New handoff message functionality tested
+
+      4. Migration tested with real database
+
+      5. Test coverage maintained or improved'
+    acceptance_criteria: []
+    depends_on:
+    - MSG-CLI
+    - MSG-MCP
+    labels:
+    - test
+    locks: []
+    priority: 2
+    status: ready
+    created_at: '2026-01-04T04:20:56.015880+00:00'
+    updated_at: '2026-01-04T04:20:56.015883+00:00'

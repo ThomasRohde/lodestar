@@ -180,6 +180,28 @@ async def task_claim(
             f"Successfully claimed task {validated_task_id} (lease: {created_lease.lease_id}, expires in {ttl_seconds}s)"
         )
 
+    # Check for handoff messages from previous agent(s)
+    unread_messages = context.db.get_task_unread_messages(validated_task_id, agent_id, limit=10)
+    unread_count = context.db.get_task_message_count(validated_task_id, unread_by=agent_id)
+
+    handoff_message = None
+    if unread_messages:
+        # Get the most recent message for inline display
+        latest = unread_messages[-1]  # Messages are in chronological order
+        handoff_message = {
+            "messageId": latest.message_id,
+            "fromAgentId": latest.from_agent_id,
+            "createdAt": latest.created_at.isoformat(),
+            "text": latest.text,
+            "subject": latest.meta.get("subject"),
+            "severity": latest.meta.get("severity"),
+        }
+
+        if ctx:
+            await ctx.info(
+                f"Task has {unread_count} unread message(s) - most recent from {latest.from_agent_id}"
+            )
+
     # Build lease object for response
     lease_data = {
         "leaseId": created_lease.lease_id,
@@ -197,12 +219,16 @@ async def task_claim(
         f"by {agent_id}",
     )
 
-    # Build response with warnings
+    # Build response with warnings and handoff message
     response_data = {
         "ok": True,
         "lease": lease_data,
         "warnings": warnings,
     }
+
+    if handoff_message:
+        response_data["handoffMessage"] = handoff_message
+        response_data["unreadCount"] = unread_count
 
     return with_item(summary, item=response_data)
 

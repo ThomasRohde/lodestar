@@ -133,9 +133,10 @@ def export_snapshot(
                             "message_id": msg.message_id,
                             "created_at": msg.created_at.isoformat(),
                             "from_agent_id": msg.from_agent_id,
-                            "to_type": msg.to_type.value,
-                            "to_id": msg.to_id,
+                            "task_id": msg.task_id,
                             "text": msg.text,
+                            "read_by": msg.read_by,
+                            "meta": msg.meta,
                         }
                     )
             snapshot["runtime"]["messages"] = messages

@@ -129,33 +129,43 @@ class RuntimeDatabase:
     # Message operations (delegate to MessageRepository)
 
     def send_message(self, message: Message) -> Message:
-        """Send a message."""
+        """Send a message to a task thread."""
         return self._messages.send(message)
 
-    def get_inbox(
-        self,
-        agent_id: str,
-        since: datetime | None = None,
-        until: datetime | None = None,
-        from_agent_id: str | None = None,
-        limit: int = 50,
-        unread_only: bool = False,
-        mark_as_read: bool = False,
-    ) -> list[Message]:
-        """Get messages for an agent."""
-        return self._messages.get_inbox(
-            agent_id, since, until, from_agent_id, limit, unread_only, mark_as_read
-        )
-
     def get_task_thread(
-        self, task_id: str, since: datetime | None = None, limit: int = 50
+        self,
+        task_id: str,
+        since: datetime | None = None,
+        limit: int = 50,
+        unread_by: str | None = None,
     ) -> list[Message]:
-        """Get messages for a task thread."""
-        return self._messages.get_task_thread(task_id, since, limit)
+        """Get messages for a task thread.
 
-    def get_task_message_count(self, task_id: str) -> int:
-        """Get the count of messages in a task thread."""
-        return self._messages.get_task_message_count(task_id)
+        Args:
+            task_id: The task ID to get messages for.
+            since: Optional filter for messages created after this time.
+            limit: Maximum number of messages to return.
+            unread_by: Optional agent ID to filter for unread messages only.
+        """
+        return self._messages.get_task_thread(task_id, since, limit, unread_by)
+
+    def get_task_unread_messages(
+        self,
+        task_id: str,
+        agent_id: str,
+        limit: int = 50,
+    ) -> list[Message]:
+        """Get unread messages for a task from an agent's perspective."""
+        return self._messages.get_task_unread_messages(task_id, agent_id, limit)
+
+    def get_task_message_count(self, task_id: str, unread_by: str | None = None) -> int:
+        """Get the count of messages in a task thread.
+
+        Args:
+            task_id: The task ID to count messages for.
+            unread_by: Optional agent ID to count only unread messages.
+        """
+        return self._messages.get_task_message_count(task_id, unread_by)
 
     def get_task_message_agents(self, task_id: str) -> list[str]:
         """Get unique agent IDs who have sent messages about a task."""
@@ -164,23 +174,32 @@ class RuntimeDatabase:
     def search_messages(
         self,
         keyword: str | None = None,
+        task_id: str | None = None,
         from_agent_id: str | None = None,
         since: datetime | None = None,
         until: datetime | None = None,
         limit: int = 50,
     ) -> list[Message]:
         """Search messages with optional filters."""
-        return self._messages.search(keyword, from_agent_id, since, until, limit)
+        return self._messages.search(keyword, task_id, from_agent_id, since, until, limit)
 
-    def get_inbox_count(self, agent_id: str, since: datetime | None = None) -> int:
-        """Get count of messages in inbox."""
-        return self._messages.get_inbox_count(agent_id, since)
+    def mark_task_messages_read(
+        self,
+        task_id: str,
+        agent_id: str,
+        message_ids: list[str] | None = None,
+    ) -> int:
+        """Mark task messages as read by an agent.
 
-    def wait_for_message(
-        self, agent_id: str, timeout_seconds: float | None = None, since: datetime | None = None
-    ) -> bool:
-        """Wait for a new message to arrive."""
-        return self._messages.wait_for_message(agent_id, timeout_seconds, since)
+        Args:
+            task_id: The task ID whose messages to mark.
+            agent_id: The agent ID marking messages as read.
+            message_ids: Optional list of specific message IDs. If None, marks all unread.
+
+        Returns:
+            Number of messages marked as read.
+        """
+        return self._messages.mark_task_messages_read(task_id, agent_id, message_ids)
 
     # Statistics (kept in facade for now)
 
@@ -207,13 +226,11 @@ class RuntimeDatabase:
                 "total_messages": total_messages or 0,
             }
 
-    def get_agent_message_counts(self) -> dict[str, int]:
-        """Get message count per agent."""
+    def get_task_message_summary(self) -> dict[str, int]:
+        """Get message count per task."""
         with get_session(self._session_factory) as session:
-            stmt = (
-                select(MessageModel.to_id, func.count().label("count"))
-                .where(MessageModel.to_type == "agent")
-                .group_by(MessageModel.to_id)
+            stmt = select(MessageModel.task_id, func.count().label("count")).group_by(
+                MessageModel.task_id
             )
             results = session.execute(stmt).all()
-            return {row.to_id: row[1] for row in results}
+            return {row.task_id: row[1] for row in results}

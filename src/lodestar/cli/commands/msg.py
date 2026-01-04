@@ -1,4 +1,4 @@
-"""lodestar msg commands - Agent messaging."""
+"""lodestar msg commands - Task messaging."""
 
 from __future__ import annotations
 
@@ -8,65 +8,62 @@ from typing import Any
 import typer
 
 from lodestar.models.envelope import Envelope
-from lodestar.models.runtime import Message, MessageType
+from lodestar.models.runtime import Message
 from lodestar.runtime.database import RuntimeDatabase
 from lodestar.util.output import console, print_json
 from lodestar.util.paths import find_lodestar_root, get_runtime_db_path
 
 app = typer.Typer(
-    help="Agent messaging commands.",
+    help="Task messaging commands.",
     no_args_is_help=False,
 )
 
 
 @app.callback(invoke_without_command=True)
 def msg_callback(ctx: typer.Context) -> None:
-    """Agent messaging.
+    """Task messaging.
 
-    Use these commands to communicate with other agents and leave context on tasks.
+    Use these commands to communicate via task threads and leave context for handoffs.
+    All messages are task-targeted - there is no agent-to-agent messaging.
     """
     if ctx.invoked_subcommand is None:
         # Show helpful workflow instead of error
         console.print()
-        console.print("[bold]Message Commands[/bold]")
+        console.print("[bold]Task Message Commands[/bold]")
         console.print()
         console.print("[info]Sending messages:[/info]")
         console.print(
-            "  [command]lodestar msg send --to task:<id> --from <agent-id> --text '...'[/command]"
+            "  [command]lodestar msg send --task <id> --from <agent-id> --text '...'[/command]"
         )
-        console.print("      Leave context on a task thread (for handoffs)")
-        console.print()
         console.print(
-            "  [command]lodestar msg send --to agent:<id> --from <agent-id> --text '...'[/command]"
+            "      Leave context on a task thread (visible to all agents working on the task)"
         )
-        console.print("      Send a direct message to another agent")
         console.print()
         console.print("[info]Reading messages:[/info]")
         console.print("  [command]lodestar msg thread <task-id>[/command]")
-        console.print("      Read the message thread for a task")
-        console.print("      (accepts 'F001' or 'task:F001' format)")
+        console.print("      Read all messages in a task thread")
         console.print()
-        console.print("  [command]lodestar msg inbox --agent <agent-id>[/command]")
-        console.print("      Read messages sent to you")
+        console.print("  [command]lodestar msg mark-read --task <id> --agent <id>[/command]")
+        console.print("      Mark task messages as read")
         console.print()
         console.print("  [command]lodestar msg search --keyword <term>[/command]")
-        console.print("      Search messages by keyword")
+        console.print("      Search messages across all tasks")
         console.print()
         console.print("[info]Examples:[/info]")
-        console.print("  lodestar msg send --to task:F001 --from A123 --text 'Blocked on X'")
-        console.print("  lodestar msg thread F001        # Both formats work")
-        console.print("  lodestar msg thread task:F001   # Both formats work")
-        console.print("  lodestar msg search --keyword 'bug' --from A123")
+        console.print("  lodestar msg send --task F001 --from A123 --text 'Blocked on X'")
+        console.print("  lodestar msg thread F001")
+        console.print("  lodestar msg mark-read --task F001 --agent A123")
+        console.print("  lodestar msg search --keyword 'bug' --task F001")
         console.print()
 
 
 @app.command(name="send")
 def msg_send(
-    to: str = typer.Option(
+    task_id: str = typer.Option(
         ...,
-        "--to",
+        "--task",
         "-t",
-        help="(REQUIRED) Recipient: 'task:<task-id>' or 'agent:<agent-id>'.",
+        help="(REQUIRED) Task ID to send message to.",
     ),
     text: str = typer.Option(
         ...,
@@ -80,6 +77,17 @@ def msg_send(
         "-f",
         help="(REQUIRED) Your agent ID. Get it from 'lodestar agent join'.",
     ),
+    subject: str | None = typer.Option(
+        None,
+        "--subject",
+        "-s",
+        help="Optional message subject (stored in meta).",
+    ),
+    severity: str | None = typer.Option(
+        None,
+        "--severity",
+        help="Optional severity level (stored in meta): info, warning, handoff, blocker.",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -91,14 +99,14 @@ def msg_send(
         help="Show what this command does.",
     ),
 ) -> None:
-    """Send a message to an agent or task thread.
+    """Send a message to a task thread.
 
-    Use task threads to leave context for other agents working on a task.
-    Use agent messages for direct communication.
+    Task messages are visible to all agents working on the task.
+    Use for handoffs, status updates, questions, or leaving context.
 
     Examples:
-        lodestar msg send --to task:F001 --from A123 --text 'Blocked on X'
-        lodestar msg send --to agent:B456 --from A123 --text 'Need help'
+        lodestar msg send --task F001 --from A123 --text 'Blocked on API key'
+        lodestar msg send --task F001 --from A123 --text 'Done' --subject 'Ready for review'
     """
     if explain:
         _show_explain_send(json_output)
@@ -112,78 +120,45 @@ def msg_send(
             console.print("[error]Not a Lodestar repository[/error]")
         raise typer.Exit(1)
 
-    # Parse recipient
-    if ":" not in to:
-        if json_output:
-            print_json(
-                Envelope.error("Invalid recipient format. Use 'agent:ID' or 'task:ID'").model_dump()
-            )
-        else:
-            console.print("[error]Invalid recipient format[/error]")
-            console.print("Use 'agent:A123' or 'task:T001'")
-        raise typer.Exit(1)
-
-    to_type_str, to_id = to.split(":", 1)
-    try:
-        to_type = MessageType(to_type_str.lower())
-    except ValueError:
-        if json_output:
-            print_json(Envelope.error(f"Invalid recipient type: {to_type_str}").model_dump())
-        else:
-            console.print(f"[error]Invalid recipient type: {to_type_str}[/error]")
-            console.print("Use 'agent' or 'task'")
-        raise typer.Exit(1)
-
     # Create and send message
     db = RuntimeDatabase(get_runtime_db_path(root))
 
+    meta: dict[str, Any] = {}
+    if subject:
+        meta["subject"] = subject
+    if severity:
+        meta["severity"] = severity
+
     message = Message(
         from_agent_id=from_agent,
-        to_type=to_type,
-        to_id=to_id,
+        task_id=task_id,
         text=text,
+        meta=meta,
     )
-
     db.send_message(message)
 
     result = {
         "message_id": message.message_id,
         "sent_at": message.created_at.isoformat(),
-        "to": to,
+        "task_id": task_id,
+        "from_agent_id": from_agent,
     }
 
     if json_output:
         print_json(Envelope.success(result).model_dump())
     else:
-        console.print(f"[success]Message sent[/success] to {to}")
-        console.print(f"  ID: {message.message_id}")
+        console.print(f"[success]Message sent[/success] to task [bold]{task_id}[/bold]")
+        console.print(f"  Message ID: {message.message_id}")
 
 
-@app.command(name="inbox")
-def msg_inbox(
-    agent_id: str = typer.Option(
-        ...,
-        "--agent",
-        "-a",
-        help="Your agent ID.",
-    ),
+@app.command(name="thread")
+def msg_thread(
+    task_id: str = typer.Argument(..., help="Task ID to view thread for."),
     since: str | None = typer.Option(
         None,
         "--since",
         "-s",
         help="Filter messages created after this timestamp (ISO format).",
-    ),
-    until: str | None = typer.Option(
-        None,
-        "--until",
-        "-u",
-        help="Filter messages created before this timestamp (ISO format).",
-    ),
-    from_agent: str | None = typer.Option(
-        None,
-        "--from",
-        "-f",
-        help="Filter by sender agent ID.",
     ),
     limit: int = typer.Option(
         50,
@@ -193,23 +168,14 @@ def msg_inbox(
     ),
     unread_only: bool = typer.Option(
         False,
-        "--unread-only",
-        help="Show only unread messages.",
+        "--unread",
+        help="Show only unread messages for --agent.",
     ),
-    show_read_status: bool = typer.Option(
-        False,
-        "--show-read-status",
-        help="Display read timestamps in output.",
-    ),
-    mark_as_read: bool = typer.Option(
-        True,
-        "--mark-as-read/--no-mark-as-read",
-        help="Mark messages as read when retrieving them (default: True).",
-    ),
-    count_only: bool = typer.Option(
-        False,
-        "--count",
-        help="Only return the count of messages, not the full list.",
+    agent_id: str | None = typer.Option(
+        None,
+        "--agent",
+        "-a",
+        help="Agent ID for filtering unread messages.",
     ),
     json_output: bool = typer.Option(
         False,
@@ -222,20 +188,17 @@ def msg_inbox(
         help="Show what this command does.",
     ),
 ) -> None:
-    """Read messages from your inbox.
+    """Read messages in a task thread.
 
-    Supports filtering by sender, date range, read status, or combination of filters.
+    Shows all messages for a task (use --unread --agent to see only unread).
 
     Examples:
-        lodestar msg inbox --agent A123
-        lodestar msg inbox --agent A123 --count
-        lodestar msg inbox --agent A123 --from B456
-        lodestar msg inbox --agent A123 --unread-only
-        lodestar msg inbox --agent A123 --show-read-status
-        lodestar msg inbox --agent A123 --since 2025-01-01T00:00:00 --until 2025-12-31T23:59:59
+        lodestar msg thread F001
+        lodestar msg thread F001 --unread --agent A123
+        lodestar msg thread F001 --since 2026-01-01T00:00:00
     """
     if explain:
-        _show_explain_inbox(json_output)
+        _show_explain_thread(json_output)
         return
 
     root = find_lodestar_root()
@@ -246,198 +209,73 @@ def msg_inbox(
             console.print("[error]Not a Lodestar repository[/error]")
         raise typer.Exit(1)
 
+    # Strip 'task:' prefix if present for consistency
+    if task_id.startswith("task:"):
+        task_id = task_id[5:]
+
     runtime_path = get_runtime_db_path(root)
     if not runtime_path.exists():
-        messages: list[Message] = []
-        count = 0
+        messages = []
     else:
         db = RuntimeDatabase(runtime_path)
 
-        # Parse timestamps
         since_dt = None
-        until_dt = None
-
         if since:
             try:
                 since_dt = datetime.fromisoformat(since)
             except ValueError:
                 if json_output:
-                    print_json(Envelope.error(f"Invalid since timestamp: {since}").model_dump())
+                    print_json(Envelope.error(f"Invalid timestamp: {since}").model_dump())
                 else:
-                    console.print(f"[error]Invalid since timestamp: {since}[/error]")
+                    console.print(f"[error]Invalid timestamp: {since}[/error]")
                 raise typer.Exit(1)
 
-        if until:
-            try:
-                until_dt = datetime.fromisoformat(until)
-            except ValueError:
-                if json_output:
-                    print_json(Envelope.error(f"Invalid until timestamp: {until}").model_dump())
-                else:
-                    console.print(f"[error]Invalid until timestamp: {until}[/error]")
-                raise typer.Exit(1)
-
-        if count_only:
-            # For count-only mode, we just get the count
-            count = db.get_inbox_count(agent_id, since=since_dt)
-            messages = []
+        # Get messages (optionally filtered for unread)
+        if unread_only and agent_id:
+            messages = db.get_task_unread_messages(task_id, agent_id, limit=limit)
+            # Still apply since filter if provided
+            if since_dt:
+                messages = [m for m in messages if m.created_at > since_dt]
         else:
-            messages = db.get_inbox(
-                agent_id,
-                since=since_dt,
-                until=until_dt,
-                from_agent_id=from_agent,
-                limit=limit,
-                unread_only=unread_only,
-                mark_as_read=mark_as_read,
+            messages = db.get_task_thread(
+                task_id, since=since_dt, limit=limit, unread_by=agent_id if unread_only else None
             )
-            count = len(messages)
 
-    result: dict[str, Any] = {
-        "count": count,
-    }
-
-    if not count_only:
-        result["messages"] = [
+    result = {
+        "task_id": task_id,
+        "messages": [
             {
                 "message_id": m.message_id,
-                "from": m.from_agent_id,
+                "from_agent_id": m.from_agent_id,
                 "text": m.text,
                 "created_at": m.created_at.isoformat(),
-                "read_at": m.read_at.isoformat() if m.read_at else None,
+                "read_by": m.read_by,
+                "meta": m.meta,
             }
             for m in messages
-        ]
-        result["cursor"] = messages[-1].created_at.isoformat() if messages else None
+        ],
+        "count": len(messages),
+        "cursor": messages[-1].created_at.isoformat() if messages else None,
+    }
 
     if json_output:
         print_json(Envelope.success(result).model_dump())
     else:
-        if count_only:
-            console.print(f"{count}")
+        console.print()
+        unread_text = " (unread)" if unread_only else ""
+        console.print(f"[bold]Thread for {task_id}{unread_text}[/bold]")
+        console.print()
+        if not messages:
+            console.print("[muted]No messages in thread.[/muted]")
         else:
-            console.print()
-            if not messages:
-                status = "unread " if unread_only else ""
-                console.print(f"[muted]No {status}messages in inbox.[/muted]")
-            else:
-                status = "unread " if unread_only else ""
-                console.print(f"[bold]Inbox ({len(messages)} {status}messages)[/bold]")
+            for msg in messages:
+                console.print(f"  [muted]{msg.created_at.isoformat()}[/muted]")
+                read_text = f" [muted](read by {len(msg.read_by)})[/muted]" if msg.read_by else ""
+                console.print(f"  [agent_id]{msg.from_agent_id}[/agent_id]{read_text}: {msg.text}")
+                if msg.meta:
+                    console.print(f"  [dim]Meta: {msg.meta}[/dim]")
                 console.print()
-                for msg in messages:
-                    console.print(f"  [muted]{msg.created_at.isoformat()}[/muted]")
-                    console.print(f"  From: [agent_id]{msg.from_agent_id}[/agent_id]")
-                    if show_read_status:
-                        if msg.read_at:
-                            console.print(f"  [muted]Read: {msg.read_at.isoformat()}[/muted]")
-                        else:
-                            console.print("  [info]Unread[/info]")
-                    console.print(f"  {msg.text}")
-                    console.print()
-            console.print()
-
-
-@app.command(name="wait")
-def msg_wait(
-    agent_id: str = typer.Option(
-        ...,
-        "--agent",
-        "-a",
-        help="Your agent ID.",
-    ),
-    timeout: int | None = typer.Option(
-        None,
-        "--timeout",
-        "-t",
-        help="Timeout in seconds (default: wait indefinitely).",
-    ),
-    since: str | None = typer.Option(
-        None,
-        "--since",
-        "-s",
-        help="Only wait for messages after this timestamp (ISO format).",
-    ),
-    json_output: bool = typer.Option(
-        False,
-        "--json",
-        help="Output in JSON format.",
-    ),
-    explain: bool = typer.Option(
-        False,
-        "--explain",
-        help="Show what this command does.",
-    ),
-) -> None:
-    """Block until a new message arrives in your inbox.
-
-    This command will block until a new message is received or the timeout expires.
-    If there are already unread messages (optionally after --since), returns immediately.
-
-    Examples:
-        lodestar msg wait --agent A123
-        lodestar msg wait --agent A123 --timeout 60
-        lodestar msg wait --agent A123 --since 2025-01-01T00:00:00
-    """
-    if explain:
-        _show_explain_wait(json_output)
-        return
-
-    root = find_lodestar_root()
-    if root is None:
-        if json_output:
-            print_json(Envelope.error("Not a Lodestar repository").model_dump())
-        else:
-            console.print("[error]Not a Lodestar repository[/error]")
-        raise typer.Exit(1)
-
-    runtime_path = get_runtime_db_path(root)
-    if not runtime_path.exists():
-        if json_output:
-            print_json(Envelope.error("Runtime database does not exist").model_dump())
-        else:
-            console.print("[error]Runtime database does not exist[/error]")
-        raise typer.Exit(1)
-
-    db = RuntimeDatabase(runtime_path)
-
-    # Parse since timestamp
-    since_dt = None
-    if since:
-        try:
-            since_dt = datetime.fromisoformat(since)
-        except ValueError:
-            if json_output:
-                print_json(Envelope.error(f"Invalid since timestamp: {since}").model_dump())
-            else:
-                console.print(f"[error]Invalid since timestamp: {since}[/error]")
-            raise typer.Exit(1)
-
-    # Wait for message
-    received = db.wait_for_message(agent_id, timeout_seconds=timeout, since=since_dt)
-
-    if received:
-        # Get the count of messages
-        count = db.get_inbox_count(agent_id, since=since_dt)
-        result = {
-            "received": True,
-            "count": count,
-        }
-
-        if json_output:
-            print_json(Envelope.success(result).model_dump())
-        else:
-            console.print(f"[success]New message received[/success] ({count} unread)")
-    else:
-        # Timeout occurred
-        result = {
-            "received": False,
-            "timeout": True,
-        }
-
-        if json_output:
-            print_json(Envelope.success(result).model_dump())
-        else:
-            console.print("[muted]Timeout: No new messages received[/muted]")
+        console.print()
 
 
 @app.command(name="search")
@@ -448,6 +286,12 @@ def msg_search(
         "-k",
         help="Search keyword to match in message text (case-insensitive).",
     ),
+    task_id: str | None = typer.Option(
+        None,
+        "--task",
+        "-t",
+        help="Filter by task ID.",
+    ),
     from_agent: str | None = typer.Option(
         None,
         "--from",
@@ -471,12 +315,6 @@ def msg_search(
         "--limit",
         "-n",
         help="Maximum messages to return.",
-    ),
-    _agent: str | None = typer.Option(
-        None,
-        "--agent",
-        hidden=True,
-        help="Ignored parameter (accepted for CLI consistency).",
     ),
     json_output: bool = typer.Option(
         False,
@@ -491,11 +329,12 @@ def msg_search(
 ) -> None:
     """Search messages with filters.
 
-    Search across all messages with optional keyword matching and filters.
+    Search across all task messages with optional keyword matching and filters.
     At least one filter must be provided.
 
     Examples:
         lodestar msg search --keyword 'bug'
+        lodestar msg search --task F001
         lodestar msg search --from A123 --since 2025-01-01T00:00:00
         lodestar msg search --keyword 'error' --until 2025-12-31T23:59:59
     """
@@ -512,16 +351,16 @@ def msg_search(
         raise typer.Exit(1)
 
     # Validate at least one filter is provided
-    if not any([keyword, from_agent, since, until]):
+    if not any([keyword, task_id, from_agent, since, until]):
         if json_output:
             print_json(
                 Envelope.error(
-                    "At least one filter is required (--keyword, --from, --since, or --until)"
+                    "At least one filter is required (--keyword, --task, --from, --since, or --until)"
                 ).model_dump()
             )
         else:
             console.print("[error]At least one filter is required[/error]")
-            console.print("Use --keyword, --from, --since, or --until")
+            console.print("Use --keyword, --task, --from, --since, or --until")
         raise typer.Exit(1)
 
     runtime_path = get_runtime_db_path(root)
@@ -556,6 +395,7 @@ def msg_search(
 
         messages = db.search_messages(
             keyword=keyword,
+            task_id=task_id,
             from_agent_id=from_agent,
             since=since_dt,
             until=until_dt,
@@ -566,17 +406,20 @@ def msg_search(
         "messages": [
             {
                 "message_id": m.message_id,
-                "from": m.from_agent_id,
-                "to": f"{m.to_type.value}:{m.to_id}",
+                "from_agent_id": m.from_agent_id,
+                "task_id": m.task_id,
                 "text": m.text,
                 "created_at": m.created_at.isoformat(),
+                "read_by": m.read_by,
+                "meta": m.meta,
             }
             for m in messages
         ],
         "count": len(messages),
         "filters": {
             "keyword": keyword,
-            "from": from_agent,
+            "task_id": task_id,
+            "from_agent_id": from_agent,
             "since": since,
             "until": until,
         },
@@ -594,34 +437,34 @@ def msg_search(
             for msg in messages:
                 console.print(f"  [muted]{msg.created_at.isoformat()}[/muted]")
                 console.print(f"  From: [agent_id]{msg.from_agent_id}[/agent_id]")
-                console.print(f"  To: {msg.to_type.value}:{msg.to_id}")
-                console.print(f"  {msg.text}")
+                console.print(f"  Task: [bold]{msg.task_id}[/bold]")
+                read_text = f" [muted](read by {len(msg.read_by)})[/muted]" if msg.read_by else ""
+                console.print(f"  {msg.text}{read_text}")
+                if msg.meta:
+                    console.print(f"  [dim]Meta: {msg.meta}[/dim]")
                 console.print()
         console.print()
 
 
-@app.command(name="thread")
-def msg_thread(
-    task_id: str = typer.Argument(
-        ..., help="Task ID to view thread for (with or without 'task:' prefix)."
+@app.command(name="mark-read")
+def msg_mark_read(
+    task_id: str = typer.Option(
+        ...,
+        "--task",
+        "-t",
+        help="(REQUIRED) Task ID whose messages to mark as read.",
     ),
-    since: str | None = typer.Option(
-        None,
-        "--since",
-        "-s",
-        help="Cursor (ISO timestamp) to fetch messages after.",
-    ),
-    limit: int = typer.Option(
-        50,
-        "--limit",
-        "-n",
-        help="Maximum messages to return.",
-    ),
-    _agent: str | None = typer.Option(
-        None,
+    agent_id: str = typer.Option(
+        ...,
         "--agent",
-        hidden=True,
-        help="Ignored parameter (accepted for CLI consistency).",
+        "-a",
+        help="(REQUIRED) Agent ID marking messages as read.",
+    ),
+    message_ids: list[str] | None = typer.Option(
+        None,
+        "--message-id",
+        "-m",
+        help="Specific message ID(s) to mark as read. If not provided, marks all task messages.",
     ),
     json_output: bool = typer.Option(
         False,
@@ -634,9 +477,17 @@ def msg_thread(
         help="Show what this command does.",
     ),
 ) -> None:
-    """Read messages in a task thread."""
+    """Mark task messages as read.
+
+    Mark specific messages or all messages in a task as read by an agent.
+    This updates the read_by array for the messages.
+
+    Examples:
+        lodestar msg mark-read --task F001 --agent A123
+        lodestar msg mark-read --task F001 --agent A123 --message-id M001 --message-id M002
+    """
     if explain:
-        _show_explain_thread(json_output)
+        _show_explain_mark_read(json_output)
         return
 
     root = find_lodestar_root()
@@ -647,87 +498,68 @@ def msg_thread(
             console.print("[error]Not a Lodestar repository[/error]")
         raise typer.Exit(1)
 
-    # Strip 'task:' prefix if present for consistency
-    if task_id.startswith("task:"):
-        task_id = task_id[5:]
-
     runtime_path = get_runtime_db_path(root)
     if not runtime_path.exists():
-        messages = []
-    else:
-        db = RuntimeDatabase(runtime_path)
+        if json_output:
+            print_json(Envelope.error("Runtime database does not exist").model_dump())
+        else:
+            console.print("[error]Runtime database does not exist[/error]")
+        raise typer.Exit(1)
 
-        since_dt = None
-        if since:
-            try:
-                since_dt = datetime.fromisoformat(since)
-            except ValueError:
-                if json_output:
-                    print_json(Envelope.error(f"Invalid timestamp: {since}").model_dump())
-                else:
-                    console.print(f"[error]Invalid timestamp: {since}[/error]")
-                raise typer.Exit(1)
+    db = RuntimeDatabase(runtime_path)
 
-        messages = db.get_task_thread(task_id, since=since_dt, limit=limit)
+    # Mark messages as read
+    updated_count = db.mark_task_messages_read(
+        task_id=task_id,
+        agent_id=agent_id,
+        message_ids=message_ids if message_ids else None,
+    )
 
     result = {
         "task_id": task_id,
-        "messages": [
-            {
-                "message_id": m.message_id,
-                "from": m.from_agent_id,
-                "text": m.text,
-                "created_at": m.created_at.isoformat(),
-            }
-            for m in messages
-        ],
-        "count": len(messages),
-        "cursor": messages[-1].created_at.isoformat() if messages else None,
+        "agent_id": agent_id,
+        "messages_marked": updated_count,
     }
 
     if json_output:
         print_json(Envelope.success(result).model_dump())
     else:
-        console.print()
-        console.print(f"[bold]Thread for {task_id}[/bold]")
-        console.print()
-        if not messages:
-            console.print("[muted]No messages in thread.[/muted]")
-        else:
-            for msg in messages:
-                console.print(f"  [muted]{msg.created_at.isoformat()}[/muted]")
-                console.print(f"  [agent_id]{msg.from_agent_id}[/agent_id]: {msg.text}")
-                console.print()
-        console.print()
+        console.print(
+            f"[success]Marked {updated_count} message(s) as read[/success] "
+            f"in task [bold]{task_id}[/bold]"
+        )
 
 
 def _show_explain_send(json_output: bool) -> None:
     explanation = {
         "command": "lodestar msg send",
-        "purpose": "Send a message to an agent or task thread.",
+        "purpose": "Send a message to a task thread.",
         "examples": [
-            "lodestar msg send --to agent:A123 --text 'Hello' --from A456",
-            "lodestar msg send --to task:T001 --text 'Progress update' --from A123",
+            "lodestar msg send --task F001 --from A123 --text 'Blocked on X'",
+            "lodestar msg send --task F001 --from A123 --text 'Done' --subject 'Ready for review'",
         ],
     }
     if json_output:
         print_json(explanation)
     else:
         console.print("\n[info]lodestar msg send[/info]\n")
-        console.print("Send a message to an agent or task thread.\n")
+        console.print("Send a message to a task thread.\n")
 
 
-def _show_explain_inbox(json_output: bool) -> None:
+def _show_explain_thread(json_output: bool) -> None:
     explanation = {
-        "command": "lodestar msg inbox",
-        "purpose": "Read messages from your inbox.",
-        "notes": ["Use --since with cursor for pagination"],
+        "command": "lodestar msg thread",
+        "purpose": "Read messages in a task thread.",
+        "examples": [
+            "lodestar msg thread F001",
+            "lodestar msg thread F001 --unread --agent A123",
+        ],
     }
     if json_output:
         print_json(explanation)
     else:
-        console.print("\n[info]lodestar msg inbox[/info]\n")
-        console.print("Read messages from your inbox.\n")
+        console.print("\n[info]lodestar msg thread[/info]\n")
+        console.print("Read messages in a task thread.\n")
 
 
 def _show_explain_search(json_output: bool) -> None:
@@ -736,8 +568,8 @@ def _show_explain_search(json_output: bool) -> None:
         "purpose": "Search messages with filters.",
         "examples": [
             "lodestar msg search --keyword 'bug'",
+            "lodestar msg search --task F001",
             "lodestar msg search --from A123 --since 2025-01-01T00:00:00",
-            "lodestar msg search --keyword 'error' --until 2025-12-31T23:59:59",
         ],
     }
     if json_output:
@@ -747,30 +579,17 @@ def _show_explain_search(json_output: bool) -> None:
         console.print("Search messages with filters.\n")
 
 
-def _show_explain_thread(json_output: bool) -> None:
+def _show_explain_mark_read(json_output: bool) -> None:
     explanation = {
-        "command": "lodestar msg thread",
-        "purpose": "Read messages in a task thread.",
-    }
-    if json_output:
-        print_json(explanation)
-    else:
-        console.print("\n[info]lodestar msg thread[/info]\n")
-        console.print("Read messages in a task thread.\n")
-
-
-def _show_explain_wait(json_output: bool) -> None:
-    explanation = {
-        "command": "lodestar msg wait",
-        "purpose": "Block until a new message arrives in your inbox.",
-        "notes": [
-            "Returns immediately if there are already unread messages",
-            "Use --timeout to limit wait time",
-            "Use --since to only wait for messages after a specific time",
+        "command": "lodestar msg mark-read",
+        "purpose": "Mark task messages as read by an agent.",
+        "examples": [
+            "lodestar msg mark-read --task F001 --agent A123",
+            "lodestar msg mark-read --task F001 --agent A123 --message-id M001",
         ],
     }
     if json_output:
         print_json(explanation)
     else:
-        console.print("\n[info]lodestar msg wait[/info]\n")
-        console.print("Block until a new message arrives in your inbox.\n")
+        console.print("\n[info]lodestar msg mark-read[/info]\n")
+        console.print("Mark task messages as read by an agent.\n")

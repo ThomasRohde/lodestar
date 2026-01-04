@@ -1,14 +1,13 @@
-"""Message repository - handles message operations."""
+"""Message repository - handles task-targeted message operations."""
 
 from __future__ import annotations
 
-import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select, update
 
-from lodestar.models.runtime import Message, MessageType
+from lodestar.models.runtime import Message
 from lodestar.runtime.converters import message_to_orm, orm_to_message
 from lodestar.runtime.engine import get_session
 from lodestar.runtime.event_types import EventType
@@ -25,7 +24,7 @@ def _utc_now() -> datetime:
 
 
 class MessageRepository:
-    """Repository for message operations."""
+    """Repository for task-targeted message operations."""
 
     def __init__(self, session_factory: sessionmaker[Session]):
         """Initialize message repository.
@@ -36,101 +35,49 @@ class MessageRepository:
         self._session_factory = session_factory
 
     def send(self, message: Message) -> Message:
-        """Send a message."""
+        """Send a message to a task thread.
+
+        Args:
+            message: The message to send (must be task-targeted).
+
+        Returns:
+            The sent message.
+        """
         with get_session(self._session_factory) as session:
             orm_message = message_to_orm(message)
             session.add(orm_message)
-
-            # Determine target_agent_id based on message type
-            target_agent_id = None
-            if message.to_type == MessageType.AGENT:
-                target_agent_id = message.to_id
 
             log_event(
                 session,
                 EventType.MESSAGE_SENT,
                 agent_id=message.from_agent_id,
-                task_id=message.to_id if message.to_type == MessageType.TASK else None,
-                target_agent_id=target_agent_id,
-                data={"to_type": message.to_type.value, "to_id": message.to_id},
+                task_id=message.task_id,
+                target_agent_id=None,
+                data={"task_id": message.task_id},
             )
 
             return message
 
-    def get_inbox(
+    def get_task_thread(
         self,
-        agent_id: str,
+        task_id: str,
         since: datetime | None = None,
-        until: datetime | None = None,
-        from_agent_id: str | None = None,
         limit: int = 50,
-        unread_only: bool = False,
-        mark_as_read: bool = False,
+        unread_by: str | None = None,
     ) -> list[Message]:
-        """Get messages for an agent.
+        """Get messages for a task thread.
 
         Args:
-            agent_id: The agent whose inbox to retrieve
-            since: Filter messages created after this time
-            until: Filter messages created before this time
-            from_agent_id: Filter by sender agent ID
-            limit: Maximum number of messages to return
-            unread_only: If True, only return unread messages (read_at IS NULL)
-            mark_as_read: If True, mark returned messages as read
+            task_id: The task ID to get messages for.
+            since: Optional filter for messages created after this time.
+            limit: Maximum number of messages to return.
+            unread_by: Optional agent ID to filter for unread messages.
 
         Returns:
-            List of messages matching the criteria
+            List of messages in chronological order.
         """
         with get_session(self._session_factory) as session:
-            # Build query with filters
-            stmt = select(MessageModel).where(
-                MessageModel.to_type == "agent",
-                MessageModel.to_id == agent_id,
-            )
-
-            if since:
-                stmt = stmt.where(MessageModel.created_at > since.isoformat())
-
-            if until:
-                stmt = stmt.where(MessageModel.created_at < until.isoformat())
-
-            if from_agent_id:
-                stmt = stmt.where(MessageModel.from_agent_id == from_agent_id)
-
-            if unread_only:
-                stmt = stmt.where(MessageModel.read_at.is_(None))
-
-            stmt = stmt.order_by(MessageModel.created_at.desc()).limit(limit)
-
-            results = session.execute(stmt).scalars().all()
-            messages = [orm_to_message(r) for r in results]
-
-            # Mark messages as read if requested
-            if mark_as_read and messages:
-                now = _utc_now()
-                message_ids = [msg.message_id for msg in messages]
-                update_stmt = (
-                    update(MessageModel)
-                    .where(MessageModel.message_id.in_(message_ids))
-                    .values(read_at=now.isoformat())
-                )
-                session.execute(update_stmt)
-                # Update the messages in-memory to reflect the read status
-                for msg in messages:
-                    if msg.read_at is None:
-                        msg.read_at = now
-
-            return messages
-
-    def get_task_thread(
-        self, task_id: str, since: datetime | None = None, limit: int = 50
-    ) -> list[Message]:
-        """Get messages for a task thread."""
-        with get_session(self._session_factory) as session:
-            stmt = select(MessageModel).where(
-                MessageModel.to_type == "task",
-                MessageModel.to_id == task_id,
-            )
+            stmt = select(MessageModel).where(MessageModel.task_id == task_id)
 
             if since:
                 stmt = stmt.where(MessageModel.created_at > since.isoformat())
@@ -138,32 +85,74 @@ class MessageRepository:
             stmt = stmt.order_by(MessageModel.created_at.asc()).limit(limit)
 
             results = session.execute(stmt).scalars().all()
-            return [orm_to_message(r) for r in results]
+            messages = [orm_to_message(r) for r in results]
 
-    def get_task_message_count(self, task_id: str) -> int:
-        """Get the count of messages in a task thread."""
+            # Filter for unread if requested
+            if unread_by:
+                messages = [m for m in messages if unread_by not in m.read_by]
+
+            return messages
+
+    def get_task_unread_messages(
+        self,
+        task_id: str,
+        agent_id: str,
+        limit: int = 50,
+    ) -> list[Message]:
+        """Get unread messages for a task from the perspective of an agent.
+
+        Args:
+            task_id: The task ID to get messages for.
+            agent_id: The agent ID to check read status for.
+            limit: Maximum number of messages to return.
+
+        Returns:
+            List of unread messages in chronological order.
+        """
+        return self.get_task_thread(task_id, unread_by=agent_id, limit=limit)
+
+    def get_task_message_count(self, task_id: str, unread_by: str | None = None) -> int:
+        """Get the count of messages in a task thread.
+
+        Args:
+            task_id: The task ID to count messages for.
+            unread_by: Optional agent ID to count only unread messages.
+
+        Returns:
+            Number of messages (or unread messages if agent_id provided).
+        """
         with get_session(self._session_factory) as session:
-            stmt = (
+            # For unread count, we need to fetch and filter in Python
+            # since read_by is a JSON array
+            if unread_by:
+                msg_stmt = select(MessageModel).where(MessageModel.task_id == task_id)
+                results = session.execute(msg_stmt).scalars().all()
+                messages = [orm_to_message(r) for r in results]
+                return len([m for m in messages if unread_by not in m.read_by])
+
+            count_stmt = (
                 select(func.count())
                 .select_from(MessageModel)
-                .where(
-                    MessageModel.to_type == "task",
-                    MessageModel.to_id == task_id,
-                )
+                .where(MessageModel.task_id == task_id)
             )
-            result = session.execute(stmt).scalar()
+
+            result = session.execute(count_stmt).scalar()
             return result or 0
 
     def get_task_message_agents(self, task_id: str) -> list[str]:
-        """Get unique agent IDs who have sent messages about a task."""
+        """Get unique agent IDs who have sent messages about a task.
+
+        Args:
+            task_id: The task ID to get agents for.
+
+        Returns:
+            List of unique agent IDs who sent messages to this task.
+        """
         with get_session(self._session_factory) as session:
             stmt = (
                 select(MessageModel.from_agent_id)
                 .distinct()
-                .where(
-                    MessageModel.to_type == "task",
-                    MessageModel.to_id == task_id,
-                )
+                .where(MessageModel.task_id == task_id)
                 .order_by(MessageModel.from_agent_id)
             )
             results = session.execute(stmt).scalars().all()
@@ -172,6 +161,7 @@ class MessageRepository:
     def search(
         self,
         keyword: str | None = None,
+        task_id: str | None = None,
         from_agent_id: str | None = None,
         since: datetime | None = None,
         until: datetime | None = None,
@@ -180,20 +170,24 @@ class MessageRepository:
         """Search messages with optional filters.
 
         Args:
-            keyword: Search term to match in message text (case-insensitive)
-            from_agent_id: Filter by sender agent ID
-            since: Filter messages created after this time
-            until: Filter messages created before this time
-            limit: Maximum number of messages to return
+            keyword: Search term to match in message text (case-insensitive).
+            task_id: Filter by task ID.
+            from_agent_id: Filter by sender agent ID.
+            since: Filter messages created after this time.
+            until: Filter messages created before this time.
+            limit: Maximum number of messages to return.
 
         Returns:
-            List of messages matching the search criteria
+            List of messages matching the search criteria.
         """
         with get_session(self._session_factory) as session:
             stmt = select(MessageModel)
 
             if keyword:
                 stmt = stmt.where(MessageModel.text.like(f"%{keyword}%"))
+
+            if task_id:
+                stmt = stmt.where(MessageModel.task_id == task_id)
 
             if from_agent_id:
                 stmt = stmt.where(MessageModel.from_agent_id == from_agent_id)
@@ -209,83 +203,45 @@ class MessageRepository:
             results = session.execute(stmt).scalars().all()
             return [orm_to_message(r) for r in results]
 
-    def get_inbox_count(self, agent_id: str, since: datetime | None = None) -> int:
-        """Get count of messages in inbox."""
-        with get_session(self._session_factory) as session:
-            stmt = (
-                select(func.count())
-                .select_from(MessageModel)
-                .where(
-                    MessageModel.to_type == "agent",
-                    MessageModel.to_id == agent_id,
-                )
-            )
-
-            if since:
-                stmt = stmt.where(MessageModel.created_at > since.isoformat())
-
-            result = session.execute(stmt).scalar()
-            return result or 0
-
-    def mark_messages_read(self, agent_id: str, message_ids: list[str]) -> int:
-        """Mark specific messages as read for an agent.
+    def mark_task_messages_read(
+        self,
+        task_id: str,
+        agent_id: str,
+        message_ids: list[str] | None = None,
+    ) -> int:
+        """Mark task messages as read by an agent.
 
         Args:
-            agent_id: The agent ID (used for verification)
-            message_ids: List of message IDs to mark as read
+            task_id: The task ID whose messages to mark as read.
+            agent_id: The agent ID marking messages as read.
+            message_ids: Optional list of specific message IDs to mark.
+                        If None, marks all unread messages in the task thread.
 
         Returns:
-            Number of messages marked as read
+            Number of messages marked as read.
         """
-        if not message_ids:
-            return 0
-
         with get_session(self._session_factory) as session:
-            now = _utc_now()
-            # Only mark messages that belong to this agent and aren't already read
-            update_stmt = (
-                update(MessageModel)
-                .where(
-                    MessageModel.message_id.in_(message_ids),
-                    MessageModel.to_type == "agent",
-                    MessageModel.to_id == agent_id,
-                    MessageModel.read_at.is_(None),
-                )
-                .values(read_at=now.isoformat())
-            )
-            result = session.execute(update_stmt)
-            return result.rowcount  # type: ignore[no-any-return, attr-defined]
+            # Fetch messages to update
+            stmt = select(MessageModel).where(MessageModel.task_id == task_id)
 
-    def wait_for_message(
-        self, agent_id: str, timeout_seconds: float | None = None, since: datetime | None = None
-    ) -> bool:
-        """Wait for a new message to arrive.
+            if message_ids:
+                stmt = stmt.where(MessageModel.message_id.in_(message_ids))
 
-        Returns True if a message was received, False if timeout occurred.
-        Uses polling with exponential backoff to check for new messages.
-        """
-        # Check if there are already messages
-        if self.get_inbox_count(agent_id, since=since) > 0:
-            return True
+            results = session.execute(stmt).scalars().all()
 
-        # Poll with exponential backoff
-        start_time = time.time()
-        sleep_time = 0.1  # Start with 100ms
-        max_sleep = 2.0  # Cap at 2 seconds
+            updated_count = 0
+            for msg_model in results:
+                # Convert to check if already read
+                msg = orm_to_message(msg_model)
+                if agent_id not in msg.read_by:
+                    # Add agent to read_by list
+                    new_read_by = msg.read_by + [agent_id]
+                    update_stmt = (
+                        update(MessageModel)
+                        .where(MessageModel.message_id == msg_model.message_id)
+                        .values(read_by=new_read_by)
+                    )
+                    session.execute(update_stmt)
+                    updated_count += 1
 
-        while True:
-            # Check for timeout
-            if timeout_seconds is not None:
-                elapsed = time.time() - start_time
-                if elapsed >= timeout_seconds:
-                    return False
-
-            # Sleep before next check
-            time.sleep(sleep_time)
-
-            # Check for new messages
-            if self.get_inbox_count(agent_id, since=since) > 0:
-                return True
-
-            # Increase sleep time with exponential backoff
-            sleep_time = min(sleep_time * 1.5, max_sleep)
+            return updated_count

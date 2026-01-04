@@ -985,6 +985,25 @@ def task_claim(
         "ttl_seconds": int(duration.total_seconds()),
     }
 
+    # Check for handoff messages from previous agent(s)
+    unread_messages = db.get_task_unread_messages(task_id, agent_id, limit=10)
+    unread_count = db.get_task_message_count(task_id, unread_by=agent_id)
+
+    handoff_message = None
+    if unread_messages:
+        # Get the most recent message for inline display
+        latest = unread_messages[-1]  # Messages are in chronological order
+        handoff_message = {
+            "message_id": latest.message_id,
+            "from_agent_id": latest.from_agent_id,
+            "created_at": latest.created_at.isoformat(),
+            "text": latest.text,
+            "subject": latest.meta.get("subject"),
+            "severity": latest.meta.get("severity"),
+        }
+        result["handoff_message"] = handoff_message
+        result["unread_count"] = unread_count
+
     # Build context bundle unless --no-context specified
     warnings: list[str] = lock_warnings.copy()  # Start with lock conflict warnings
     if not no_context:
@@ -1034,6 +1053,17 @@ def task_claim(
         ),
     ]
 
+    # Add message thread action if there are unread messages
+    if unread_count and unread_count > 0:
+        next_actions.insert(
+            0,
+            NextAction(
+                intent="msg.thread",
+                cmd=f"lodestar msg thread {task_id}",
+                description=f"View full message thread ({unread_count} unread)",
+            ),
+        )
+
     if json_output:
         print_json(
             Envelope.success(result, next_actions=next_actions, warnings=warnings).model_dump()
@@ -1043,6 +1073,29 @@ def task_claim(
         console.print(f"[success]Claimed task[/success] [task_id]{task_id}[/task_id]")
         console.print(f"  Lease: {created_lease.lease_id}")
         console.print(f"  Expires in: {format_duration(duration)}")
+
+        # Show handoff message if present
+        if handoff_message:
+            from rich.panel import Panel
+
+            console.print()
+            msg_text = handoff_message["text"]
+            msg_header = f"From: {handoff_message['from_agent_id']}"
+            if handoff_message.get("subject"):
+                msg_header += f" | {handoff_message['subject']}"
+            if handoff_message.get("severity"):
+                msg_header += f" [{handoff_message['severity']}]"
+
+            panel = Panel(
+                msg_text,
+                title=f"[bold]Handoff Message[/bold] ({unread_count} unread)",
+                subtitle=msg_header,
+                border_style="cyan",
+            )
+            console.print(panel)
+            console.print(
+                f"  [info]See full thread:[/info] [command]lodestar msg thread {task_id}[/command]"
+            )
 
         if warnings:
             console.print()
