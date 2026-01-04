@@ -1079,7 +1079,7 @@ def task_claim(
             from rich.panel import Panel
 
             console.print()
-            msg_text = handoff_message["text"]
+            msg_text: str = handoff_message.get("text") or "(no message text)"
             msg_header = f"From: {handoff_message['from_agent_id']}"
             if handoff_message.get("subject"):
                 msg_header += f" | {handoff_message['subject']}"
@@ -1269,7 +1269,7 @@ def task_release(
     Examples:
         lodestar task release F001
         lodestar task release F001 --agent A1234ABCD
-        lodestar msg send --to task:F001 --from A1234ABCD --text 'Blocked on X'
+        lodestar msg send --task F001 --from A1234ABCD --text 'Blocked on X'
     """
     if explain:
         _show_explain_release(json_output)

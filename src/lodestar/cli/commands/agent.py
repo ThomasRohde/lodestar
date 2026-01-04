@@ -545,7 +545,7 @@ def agent_brief(
         "formatted_output": formatted_brief,
         "commands": {
             "claim": f"lodestar task claim {task.id} --agent <your-agent-id>",
-            "report_progress": f"lodestar msg send --to task:{task.id} --from <your-agent-id> --text 'Progress update'",
+            "report_progress": f"lodestar msg send --task {task.id} --from <your-agent-id> --text 'Progress update'",
             "mark_done": f"lodestar task done {task.id}",
         },
     }

@@ -69,7 +69,7 @@ class ClaudeBriefFormatter(BriefFormatter):
         lines.append("<instructions>")
         lines.append(f"  1. Claim task: lodestar task claim {brief.task_id} --agent YOUR_AGENT_ID")
         lines.append(
-            f"  2. Report progress: lodestar msg send --to task:{brief.task_id} "
+            f"  2. Report progress: lodestar msg send --task {brief.task_id} "
             "--from YOUR_AGENT_ID --text 'Update'"
         )
         lines.append(f"  3. Mark complete: lodestar task done {brief.task_id}")
@@ -115,7 +115,7 @@ class CopilotBriefFormatter(BriefFormatter):
         lines.append("")
         lines.append("# Report progress")
         lines.append(
-            f"lodestar msg send --to task:{brief.task_id} "
+            f"lodestar msg send --task {brief.task_id} "
             "--from YOUR_AGENT_ID --text 'Progress update'"
         )
         lines.append("")
@@ -150,7 +150,7 @@ class GenericBriefFormatter(BriefFormatter):
         lines.append("COMMANDS:")
         lines.append(f"  Claim:    lodestar task claim {brief.task_id} --agent YOUR_AGENT_ID")
         lines.append(
-            f"  Progress: lodestar msg send --to task:{brief.task_id} "
+            f"  Progress: lodestar msg send --task {brief.task_id} "
             "--from YOUR_AGENT_ID --text 'Update'"
         )
         lines.append(f"  Done:     lodestar task done {brief.task_id}")

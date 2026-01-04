@@ -214,15 +214,19 @@ class TestMessaging:
             agent1_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 1"})
             agent1_id = agent1_result.structuredContent["agentId"]
 
-            agent2_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
-            agent2_id = agent2_result.structuredContent["agentId"]
+            # Register second agent for later tests
+            await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
 
-            # Agent 1 sends message to Agent 2
+            # Create a task
+            next_result = await session.call_tool("lodestar_task_next", {})
+            task_id = next_result.structuredContent["candidates"][0]["id"]
+
+            # Agent 1 sends message to task
             send_result = await session.call_tool(
                 "lodestar_message_send",
                 {
                     "from_agent_id": agent1_id,
-                    "to_agent_id": agent2_id,
+                    "task_id": task_id,
                     "body": "Hello from Agent 1!",
                 },
             )
@@ -231,11 +235,11 @@ class TestMessaging:
             assert send_result.structuredContent["ok"] is True
             message_id = send_result.structuredContent["messageId"]
 
-            # Agent 2 lists messages
+            # Agent 2 lists messages in task thread
             list_result = await session.call_tool(
                 "lodestar_message_list",
                 {
-                    "agent_id": agent2_id,
+                    "task_id": task_id,
                 },
             )
 
@@ -244,11 +248,11 @@ class TestMessaging:
             assert len(messages) > 0
 
             # Find our message
-            our_message = next((m for m in messages if m["id"] == message_id), None)
+            our_message = next((m for m in messages if m["message_id"] == message_id), None)
             assert our_message is not None
-            assert our_message["from"] == agent1_id
-            assert our_message["to"] == agent2_id
-            assert our_message["body"] == "Hello from Agent 1!"
+            assert our_message["from_agent_id"] == agent1_id
+            assert our_message["task_id"] == task_id
+            assert our_message["text"] == "Hello from Agent 1!"
 
     @pytest.mark.anyio
     async def test_message_acknowledgment(self, test_repo):
@@ -268,42 +272,46 @@ class TestMessaging:
             agent2_result = await session.call_tool("lodestar_agent_join", {"name": "Agent 2"})
             agent2_id = agent2_result.structuredContent["agentId"]
 
-            # Send message
+            # Get a task
+            next_result = await session.call_tool("lodestar_task_next", {})
+            task_id = next_result.structuredContent["candidates"][0]["id"]
+
+            # Send message to task
             send_result = await session.call_tool(
                 "lodestar_message_send",
                 {
                     "from_agent_id": agent1_id,
-                    "to_agent_id": agent2_id,
+                    "task_id": task_id,
                     "body": "Test message for ack",
                 },
             )
             message_id = send_result.structuredContent["messageId"]
 
-            # Acknowledge the message
+            # Acknowledge the message (mark as read by agent2)
             ack_result = await session.call_tool(
                 "lodestar_message_ack",
                 {
-                    "message_ids": [message_id],
+                    "task_id": task_id,
                     "agent_id": agent2_id,
+                    "message_ids": [message_id],
                 },
             )
 
             assert ack_result.isError is None or ack_result.isError is False
             assert ack_result.structuredContent["ok"] is True
 
-            # List messages again and verify ack status (pass unread_only=False to see all)
+            # List messages again and verify read status
             list_result = await session.call_tool(
                 "lodestar_message_list",
                 {
-                    "agent_id": agent2_id,
-                    "unread_only": False,
+                    "task_id": task_id,
                 },
             )
 
             messages = list_result.structuredContent["messages"]
-            our_message = next((m for m in messages if m["id"] == message_id), None)
+            our_message = next((m for m in messages if m["message_id"] == message_id), None)
             assert our_message is not None
-            assert "readAt" in our_message  # Should have readAt field if acknowledged
+            assert agent2_id in our_message["read_by"]  # Should be in read_by array
 
 
 class TestEventStreaming:
