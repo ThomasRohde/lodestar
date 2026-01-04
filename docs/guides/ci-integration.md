@@ -11,7 +11,7 @@ Lodestar comes with two GitHub Actions workflows:
 Runs on every push and pull request:
 
 - **Linting**: Runs `ruff check` and `ruff format --check`
-- **Testing**: Runs pytest on Python 3.12 and 3.13
+- **Testing**: Runs pytest on Python 3.13
 - **Docs Build**: Builds documentation with `mkdocs build --strict`
 - **Lodestar Health**: Runs `lodestar doctor` to validate task spec
 
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv python install 3.12
+      - run: uv python install 3.13
       - run: uv sync --extra dev
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv python install 3.12
+      - run: uv python install 3.13
       - run: uv sync --extra dev
       - run: uv run pytest
 
@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv python install 3.12
+      - run: uv python install 3.13
       - run: uv sync
       - run: uv run lodestar doctor
 ```
@@ -79,7 +79,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv python install 3.12
+      - run: uv python install 3.13
       - run: uv sync --extra docs
       - run: uv run mkdocs build --strict
       - uses: actions/upload-pages-artifact@v3

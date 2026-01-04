@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **CLI name**: `lodestar`
 - **Package**: `lodestar-cli` (PyPI)
-- **Python**: 3.12+
+- **Python**: 3.13+
 - **Full spec**: See [PRD.md](PRD.md) for complete product requirements
 
 ### Two-Plane State Model (Core Concept)

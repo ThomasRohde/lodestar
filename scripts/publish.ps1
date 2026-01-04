@@ -29,7 +29,7 @@
 
 .EXAMPLE
     .\scripts\publish.ps1 -Bump patch
-    # Bumps patch version (0.1.0 -> 0.1.1) and publishes
+    # Bumps patch version (1.0.0 -> 1.0.1) and publishes
 
 .EXAMPLE
     .\scripts\publish.ps1 -Version 1.0.0 -Message "First stable release"

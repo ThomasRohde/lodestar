@@ -4,7 +4,7 @@ This guide walks you through installing Lodestar and completing your first task 
 
 ## Prerequisites
 
-- Python 3.12 or later
+- Python 3.13 or later
 - Git repository (Lodestar works within Git repos)
 
 !!! note "Windows Users"
@@ -14,7 +14,7 @@ This guide walks you through installing Lodestar and completing your first task 
     - **Performance**: File operations are typically 2-3x slower than on Linux/macOS
     - **Antivirus**: Windows Defender or other antivirus software may cause additional file locks
     
-    Lodestar v0.2.0+ includes automatic retry logic for these transient errors. Most operations succeed within 1-2 retries.
+    Lodestar includes automatic retry logic for these transient errors. Most operations succeed within 1-2 retries.
 
 ## Installation
 
@@ -42,7 +42,7 @@ Verify the installation:
 
 ```bash
 $ lodestar --version
-lodestar 0.1.0
+lodestar 1.0.0
 ```
 
 ## Initialize a Repository

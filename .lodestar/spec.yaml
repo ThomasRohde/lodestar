@@ -1,495 +1,466 @@
 project:
   name: lodestar
-  default_branch: main
-  conventions:
-    commit_style: conventional
-    test_framework: pytest
+  default_branch: master
+  conventions: {}
 tasks:
-  HTTP-01:
-    title: Add transport CLI options to mcp serve
-    description: 'WHAT: Add --transport (-t), --host, and --port CLI options to the
-      ''lodestar mcp serve'' command.
-
-
-      WHERE: src/lodestar/cli/commands/mcp.py
-
-
-      WHY: Enable users to choose between stdio and streamable-http transports.
-
-
-      ACCEPT:
-
-      1. --transport accepts ''stdio'' (default) or ''streamable-http''
-
-      2. --host defaults to ''127.0.0.1'', only used for streamable-http
-
-      3. --port defaults to 8000, only used for streamable-http
-
-      4. Remove the ''Only stdio transport is currently supported'' guard
-
-      5. Pass transport/host/port to server startup function
-
-
-      CONTEXT: See TR-1 in docs/prd/HTTP-PRD.md. Current CLI is in mcp.py with hardcoded
-      stdio.'
-    acceptance_criteria: []
+  T001:
+    title: Add MCP task creation tool
+    description: "WHAT: Add lodestar_task_create() MCP tool to enable task creation\
+      \ via MCP\nWHERE: src/lodestar/mcp/tools/task_mutations.py\nWHY: Currently task\
+      \ creation is CLI-only per AGENTS.md, but planning agents need the ability to\
+      \ create tasks programmatically via MCP for agent-driven workflows\nSCOPE: Add\
+      \ single tool for creating tasks. Do NOT modify CLI commands. Follow existing\
+      \ pattern from task_mutations.py (claim, release, done, verify, complete, batch_verify)\n\
+      ACCEPT: \n1) Tool accepts all task creation parameters (title, description,\
+      \ accept criteria, priority, deps, labels, locks, PRD refs)\n2) Tool validates\
+      \ required fields and PRD references if specified\n3) Tool saves task to spec.yaml\
+      \ and emits task.create event\n4) Tool returns success with task_id or error\
+      \ with validation details\nREFS: See lodestar task create in CLI commands/task.py\
+      \ for parameter specifications; follow task_done/verify patterns in task_mutations.py"
+    acceptance_criteria:
+    - Tool accepts all task creation parameters
+    - Tool validates required fields and PRD references
+    - Tool saves task to spec and emits event
+    - Tool returns task_id on success
     depends_on: []
     labels:
+    - mcp
     - feature
-    locks: []
+    locks:
+    - src/lodestar/mcp/tools/task_mutations.py
     priority: 1
-    status: verified
-    created_at: '2026-01-02T07:55:38.297719+00:00'
-    updated_at: '2026-01-02T08:08:56.844252+00:00'
-    completed_by: A217E5B89
-    completed_at: 2026-01-02 08:01:37.765075+00:00
-    verified_by: A217E5B89
-    verified_at: 2026-01-02 08:08:56.844291+00:00
-    prd:
-      source: docs/prd/HTTP-PRD.md
-      refs:
-      - anchor: TR-1
-        lines: null
-      excerpt: null
-      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
-  HTTP-02:
-    title: Implement lifespan context manager
-    description: 'WHAT: Add async lifespan context manager for MCP server startup/shutdown
-      lifecycle.
+    status: ready
+    created_at: '2026-01-04T09:19:43.789680+00:00'
+    updated_at: '2026-01-04T09:19:43.789685+00:00'
+  T002:
+    title: Add MCP task update tool
+    description: 'WHAT: Add lodestar_task_update() MCP tool to enable task updates
+      via MCP
 
+      WHERE: src/lodestar/mcp/tools/task_mutations.py
 
-      WHERE: src/lodestar/mcp/server.py
+      WHY: Agents need ability to update task metadata (priority, labels, description,
+      acceptance criteria) during execution for dynamic planning
 
-
-      WHY: Ensure proper resource initialization on startup and cleanup on shutdown.
-
+      SCOPE: Add single tool for updating existing tasks. Support updating: title,
+      description, priority, labels, acceptance criteria, locks. Do NOT allow updating
+      status or dependencies via this tool (use specific tools for those)
 
       ACCEPT:
 
-      1. On startup: Initialize shared McpContext, run cleanup_orphaned_leases(),
-      run cleanup_temp_files(), log server ready
+      1) Tool accepts task_id and fields to update
 
-      2. On shutdown: Call context.db.dispose() to close DB connections
+      2) Tool validates task exists and fields are valid
 
-      3. Graceful handling of SIGTERM and SIGINT
+      3) Tool updates spec.yaml and emits task.update event
 
-      4. No orphaned database connections after shutdown
+      4) Tool returns updated task or error
 
-      5. Wire lifespan into FastMCP server
-
-
-      CONTEXT: See TR-2 in docs/prd/HTTP-PRD.md. Currently no lifespan management
-      - cleanup only runs at startup, no shutdown hook.'
-    acceptance_criteria: []
-    depends_on: []
-    labels:
-    - feature
-    locks: []
-    priority: 1
-    status: verified
-    created_at: '2026-01-02T07:55:59.299143+00:00'
-    updated_at: '2026-01-02T08:09:00.728749+00:00'
-    completed_by: A217E5B89
-    completed_at: 2026-01-02 08:08:07.340846+00:00
-    verified_by: A217E5B89
-    verified_at: 2026-01-02 08:09:00.728785+00:00
-    prd:
-      source: docs/prd/HTTP-PRD.md
-      refs:
-      - anchor: TR-2
-        lines: null
-      excerpt: null
-      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
-  HTTP-03:
-    title: Add connection pooling option for HTTP mode
-    description: 'WHAT: Add optional connection pooling to RuntimeDatabase for HTTP
-      transport mode.
-
-
-      WHERE: src/lodestar/runtime/database.py
-
-
-      WHY: HTTP mode has concurrent sessions; QueuePool handles this better than NullPool.
-
-
-      ACCEPT:
-
-      1. Add optional ''use_pool'' parameter to RuntimeDatabase.__init__()
-
-      2. When use_pool=False (default): Use NullPool (current behavior for stdio)
-
-      3. When use_pool=True: Use QueuePool with pool_size=5, max_overflow=10
-
-      4. WAL mode and busy_timeout still configured on all connections
-
-      5. Existing CLI commands work unchanged (NullPool default)
-
-
-      CONTEXT: See TR-3 in docs/prd/HTTP-PRD.md. Current implementation uses NullPool
-      exclusively.'
-    acceptance_criteria: []
-    depends_on: []
-    labels:
-    - feature
-    locks: []
-    priority: 1
-    status: verified
-    created_at: '2026-01-02T07:56:07.938345+00:00'
-    updated_at: '2026-01-02T08:09:04.979753+00:00'
-    completed_by: A217E5B89
-    completed_at: 2026-01-02 08:08:10.560100+00:00
-    verified_by: A217E5B89
-    verified_at: 2026-01-02 08:09:04.979829+00:00
-    prd:
-      source: docs/prd/HTTP-PRD.md
-      refs:
-      - anchor: TR-3
-        lines: null
-      excerpt: null
-      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
-  HTTP-04:
-    title: Wire up transport branching in server
-    description: 'WHAT: Implement transport selection logic in MCP server startup.
-
-
-      WHERE: src/lodestar/mcp/server.py, src/lodestar/cli/commands/mcp.py
-
-
-      WHY: Enable the server to run in either stdio or streamable-http mode based
-      on CLI options.
-
-
-      ACCEPT:
-
-      1. Add run_server(transport, host, port, repo_root, log_level) function
-
-      2. For streamable-http: Configure mcp.settings.host and mcp.settings.port
-
-      3. Call mcp.run(transport=transport) with appropriate transport string
-
-      4. CLI command calls run_server() with parsed options
-
-      5. Server logs listening URL when using HTTP transport
-
-      6. Works with lifespan context manager from HTTP-02
-
-
-      CONTEXT: See TR-4 in docs/prd/HTTP-PRD.md. FastMCP supports transport parameter
-      in run().'
-    acceptance_criteria: []
+      REFS: Follow task creation tool pattern; see CLI task update command for field
+      specifications'
+    acceptance_criteria:
+    - Tool accepts task_id and update fields
+    - Tool validates task and fields
+    - Tool updates spec and emits event
+    - Tool returns updated task
     depends_on:
-    - HTTP-01
-    - HTTP-02
-    - HTTP-03
+    - T001
     labels:
+    - mcp
     - feature
-    locks: []
+    locks:
+    - src/lodestar/mcp/tools/task_mutations.py
     priority: 2
-    status: verified
-    created_at: '2026-01-02T07:56:17.462588+00:00'
-    updated_at: '2026-01-02T08:10:36.953649+00:00'
-    completed_by: A217E5B89
-    completed_at: 2026-01-02 08:10:24.173560+00:00
-    verified_by: A217E5B89
-    verified_at: 2026-01-02 08:10:36.953665+00:00
-    prd:
-      source: docs/prd/HTTP-PRD.md
-      refs:
-      - anchor: TR-4
-        lines: null
-      excerpt: null
-      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
-  HTTP-05:
-    title: Update MCP documentation for HTTP transport
-    description: 'WHAT: Update docs/mcp.md with HTTP transport usage and configuration.
+    status: ready
+    created_at: '2026-01-04T09:20:01.595192+00:00'
+    updated_at: '2026-01-04T09:20:01.595194+00:00'
+  T003:
+    title: Add MCP task delete tool
+    description: 'WHAT: Add lodestar_task_delete() MCP tool to enable task deletion
+      via MCP
+
+      WHERE: src/lodestar/mcp/tools/task_mutations.py
+
+      WHY: Agents need ability to remove obsolete or incorrectly created tasks during
+      planning workflows
+
+      SCOPE: Add single tool for deleting tasks. Support cascade option to delete
+      dependent tasks. Validate no active leases before deletion. Do NOT allow deleting
+      verified tasks without explicit force flag
+
+      ACCEPT:
+
+      1) Tool accepts task_id and optional cascade flag
+
+      2) Tool validates task exists and has no active leases
+
+      3) Tool removes from spec.yaml and emits task.delete event
+
+      4) Tool returns confirmation or error with conflict details
+
+      REFS: Follow task creation/update tool pattern; see CLI task delete command
+      for cascade behavior'
+    acceptance_criteria:
+    - Tool accepts task_id and cascade flag
+    - Tool validates no active leases
+    - Tool removes from spec and emits event
+    - Tool returns confirmation
+    depends_on:
+    - T001
+    labels:
+    - mcp
+    - feature
+    locks:
+    - src/lodestar/mcp/tools/task_mutations.py
+    priority: 3
+    status: ready
+    created_at: '2026-01-04T09:20:11.593910+00:00'
+    updated_at: '2026-01-04T09:20:11.593913+00:00'
+  T004:
+    title: Update AGENTS.md documentation
+    description: 'WHAT: Update AGENTS.md to reflect new MCP task creation/mutation
+      tools
+
+      WHERE: AGENTS.md
+
+      WHY: Documentation must reflect that task creation is now available via MCP,
+      not just CLI-only
+
+      SCOPE: Update documentation sections on task creation (lines 33-45), add new
+      MCP tools to tool reference table (lines 134-154), add usage examples for planning
+      agents. Keep CLI workflow intact as primary planning method
+
+      ACCEPT:
+
+      1) Remove or update ''IMPORTANT: Task Creation Requires CLI'' section to note
+      MCP tools are now available
+
+      2) Add lodestar_task_create, lodestar_task_update, lodestar_task_delete to MCP
+      Tool Reference table
+
+      3) Add ''Task Planning'' workflow example showing MCP tool usage
+
+      4) Documentation is clear and consistent
+
+      REFS: Follow existing documentation patterns in AGENTS.md'
+    acceptance_criteria:
+    - Update task creation section
+    - Add new tools to reference table
+    - Add planning workflow example
+    - Documentation is clear
+    depends_on:
+    - T001
+    - T002
+    - T003
+    labels:
+    - docs
+    locks:
+    - AGENTS.md
+    priority: 4
+    status: ready
+    created_at: '2026-01-04T09:21:20.018162+00:00'
+    updated_at: '2026-01-04T09:21:20.018165+00:00'
+  T005:
+    title: Add integration tests for task creation tools
+    description: 'WHAT: Add comprehensive tests for new MCP task creation/mutation
+      tools
+
+      WHERE: tests/mcp/tools/test_task_mutations.py (or new test file)
+
+      WHY: Ensure task creation tools work correctly and handle edge cases (invalid
+      inputs, conflicts, PRD validation)
+
+      SCOPE: Test all three new tools (create, update, delete) with positive and negative
+      test cases. Test parameter validation, PRD reference validation, dependency
+      handling, and event emission. Do NOT test CLI commands
+
+      ACCEPT:
+
+      1) Tests for task_create cover: valid creation, missing required fields, invalid
+      PRD refs, duplicate task IDs
+
+      2) Tests for task_update cover: valid updates, non-existent tasks, invalid fields
+
+      3) Tests for task_delete cover: valid deletion, cascade behavior, active lease
+      conflicts
+
+      4) All tests pass
+
+      REFS: See existing test patterns in tests/ directory'
+    acceptance_criteria:
+    - task_create tests cover all cases
+    - task_update tests cover all cases
+    - task_delete tests cover all cases
+    - All tests pass
+    depends_on:
+    - T001
+    - T002
+    - T003
+    labels:
+    - testing
+    - mcp
+    locks:
+    - tests/mcp/tools/test_task_mutations.py
+    priority: 5
+    status: ready
+    created_at: '2026-01-04T09:21:37.528749+00:00'
+    updated_at: '2026-01-04T09:21:37.528752+00:00'
+  T006:
+    title: Update AGENTS.md template for MCP task creation
+    description: 'WHAT: Update render_agents_md_mcp template to reflect new MCP task
+      creation tools
+
+      WHERE: src/lodestar/cli/templates/agents_md.py (AGENTS_MD_MCP_TEMPLATE constant,
+      lines 273-511)
+
+      WHY: The template generates AGENTS.md for new projects and must reflect that
+      task creation is now available via MCP, not just CLI-only
+
+      SCOPE: Update AGENTS_MD_MCP_TEMPLATE only. Update section ''IMPORTANT: Task
+      Creation Requires CLI'' (lines 306-318), add new tools to MCP Tool Reference
+      table (lines 407-427), and update CLI Commands section (lines 482-493). Do NOT
+      modify AGENTS_MD_CLI_TEMPLATE
+
+      ACCEPT:
+
+      1) Update or remove ''IMPORTANT: Task Creation Requires CLI'' section to note
+      MCP tools are available
+
+      2) Add lodestar_task_create, lodestar_task_update, lodestar_task_delete to MCP
+      Tool Reference table
+
+      3) Update CLI Commands section to clarify which commands still have no MCP equivalent
+
+      4) Template generates correct documentation for new projects
+
+      REFS: Follow T004 changes to AGENTS.md; ensure template stays in sync with updated
+      docs'
+    acceptance_criteria:
+    - Update CLI-only section in template
+    - Add new tools to MCP reference table
+    - Update CLI commands section
+    - Template generates correct docs
+    depends_on:
+    - T004
+    labels:
+    - docs
+    - template
+    locks:
+    - src/lodestar/cli/templates/agents_md.py
+    priority: 6
+    status: ready
+    created_at: '2026-01-04T09:27:40.801649+00:00'
+    updated_at: '2026-01-04T09:27:40.801652+00:00'
+  T007:
+    title: Update MCP documentation with task creation tools
+    description: 'WHAT: Update docs/mcp.md to document new task creation/mutation
+      MCP tools
+
+      WHERE: docs/mcp.md (MCP Tools Reference section, lines 252-795)
+
+      WHY: Comprehensive MCP documentation must include the new task planning tools
+      for completeness
+
+      SCOPE: Add documentation for lodestar_task_create, lodestar_task_update, lodestar_task_delete
+      in the ''Task Tools'' section (after task.complete, before Message Tools). Follow
+      existing tool documentation format with Inputs, Returns, JSON examples, and
+      tips/warnings. Do NOT modify other sections
+
+      ACCEPT:
+
+      1) Add lodestar.task.create tool documentation with all parameters and examples
+
+      2) Add lodestar.task.update tool documentation with field update examples
+
+      3) Add lodestar.task.delete tool documentation with cascade behavior
+
+      4) Documentation follows same format as existing tools (Inputs table, Returns
+      JSON, tips)
+
+      REFS: Follow existing tool documentation patterns in docs/mcp.md; check T001-T003
+      for parameter specifications'
+    acceptance_criteria:
+    - Add task.create documentation
+    - Add task.update documentation
+    - Add task.delete documentation
+    - Documentation follows existing format
+    depends_on:
+    - T001
+    - T002
+    - T003
+    labels:
+    - docs
+    locks:
+    - docs/mcp.md
+    priority: 7
+    status: ready
+    created_at: '2026-01-04T09:28:04.673233+00:00'
+    updated_at: '2026-01-04T09:28:04.673235+00:00'
+  T008:
+    title: Update MCP prompts to remove CLI-only references
+    description: 'WHAT: Update MCP prompts to remove references to CLI-only commands
+      and add new task creation tools
+
+      WHERE: src/lodestar/mcp/prompts.py
+
+      WHY: Prompts currently reference lodestar_task_renew() which is CLI-only (lines
+      115, 196, 292), causing confusion for MCP users. Also need to add the new task
+      creation tools to the prompts once available
+
+      SCOPE: Update all three prompts (agent_workflow, task_execute, task_communication).
+      Remove all references to lodestar_task_renew(). Add note about lease auto-expiry.
+      Optionally add task planning workflow guidance when task creation tools are
+      available. Do NOT add the task creation tools yet (wait for T001-T003 to be
+      implemented first)
+
+      ACCEPT:
+
+      1) Remove all references to lodestar_task_renew() from prompts
+
+      2) Add guidance that leases auto-expire after 15 minutes if not completed
+
+      3) Highlight lodestar_task_complete() as recommended completion method
+
+      4) Prompts are clear and accurate for MCP-only usage
+
+      REFS: Lines 115, 196, 292 mention non-existent lodestar_task_renew(); see docs/mcp.md
+      for accurate tool list'
+    acceptance_criteria:
+    - Remove lodestar_task_renew references
+    - Add lease auto-expiry guidance
+    - Highlight task_complete method
+    - Prompts accurate for MCP
+    depends_on: []
+    labels:
+    - docs
+    - mcp
+    locks:
+    - src/lodestar/mcp/prompts.py
+    priority: 8
+    status: ready
+    created_at: '2026-01-04T09:30:51.357370+00:00'
+    updated_at: '2026-01-04T09:30:51.357373+00:00'
+  T009:
+    title: Add task planning prompt for MCP task creation
+    description: 'WHAT: Add new MCP prompt for task planning workflow using the new
+      task creation tools
+
+      WHERE: src/lodestar/mcp/prompts.py
+
+      WHY: Once task creation tools are available via MCP, agents need guidance on
+      how to use them for planning and creating well-structured tasks
+
+      SCOPE: Add new prompt ''lodestar_task_planning'' that guides agents through
+      creating INVEST-compliant tasks using lodestar_task_create, lodestar_task_update,
+      lodestar_task_delete. Include examples of task decomposition, PRD references,
+      dependency management, and the WHAT/WHERE/WHY/SCOPE/ACCEPT format. Follow existing
+      prompt patterns (agent_workflow, task_execute, task_communication)
+
+      ACCEPT:
+
+      1) New prompt registered: lodestar_task_planning
+
+      2) Prompt covers task creation best practices (INVEST criteria, 15-min scope,
+      PRD refs)
+
+      3) Prompt includes examples of using lodestar_task_create with all parameters
+
+      4) Prompt covers task decomposition patterns (vertical slicing, horizontal layering)
+
+      REFS: Follow patterns from existing prompts; see AGENTS.md lines 24-132 for
+      task design principles; see docs/mcp.md for tool parameter specs'
+    acceptance_criteria:
+    - New lodestar_task_planning prompt registered
+    - Covers INVEST task design
+    - Includes task_create examples
+    - Covers decomposition patterns
+    depends_on:
+    - T001
+    - T002
+    - T003
+    labels:
+    - docs
+    - mcp
+    locks:
+    - src/lodestar/mcp/prompts.py
+    priority: 9
+    status: ready
+    created_at: '2026-01-04T09:31:06.637055+00:00'
+    updated_at: '2026-01-04T09:31:06.637058+00:00'
+  B001:
+    title: Prepare release metadata and licensing for 1.0.0
+    description: 'WHAT: Update release metadata to 1.0.0, set stable classifier, add
+      LICENSE, and align default branch metadata.
 
 
-      WHERE: docs/mcp.md
+      WHERE: pyproject.toml, LICENSE (new), .lodestar/spec.yaml
 
 
-      WHY: Users need documentation to configure and use the new transport.
+      WHY: 1.0.0 requires stable release metadata, a license file, and consistent
+      branch metadata.
 
 
       ACCEPT:
 
-      1. Add HTTP transport section with usage examples
+      1) pyproject.toml version is 1.0.0
 
-      2. Document --transport, --host, --port options
+      2) Development Status classifier is Production/Stable
 
-      3. Add VS Code and Claude Desktop client configuration examples
+      3) LICENSE file exists with MIT text
 
-      4. Document multi-agent access patterns
-
-      5. Add security notes (localhost binding, no auth)
-
-      6. Add troubleshooting section (port in use, connection refused)
+      4) .lodestar/spec.yaml default_branch matches repo branch
 
 
-      CONTEXT: See TR-5 in docs/prd/HTTP-PRD.md. Current docs only cover stdio.'
+      CONTEXT: README already claims MIT license; repo branch is master'
     acceptance_criteria: []
-    depends_on:
-    - HTTP-04
+    depends_on: []
+    labels:
+    - bug
+    locks: []
+    priority: 1
+    status: verified
+    created_at: '2026-01-04T09:35:49.131792+00:00'
+    updated_at: '2026-01-04T09:41:31.328430+00:00'
+    completed_by: A473B2805
+    completed_at: 2026-01-04 09:41:26.570037+00:00
+    verified_by: A473B2805
+    verified_at: 2026-01-04 09:41:31.328445+00:00
+  D001:
+    title: Align README/docs for 1.0.0
+    description: 'WHAT: Update README and docs to reflect 1.0.0 release and correct
+      Python requirement and repo links.
+
+
+      WHERE: README.md, docs/getting-started.md, docs/cli/other.md, docs/guides/error-handling.md
+
+
+      WHY: Current docs reference 0.1.0/0.2.0 and Python 3.12+, and repo URLs/branches
+      are inconsistent with metadata.
+
+
+      ACCEPT:
+
+      1) Version examples show 1.0.0 (or are version-neutral)
+
+      2) Python requirement matches pyproject.toml
+
+      3) README badges/links point to correct repo
+
+      4) No remaining 0.1.0/0.2.0 references unless intentional
+
+
+      CONTEXT: Repo remote is https://github.com/ThomasRohde/lodestar.git, branch
+      is master'
+    acceptance_criteria: []
+    depends_on: []
     labels:
     - docs
     locks: []
-    priority: 3
-    status: verified
-    created_at: '2026-01-02T07:56:24.996871+00:00'
-    updated_at: '2026-01-02T08:12:36.646285+00:00'
-    completed_by: A217E5B89
-    completed_at: 2026-01-02 08:12:16.599852+00:00
-    verified_by: A217E5B89
-    verified_at: 2026-01-02 08:12:36.646338+00:00
-    prd:
-      source: docs/prd/HTTP-PRD.md
-      refs:
-      - anchor: TR-5
-        lines: null
-      excerpt: null
-      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
-  HTTP-06:
-    title: Add concurrent access integration test
-    description: 'WHAT: Add integration test verifying thread-safety under concurrent
-      HTTP access.
-
-
-      WHERE: tests/test_mcp_http.py (new file)
-
-
-      WHY: Ensure multiple agents can safely use the MCP server simultaneously.
-
-
-      ACCEPT:
-
-      1. Start MCP server with streamable-http transport in test fixture
-
-      2. Spawn 3+ parallel HTTP clients using httpx
-
-      3. Each client makes simultaneous tool calls (agent.list, task.list, task.claim)
-
-      4. Verify all responses are correct (no cross-talk between sessions)
-
-      5. Verify no database errors or deadlocks
-
-      6. Test completes in <30 seconds
-
-      7. Test is not flaky (run 5x to verify)
-
-
-      CONTEXT: See TR-6 in docs/prd/HTTP-PRD.md. Use pytest-asyncio for async test.
-      httpx is bundled with mcp package.'
-    acceptance_criteria: []
-    depends_on:
-    - HTTP-04
-    labels:
-    - test
-    locks: []
-    priority: 3
-    status: verified
-    created_at: '2026-01-02T07:56:34.392396+00:00'
-    updated_at: '2026-01-02T09:02:53.036765+00:00'
-    completed_by: A-51bb89
-    completed_at: 2026-01-02 09:02:48.458888+00:00
-    verified_by: A-51bb89
-    verified_at: 2026-01-02 09:02:53.036790+00:00
-    prd:
-      source: docs/prd/HTTP-PRD.md
-      refs:
-      - anchor: TR-6
-        lines: null
-      excerpt: null
-      prd_hash: edca089d4ed498038921b0a30e7d5d68b276b2e5a94cabf5f1e98368fb88dac2
-  MSG-CLI:
-    title: Update CLI msg commands for task-only messaging
-    description: 'Complete the refactoring of CLI msg commands to support only task-targeted
-      messaging:
-
-
-      WHAT: Update msg.py CLI commands to match new task-only architecture
-
-      WHERE: src/lodestar/cli/commands/msg.py
-
-      WHY: Agent-to-agent messaging deprecated, only task threads supported now
-
-
-      TASKS:
-
-      - Remove or update ''inbox'' command (no longer applicable)
-
-      - Update ''thread'' command to work with new schema (task_id, read_by array)
-
-      - Update ''search'' command to work with new Message model
-
-      - Add ''mark-read'' command for marking task messages as read
-
-      - Update all help text and examples
-
-      - Ensure JSON output matches new envelope structure
-
-
-      CONTEXT:
-
-      - Message model now has: message_id, created_at, from_agent_id, task_id, text,
-      meta, read_by (array)
-
-      - See message_repo.py for new methods: get_task_thread(), get_task_unread_messages(),
-      mark_task_messages_read()
-
-      - Database facade in database.py has matching methods
-
-      - No more MessageType enum or to_type/to_id fields
-
-
-      ACCEPTANCE:
-
-      1. All msg commands work with new schema
-
-      2. No references to agent messaging remain
-
-      3. Commands compile without errors'
-    acceptance_criteria: []
-    depends_on: []
-    labels:
-    - refactor
-    locks: []
-    priority: 1
-    status: verified
-    created_at: '2026-01-04T04:20:37.469291+00:00'
-    updated_at: '2026-01-04T04:31:15.938082+00:00'
-    completed_by: A96CBCB48
-    completed_at: 2026-01-04 04:31:11.724940+00:00
-    verified_by: A96CBCB48
-    verified_at: 2026-01-04 04:31:15.938096+00:00
-  MSG-MCP:
-    title: Update MCP message tools for task-only messaging
-    description: 'Refactor MCP message tools to support only task-targeted messaging:
-
-
-      WHAT: Update MCP message tools in mcp/tools/
-
-      WHERE: src/lodestar/mcp/tools/message.py (or wherever message tools are defined)
-
-      WHY: Agent-to-agent messaging deprecated, align with new architecture
-
-
-      TASKS:
-
-      - Find and update lodestar_message_send tool (change to task-only)
-
-      - Update lodestar_message_list tool (task threads only, add unread_by param)
-
-      - Update lodestar_message_ack tool (use mark_task_messages_read)
-
-      - Remove any agent inbox functionality
-
-      - Update tool docstrings and parameter descriptions
-
-      - Update MCP tool registration
-
-      - Ensure tools match CLI behavior
-
-
-      CONTEXT:
-
-      - Message model: message_id, created_at, from_agent_id, task_id, text, meta,
-      read_by[]
-
-      - RuntimeDatabase methods: get_task_thread(), mark_task_messages_read()
-
-      - task_claim tool already updated with handoffMessage support
-
-      - See CLI msg.py for reference implementation
-
-
-      ACCEPTANCE:
-
-      1. All MCP message tools work with new schema
-
-      2. Tool parameters match new Message model
-
-      3. No agent messaging references
-
-      4. Tools compile and pass type checks'
-    acceptance_criteria: []
-    depends_on:
-    - MSG-CLI
-    labels:
-    - refactor
-    locks: []
-    priority: 1
-    status: verified
-    created_at: '2026-01-04T04:20:46.390193+00:00'
-    updated_at: '2026-01-04T04:46:34.142878+00:00'
-    completed_by: A20146E0B
-    completed_at: 2026-01-04 04:46:30.029499+00:00
-    verified_by: A20146E0B
-    verified_at: 2026-01-04 04:46:34.142892+00:00
-  MSG-TEST:
-    title: Update tests for new task-only messaging model
-    description: 'Fix and update all tests to work with the new messaging architecture:
-
-
-      WHAT: Update test suite for task-only messaging with read tracking
-
-      WHERE: tests/test_runtime.py, tests/test_mcp_tools.py, tests/test_cli.py, others
-
-      WHY: Tests currently fail due to Message model changes
-
-
-      TASKS:
-
-      - Fix tests that import MessageType (removed)
-
-      - Update Message construction to use task_id instead of to_type/to_id
-
-      - Update assertions for read_by array instead of read_at timestamp
-
-      - Add tests for new functionality: unread_count, handoff_message in claim
-
-      - Update MCP tool tests for new message tool signatures
-
-      - Add tests for mark_task_messages_read()
-
-      - Test migration script (003_task_only_messages.py)
-
-      - Ensure test fixtures create valid task-only messages
-
-
-      CONTEXT:
-
-      - Message model: message_id, created_at, from_agent_id, task_id, text, meta,
-      read_by[]
-
-      - Task claim now returns handoffMessage and unreadCount
-
-      - No more agent inboxes or agent-to-agent messaging
-
-      - Database migration in runtime/alembic/versions/003_task_only_messages.py
-
-
-      ACCEPTANCE:
-
-      1. All tests pass (uv run pytest)
-
-      2. No MessageType import errors
-
-      3. New handoff message functionality tested
-
-      4. Migration tested with real database
-
-      5. Test coverage maintained or improved'
-    acceptance_criteria: []
-    depends_on:
-    - MSG-CLI
-    - MSG-MCP
-    labels:
-    - test
-    locks: []
     priority: 2
     status: verified
-    created_at: '2026-01-04T04:20:56.015880+00:00'
-    updated_at: '2026-01-04T05:02:32.186328+00:00'
-    completed_by: A5ED8138F
-    completed_at: 2026-01-04 05:02:21.815927+00:00
-    verified_by: A5ED8138F
-    verified_at: 2026-01-04 05:02:32.186375+00:00
+    created_at: '2026-01-04T09:35:59.071439+00:00'
+    updated_at: '2026-01-04T09:41:40.172744+00:00'
+    completed_by: A473B2805
+    completed_at: 2026-01-04 09:41:35.869246+00:00
+    verified_by: A473B2805
+    verified_at: 2026-01-04 09:41:40.172758+00:00

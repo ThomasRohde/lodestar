@@ -128,7 +128,7 @@ except SpecFileAccessError:
     result = lodestar_task_verify(task_id, agent_id)
 ```
 
-**Note**: Lodestar 0.2.0+ includes internal retry logic for these errors, but external retries may still be needed for some edge cases.
+**Note**: Lodestar includes internal retry logic for these errors, but external retries may still be needed for some edge cases.
 
 ---
 
@@ -613,7 +613,7 @@ except Exception as e:
 
 ## Migration from v0.1.x
 
-In Lodestar 0.2.0+, internal retry logic handles most Windows file system issues. If you have existing retry logic:
+In current Lodestar releases, internal retry logic handles most Windows file system issues. If you have existing retry logic:
 
 **Before** (v0.1.x - external retry required):
 ```python
@@ -625,7 +625,7 @@ for _ in range(3):
         time.sleep(0.1)
 ```
 
-**After** (v0.2.0+ - internal retry, but external still helps):
+**After** (internal retry, but external still helps):
 ```python
 try:
     lodestar_task_verify(task_id, agent_id)

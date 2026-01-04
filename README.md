@@ -1,9 +1,9 @@
 # Lodestar
 
 [![PyPI version](https://img.shields.io/pypi/v/lodestar-cli.svg)](https://pypi.org/project/lodestar-cli/)
-[![CI Status](https://github.com/lodestar-cli/lodestar/actions/workflows/ci.yml/badge.svg)](https://github.com/lodestar-cli/lodestar/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://github.com/lodestar-cli/lodestar/tree/master/docs)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![CI Status](https://github.com/ThomasRohde/lodestar/actions/workflows/ci.yml/badge.svg)](https://github.com/ThomasRohde/lodestar/actions/workflows/ci.yml)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://github.com/ThomasRohde/lodestar/tree/master/docs)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Agent-native repo orchestration for multi-agent coordination in Git repositories.**
@@ -323,7 +323,7 @@ Contributions are welcome! This project uses Lodestar for its own task managemen
 
 ```bash
 # Clone the repository
-git clone https://github.com/lodestar-cli/lodestar.git
+git clone https://github.com/ThomasRohde/lodestar.git
 cd lodestar
 
 # Install dependencies
@@ -371,6 +371,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Links
 
 - **PyPI**: [lodestar-cli](https://pypi.org/project/lodestar-cli/)
-- **Repository**: [github.com/lodestar-cli/lodestar](https://github.com/lodestar-cli/lodestar)
-- **Issues**: [github.com/lodestar-cli/lodestar/issues](https://github.com/lodestar-cli/lodestar/issues)
+- **Repository**: [github.com/ThomasRohde/lodestar](https://github.com/ThomasRohde/lodestar)
+- **Issues**: [github.com/ThomasRohde/lodestar/issues](https://github.com/ThomasRohde/lodestar/issues)
 - **Documentation**: [docs/](docs/)

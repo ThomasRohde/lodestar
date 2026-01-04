@@ -24,7 +24,7 @@ src/lodestar/
 
 | Component | Choice | Notes |
 |-----------|--------|-------|
-| Python | 3.12+ | Use `uv` for dev workflow |
+| Python | 3.13+ | Use `uv` for dev workflow |
 | CLI | Typer | `--json`, `--schema`, `--explain` on every command |
 | Output | Rich | Custom theme in `util/output.py`; no ANSI in `--json` mode |
 | Models | Pydantic v2 | Strict schemas, auto JSON Schema export |

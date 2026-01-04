@@ -435,7 +435,7 @@ These options are available on all commands:
 
 ```bash
 $ lodestar --version
-lodestar 0.1.0
+lodestar 1.0.0
 ```
 
 ### JSON Envelope

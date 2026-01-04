@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "Lodestar": {
+      "type": "stdio",
+      "command": "lodestar",
+      "args": [
+        "mcp",
+        "serve",
+        "--repo",
+        "."
+      ]
+    }
+  }
+}
