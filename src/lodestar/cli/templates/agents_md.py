@@ -206,19 +206,35 @@ lodestar agent join --name "Agent-1"
 # 2. Find available work
 lodestar task next --count 3
 
-# 3. Claim before working (creates 15-min lease)
+# 3. Check for upstream messages (tasks this depends on)
+lodestar task show F001  # See dependencies
+lodestar msg list --task F001 --unread-by A1234ABCD
+# Read any messages from upstream tasks about context or issues
+
+# 4. Claim before working (creates 15-min lease)
 lodestar task claim F001 --agent A1234ABCD
 
-# 4. Do the work...
+# 5. Do the work...
 #    Renew if taking longer than 10 min:
 lodestar task renew F001 --agent A1234ABCD
 
-# 5. Complete the task
+# 6. Complete the task
 lodestar task done F001
 lodestar task verify F001
 
+# 7. Message downstream tasks if needed
+# If there are remaining issues or important context:
+lodestar task show F001  # See dependents
+lodestar msg send --task F002 --from A1234ABCD \\
+  --text "Note: API rate limit applies to /users endpoint" \\
+  --severity warning
+
 # Alternative: Release if you can't complete
 lodestar task release F001 --agent A1234ABCD --reason "Blocked on API approval"
+# Leave message for next agent:
+lodestar msg send --task F001 --from A1234ABCD \\
+  --text "60% complete. Tests passing. Blocked on API key approval." \\
+  --severity handoff
 ```
 
 ---
@@ -274,13 +290,15 @@ lodestar_task_claim(task_id="F001", agent_id="YOUR_ID")
 ### Agent Workflow
 
 ```
-1. JOIN      lodestar_agent_join()         -> Get your agentId
-2. FIND      lodestar_task_next()          -> Get claimable tasks
-3. CLAIM     lodestar_task_claim()         -> Create 15-min lease
-4. CONTEXT   lodestar_task_context()       -> Get PRD context
-5. WORK      (implement the task)
-6. DONE      lodestar_task_done()          -> Mark complete
-7. VERIFY    lodestar_task_verify()        -> Unblock dependents
+1. JOIN      lodestar_agent_join()                          -> Get your agentId
+2. FIND      lodestar_task_next()                           -> Get claimable tasks
+3. CHECK     lodestar_message_list(task_id, unread_by)      -> Check upstream messages
+4. CLAIM     lodestar_task_claim()                          -> Create 15-min lease
+5. CONTEXT   lodestar_task_context()                        -> Get PRD context
+6. WORK      (implement the task)
+7. DONE      lodestar_task_done()                           -> Mark complete
+8. VERIFY    lodestar_task_verify()                         -> Unblock dependents
+9. MESSAGE   lodestar_message_send(task_id=downstream)      -> Alert downstream tasks
 ```
 
 ---
@@ -403,20 +421,60 @@ REFS: Follow pattern in validation.ts, see F041 for form structure" \\
 | | `lodestar_task_release` | Release claim (if blocked) |
 | | `lodestar_task_done` | Mark task complete |
 | | `lodestar_task_verify` | Verify task (unblocks deps) |
-| **Message** | `lodestar_message_send` | Send to agent or task thread |
-| | `lodestar_message_list` | Get inbox messages |
+| **Message** | `lodestar_message_send` | Send to task thread |
+| | `lodestar_message_list` | Get task messages |
 | | `lodestar_message_ack` | Mark messages as read |
 | **Events** | `lodestar_events_pull` | Pull event stream |
 
 ---
 
-## Handoff Pattern
+## Task Communication Patterns
+
+### Check Upstream Messages
+
+Before claiming a task, check for messages from dependencies:
+
+```
+# Get task details to see dependencies
+task = lodestar_task_get(task_id="F002")
+# Check each dependency for messages
+for dep_id in task["dependsOn"]:
+    messages = lodestar_message_list(task_id=dep_id, unread_by="YOUR_ID")
+    # Read any warnings, context, or issues left by upstream
+```
+
+### Message Downstream Tasks
+
+After completing a task, leave important context for dependent tasks:
+
+```
+# After verify, get list of dependents
+task = lodestar_task_get(task_id="F001")
+
+# Send warnings or context to downstream tasks
+for dependent_id in task["dependents"]:
+    lodestar_message_send(
+        task_id=dependent_id,
+        from_agent_id="YOUR_ID",
+        body="API rate limit: 100 req/min applies to all /users endpoints",
+        severity="warning"
+    )
+```
+
+### Handoff Pattern (Blocked or Incomplete)
 
 When blocked or ending session before completion:
 
 ```
 lodestar_task_release(task_id="F001", agent_id="YOUR_ID", reason="Blocked on API approval")
-lodestar_message_send(task_id="F001", from_agent_id="YOUR_ID", body="Progress: 60% complete. Tests passing. Next: finish validation.")
+
+# Leave message for next agent on THIS task
+lodestar_message_send(
+    task_id="F001",
+    from_agent_id="YOUR_ID",
+    body="Progress: 60% complete. Tests passing. Blocked on API key approval. Next: finish validation logic in src/auth/validate.py",
+    severity="handoff"
+)
 ```
 
 ---
