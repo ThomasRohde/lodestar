@@ -42,7 +42,7 @@ def upgrade() -> None:
     # Migrate task messages from old table (drop agent messages)
     op.execute("""
         INSERT INTO messages_new (message_id, created_at, from_agent_id, task_id, text, meta, read_by)
-        SELECT 
+        SELECT
             message_id,
             created_at,
             from_agent_id,
@@ -87,7 +87,7 @@ def downgrade() -> None:
     # Migrate task messages back (cannot restore agent messages or read tracking)
     op.execute("""
         INSERT INTO messages_old (message_id, created_at, from_agent_id, to_type, to_id, text, meta, read_at)
-        SELECT 
+        SELECT
             message_id,
             created_at,
             from_agent_id,

@@ -285,31 +285,23 @@ INSERT INTO leases VALUES (
 
 ### Table: `messages`
 
-Agent-to-agent and task-thread messaging.
+Task thread messaging.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `message_id` | TEXT | PRIMARY KEY | Unique message ID (format: `M` + 12 hex chars) |
 | `created_at` | TEXT | NOT NULL, INDEX | When message was sent (ISO 8601) |
 | `from_agent_id` | TEXT | NOT NULL, FK → agents.agent_id | Sender agent ID |
-| `to_type` | TEXT | NOT NULL | Recipient type: `"agent"` or `"task"` |
-| `to_id` | TEXT | NOT NULL | Recipient ID (agent_id or task_id) |
+| `task_id` | TEXT | NOT NULL | Task ID for thread |
 | `text` | TEXT | NOT NULL | Message content |
 | `meta` | TEXT | DEFAULT `{}` | JSON object with additional metadata |
-| `read_at` | TEXT | NULL | When message was read (ISO 8601, NULL if unread) |
+| `read_by` | TEXT | DEFAULT `[]` | JSON array of agent IDs who have read this message |
 
 #### Indexes
 
-- `idx_messages_to` on `(to_type, to_id)`
+- `idx_messages_task` on `task_id`
 - `idx_messages_from` on `from_agent_id`
 - `idx_messages_created` on `created_at`
-
-#### Message Types
-
-| `to_type` | Description |
-|-----------|-------------|
-| `agent` | Direct message to a specific agent |
-| `task` | Message in a task thread (visible to all) |
 
 #### Message Metadata
 
@@ -322,6 +314,16 @@ The `meta` field can contain:
 }
 ```
 
+#### Read Tracking
+
+Messages use a `read_by` JSON array to track which agents have read the message:
+
+```json
+["A1B2C3D4E", "A5678EFGH"]
+```
+
+This allows multiple agents to independently track their read status for each message.
+
 #### Message ID Format
 
 Message IDs follow the pattern `M{12-hex-chars}`, e.g., `M1A2B3C4D5E6F`.
@@ -329,28 +331,26 @@ Message IDs follow the pattern `M{12-hex-chars}`, e.g., `M1A2B3C4D5E6F`.
 #### Example Rows
 
 ```sql
--- Direct message to agent
+-- Task thread message (unread)
 INSERT INTO messages VALUES (
   'M1A2B3C4D5E6F',
   '2025-01-15T10:00:00+00:00',
   'A1B2C3D4E',
-  'agent',
-  'A9F8E7D6C',
-  'Need help with authentication flow',
-  '{"subject": "Help needed", "severity": "info"}',
-  NULL
+  'AUTH-001',
+  'Started working on OAuth2 integration',
+  '{"subject": "Work started"}',
+  '[]'
 );
 
--- Task thread message
+-- Task thread message (read by two agents)
 INSERT INTO messages VALUES (
   'M2B3C4D5E6F7A',
   '2025-01-15T10:05:00+00:00',
   'A1B2C3D4E',
-  'task',
   'AUTH-001',
-  'Started working on OAuth2 integration',
-  '{}',
-  NULL
+  'Implementation complete, ready for review',
+  '{"severity": "handoff"}',
+  '["A5678EFGH", "A9999WXYZ"]'
 );
 ```
 

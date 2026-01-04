@@ -673,31 +673,14 @@ Send a message to another agent.
 {
   "messageId": "M123",
   "fromAgentId": "A1234ABCD",
-  "toAgentId": "A5678EFGH",
   "taskId": "F002",
   "subject": "Task handoff",
   "sentAt": "2025-01-15T11:00:00Z"
 }
 ```
 
-#### `lodestar.message.list`
-
-List messages for an agent (inbox).
-
-**Inputs:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `agent_id` | string | Yes | Agent ID |
-| `unread_only` | boolean | No | Only show unread messages (default false) |
-| `limit` | integer | No | Max results (default 50, max 200) |
-
-**Returns:**
-
-```json
-{
-  "items": [
-    {
+!!! warning "Note: message.list is deprecated"
+    The `message.list` (inbox) tool has been removed. Use `task.context` to get task thread messages when starting work on a task.
       "messageId": "M123",
       "fromAgentId": "A5678EFGH",
       "toAgentId": "A1234ABCD",

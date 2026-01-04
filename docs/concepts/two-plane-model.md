@@ -105,9 +105,10 @@ erDiagram
     messages {
         text id PK
         text from_agent FK
-        text to_type
-        text to_id
+        text task_id
         text body
+        text read_by
+        text meta
         text created_at
     }
 

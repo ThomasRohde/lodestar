@@ -28,7 +28,7 @@ When multiple agents work in the same repository, chaos ensues: duplicate work, 
 - **PRD Context Delivery**: Tasks carry just-enough product intent from PRDs—frozen excerpts, section refs, and drift detection
 - **Self-Documenting CLI**: Every command supports `--json`, `--schema`, and `--explain` flags for programmatic access
 - **Progressive Discovery**: No-args commands suggest next actions to guide workflows
-- **Agent Messaging**: Built-in inter-agent communication for handoffs and coordination
+- **Task Messaging**: Built-in task thread communication for handoffs and context sharing
 - **MCP Server Integration**: Expose Lodestar as an MCP server for seamless integration with AI assistants like Claude Desktop
 
 ## Installation

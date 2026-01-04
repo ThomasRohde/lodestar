@@ -430,7 +430,7 @@ lodestar task done <id>
 lodestar task verify <id>
 
 # Communication
-lodestar msg send --to task:<id> --from <agent-id> --text "..."
+lodestar msg send --task <id> --from <agent-id> --text "..."
 lodestar msg thread <task-id>
-lodestar msg inbox --agent <agent-id>
+lodestar msg mark-read --task <id> --agent <agent-id>
 ```

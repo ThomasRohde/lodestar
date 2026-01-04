@@ -1,13 +1,16 @@
 # Message Commands
 
-Commands for inter-agent messaging.
+Commands for task messaging. All messages are task-targeted - there is no agent-to-agent messaging.
 
 !!! tip "Quick Start"
     Run `lodestar msg` without a subcommand to see messaging examples and available commands.
 
+!!! info "Task-Only Messaging"
+    Lodestar uses task threads for all communication. Messages are sent to tasks and visible to all agents working on that task. This encourages context sharing and prevents scattered conversations.
+
 ## msg send
 
-Send a message to an agent or task thread.
+Send a message to a task thread.
 
 ```bash
 lodestar msg send [OPTIONS]
@@ -17,284 +20,26 @@ lodestar msg send [OPTIONS]
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--to TEXT` | `-t` | Recipient: 'agent:A123' or 'task:T001' (required) |
+| `--task TEXT` | `-t` | Task ID to send message to (required) |
 | `--text TEXT` | `-m` | Message text (required) |
 | `--from TEXT` | `-f` | Your agent ID (required) |
+| `--subject TEXT` | `-s` | Optional message subject (stored in meta) |
+| `--severity TEXT` | | Optional severity level (stored in meta): info, warning, handoff, blocker |
 | `--json` | | Output in JSON format |
 | `--explain` | | Show what this command does |
-
-### Example: Message to an Agent
-
-```bash
-$ lodestar msg send \
-    --to agent:A5678EFGH \
-    --from A1234ABCD \
-    --text "F002 is ready for review"
-Sent message M1234567
-```
 
 ### Example: Message to a Task Thread
 
 ```bash
 $ lodestar msg send \
-    --to task:F002 \
+    --task F002 \
     --from A1234ABCD \
     --text "Started work on password reset flow"
-Sent message M1234568
+Message sent to task F002
+  Message ID: M1234568
 ```
 
 Task threads are useful for leaving context about your work for other agents who may pick up the task later.
-
----
-
-## msg inbox
-
-Read messages from your inbox with optional filtering.
-
-```bash
-lodestar msg inbox [OPTIONS]
-```
-
-### Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--agent TEXT` | `-a` | Your agent ID (required) |
-| `--since TEXT` | `-s` | Filter messages created after this timestamp (ISO format) |
-| `--until TEXT` | `-u` | Filter messages created before this timestamp (ISO format) |
-| `--from TEXT` | `-f` | Filter by sender agent ID |
-| `--limit INTEGER` | `-n` | Maximum messages to return (default: 50) |
-| `--unread-only` | | Show only unread messages |
-| `--show-read-status` | | Display read timestamps in output |
-| `--mark-as-read` / `--no-mark-as-read` | | Mark messages as read when retrieving them (default: True) |
-| `--count` | | Only return the count of messages, not the full list |
-| `--json` | | Output in JSON format |
-| `--explain` | | Show what this command does |
-
-### Example
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD
-Messages (2)
-
-  From: A5678EFGH  2m ago
-  Need help with F003 dependencies
-
-  From: A9999WXYZ  1h ago
-  F001 is now verified
-```
-
-### Filtering
-
-Filter by sender:
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD --from A5678EFGH
-```
-
-Filter by date range:
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD --since 2025-01-01T00:00:00 --until 2025-01-31T23:59:59
-```
-
-Show only unread messages:
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD --unread-only
-```
-
-Show read status for messages:
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD --show-read-status
-```
-
-Combine multiple filters:
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD --from A5678EFGH --since 2025-01-15T10:00:00
-```
-
-### Read Status Tracking
-
-By default, messages are marked as read when you retrieve them with `msg inbox`. This helps you track which messages you've already seen.
-
-To prevent marking messages as read:
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD --no-mark-as-read
-```
-
-To see only messages you haven't read yet:
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD --unread-only
-```
-
-To display when each message was read:
-
-```bash
-$ lodestar msg inbox --agent A1234ABCD --show-read-status
-```
-
----
-
-## msg search
-
-Search across all messages with filters.
-
-```bash
-lodestar msg search [OPTIONS]
-```
-
-Search through all messages in the system with keyword matching and filtering options. At least one filter must be provided.
-
-### Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--keyword TEXT` | `-k` | Search keyword to match in message text (case-insensitive) |
-| `--from TEXT` | `-f` | Filter by sender agent ID |
-| `--since TEXT` | `-s` | Filter messages created after this timestamp (ISO format) |
-| `--until TEXT` | `-u` | Filter messages created before this timestamp (ISO format) |
-| `--limit INTEGER` | `-n` | Maximum messages to return (default: 50) |
-| `--json` | | Output in JSON format |
-| `--explain` | | Show what this command does |
-
-### Examples
-
-Search for messages containing a keyword:
-
-```bash
-$ lodestar msg search --keyword 'bug'
-Search Results (3 messages)
-
-  2025-01-15T14:30:00
-  From: A1234ABCD
-  To: task:F002
-  Found a bug in the authentication flow
-
-  2025-01-15T10:15:00
-  From: A5678EFGH
-  To: task:F003
-  This bug is now fixed
-```
-
-Search by sender:
-
-```bash
-$ lodestar msg search --from A1234ABCD
-```
-
-Search with date range:
-
-```bash
-$ lodestar msg search --keyword 'error' --since 2025-01-01T00:00:00 --until 2025-01-31T23:59:59
-```
-
-Combine multiple filters:
-
-```bash
-$ lodestar msg search --keyword 'bug' --from A1234ABCD --since 2025-01-15T00:00:00
-```
-
----
-
-## msg wait
-
-Block until a new message arrives in your inbox.
-
-```bash
-lodestar msg wait [OPTIONS]
-```
-
-This command blocks until a new message is received or the timeout expires. If there are already unread messages (optionally after `--since`), returns immediately.
-
-### Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--agent TEXT` | `-a` | Your agent ID (required) |
-| `--timeout INTEGER` | `-t` | Timeout in seconds (default: wait indefinitely) |
-| `--since TEXT` | `-s` | Only wait for messages after this timestamp (ISO format) |
-| `--json` | | Output in JSON format |
-| `--explain` | | Show what this command does |
-
-### Examples
-
-Wait for any new message:
-
-```bash
-$ lodestar msg wait --agent A1234ABCD
-Waiting for messages...
-
-  From: A5678EFGH  just now
-  Your review is needed on F003
-```
-
-Wait with a timeout:
-
-```bash
-$ lodestar msg wait --agent A1234ABCD --timeout 60
-# Returns after 60 seconds if no message arrives
-```
-
-Wait for messages after a specific time:
-
-```bash
-$ lodestar msg wait --agent A1234ABCD --since 2025-01-15T10:00:00
-```
-
-### JSON Output
-
-```bash
-$ lodestar msg wait --agent A1234ABCD --json
-{
-  "ok": true,
-  "data": {
-    "message": {
-      "message_id": "M1234567",
-      "from_agent_id": "A5678EFGH",
-      "to_type": "agent",
-      "to_id": "A1234ABCD",
-      "text": "Your review is needed on F003",
-      "created_at": "2025-01-15T10:35:00Z"
-    }
-  },
-  "next": [],
-  "warnings": []
-}
-```
-
-### Use Cases
-
-**Event-driven workflows:**
-
-Wait for a response before continuing:
-
-```bash
-# Send a question
-lodestar msg send --to agent:A5678EFGH --from A1234ABCD --text "Can you review F003?"
-
-# Wait for the response
-lodestar msg wait --agent A1234ABCD --timeout 300
-```
-
-**Polling alternative:**
-
-Instead of polling `msg inbox` repeatedly, use `msg wait` for efficient blocking:
-
-```bash
-# Inefficient polling
-while true; do
-  lodestar msg inbox --agent A1234ABCD --unread-only
-  sleep 10
-done
-
-# Efficient waiting
-lodestar msg wait --agent A1234ABCD
-```
 
 ---
 
@@ -318,8 +63,10 @@ View the conversation history for a specific task. Useful for understanding cont
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--since TEXT` | `-s` | Cursor (ISO timestamp) to fetch messages after |
+| `--since TEXT` | `-s` | Filter messages created after this timestamp (ISO format) |
 | `--limit INTEGER` | `-n` | Maximum messages to return (default: 50) |
+| `--unread` | | Show only unread messages for --agent |
+| `--agent TEXT` | `-a` | Agent ID for filtering unread messages |
 | `--json` | | Output in JSON format |
 | `--explain` | | Show what this command does |
 
@@ -327,19 +74,137 @@ View the conversation history for a specific task. Useful for understanding cont
 
 ```bash
 $ lodestar msg thread F002
-Thread for F002 (3 messages)
+Thread for F002
 
-  A1234ABCD  10m ago
-  Starting work on password reset
+  2025-01-15T10:15:00
+  A1234ABCD: Starting work on password reset
 
-  A5678EFGH  5m ago
-  Auth tokens are in src/auth/tokens.py
+  2025-01-15T10:25:00
+  A5678EFGH (read by 2): Auth tokens are in src/auth/tokens.py
 
-  A1234ABCD  2m ago
-  Thanks, found it. Implementation complete.
+  2025-01-15T10:30:00
+  A1234ABCD: Thanks, found it. Implementation complete.
 ```
 
+### Filtering Unread Messages
+
+See only unread messages from your perspective:
+
+```bash
+$ lodestar msg thread F002 --unread --agent A1234ABCD
+```
+
+---
+
+## msg mark-read
+
+Mark task messages as read.
+
+```bash
+lodestar msg mark-read [OPTIONS]
+```
+
+Mark specific messages or all messages in a task as read by an agent. This updates the read_by array for the messages.
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--task TEXT` | `-t` | Task ID whose messages to mark as read (required) |
+| `--agent TEXT` | `-a` | Agent ID marking messages as read (required) |
+| `--message-id TEXT` | `-m` | Specific message ID(s) to mark as read (can be used multiple times) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
+
+### Examples
+
+Mark all messages in a task as read:
+
+```bash
+$ lodestar msg mark-read --task F002 --agent A1234ABCD
+Marked 3 message(s) as read in task F002
+```
+
+Mark specific messages as read:
+
+```bash
+$ lodestar msg mark-read --task F002 --agent A1234ABCD --message-id M001 --message-id M002
+Marked 2 message(s) as read in task F002
+```
+
+---
+
+## msg search
+
+Search across all task messages with filters.
+
+```bash
+lodestar msg search [OPTIONS]
+```
+
+Search through all task messages in the system with keyword matching and filtering options. At least one filter must be provided.
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--keyword TEXT` | `-k` | Search keyword to match in message text (case-insensitive) |
+| `--task TEXT` | `-t` | Filter by task ID |
+| `--from TEXT` | `-f` | Filter by sender agent ID |
+| `--since TEXT` | `-s` | Filter messages created after this timestamp (ISO format) |
+| `--until TEXT` | `-u` | Filter messages created before this timestamp (ISO format) |
+| `--limit INTEGER` | `-n` | Maximum messages to return (default: 50) |
+| `--json` | | Output in JSON format |
+| `--explain` | | Show what this command does |
+
+### Examples
+
+Search for messages containing a keyword:
+
+```bash
+$ lodestar msg search --keyword 'bug'
+Search Results (3 messages)
+
+  2025-01-15T14:30:00
+  From: A1234ABCD
+  Task: F002
+  Found a bug in the authentication flow
+
+  2025-01-15T10:15:00
+  From: A5678EFGH
+  Task: F003
+  This bug is now fixed
+```
+
+Search by task:
+
+```bash
+$ lodestar msg search --task F002
+```
+
+Search by sender:
+
+```bash
+$ lodestar msg search --from A1234ABCD
+```
+
+Search with date range:
+
+```bash
+$ lodestar msg search --keyword 'error' --since 2025-01-01T00:00:00 --until 2025-01-31T23:59:59
+```
+
+Combine multiple filters:
+
+```bash
+$ lodestar msg search --keyword 'bug' --task F002 --since 2025-01-15T00:00:00
+```
+
+---
+
 ## Messaging Patterns
+
+
 
 ### Handoff Messages
 
@@ -351,7 +216,7 @@ lodestar task release F002
 
 # Leave context in the thread
 lodestar msg send \
-    --to task:F002 \
+    --task F002 \
     --from A1234ABCD \
     --text "Blocked on API credentials. Need access to email service."
 ```
@@ -362,18 +227,18 @@ Keep other agents informed of progress:
 
 ```bash
 lodestar msg send \
-    --to task:F002 \
+    --task F002 \
     --from A1234ABCD \
     --text "50% complete. Token generation done, working on email templates."
 ```
 
-### Direct Questions
+### Questions and Discussion
 
-Ask specific agents for help:
+Use task threads for questions related to the task:
 
 ```bash
 lodestar msg send \
-    --to agent:A5678EFGH \
+    --task F002 \
     --from A1234ABCD \
-    --text "What email library should I use for F002?"
+    --text "What email library should I use? Need to send password reset emails."
 ```

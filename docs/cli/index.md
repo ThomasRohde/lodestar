@@ -60,15 +60,14 @@ Create, claim, and complete tasks.
 
 ### [Message Commands](msg.md)
 
-Inter-agent messaging.
+Task thread messaging.
 
 | Command | Description |
 |---------|-------------|
-| `msg send` | Send a message to an agent or task thread |
-| `msg inbox` | Read messages from your inbox |
-| `msg wait` | Block until a new message arrives |
-| `msg search` | Search messages with filters |
+| `msg send` | Send a message to a task thread |
 | `msg thread` | Read messages in a task thread |
+| `msg mark-read` | Mark task messages as read |
+| `msg search` | Search messages with filters |
 
 ### [Other Commands](other.md)
 
@@ -134,9 +133,8 @@ lodestar task verify <id>           # Mark as verified
 lodestar task delete <id>           # Soft-delete task
 
 # Messaging
-lodestar msg send -t <to> -f <from> -m "text"  # Send message
-lodestar msg inbox -a <agent>                   # Check inbox
-lodestar msg wait -a <agent>                    # Wait for new messages
-lodestar msg search -k <keyword>                # Search messages
-lodestar msg thread <task-id>                   # View task thread
+lodestar msg send -t <task> -f <from> -m "text"  # Send message to task
+lodestar msg thread <task-id>                     # View task thread
+lodestar msg mark-read -t <task> -a <agent>      # Mark messages as read
+lodestar msg search -k <keyword>                  # Search messages
 ```
