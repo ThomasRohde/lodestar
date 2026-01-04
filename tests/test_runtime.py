@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lodestar.models.runtime import Agent, Lease, Message, MessageType
+from lodestar.models.runtime import Agent, Lease, Message
 from lodestar.runtime.database import RuntimeDatabase
 
 
@@ -313,8 +313,7 @@ class TestMessageOperations:
 
         msg = Message(
             from_agent_id=agent.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T001",
+            task_id="T001",
             text="Hello",
         )
         sent = db.send_message(msg)
@@ -326,14 +325,12 @@ class TestMessageOperations:
 
         msg1 = Message(
             from_agent_id=agent.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T001",
+            task_id="T001",
             text="First",
         )
         msg2 = Message(
             from_agent_id=agent.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T001",
+            task_id="T001",
             text="Second",
         )
         db.send_message(msg1)
@@ -344,113 +341,23 @@ class TestMessageOperations:
         assert thread[0].text == "First"
         assert thread[1].text == "Second"
 
-    def test_get_inbox(self, db):
-        sender = Agent()
-        receiver = Agent()
-        db.register_agent(sender)
-        db.register_agent(receiver)
-
-        msg = Message(
-            from_agent_id=sender.agent_id,
-            to_type=MessageType.AGENT,
-            to_id=receiver.agent_id,
-            text="Hello",
-        )
-        db.send_message(msg)
-
-        inbox = db.get_inbox(receiver.agent_id)
-        assert len(inbox) == 1
-        assert inbox[0].text == "Hello"
-
-    def test_get_inbox_with_from_filter(self, db):
-        sender1 = Agent()
-        sender2 = Agent()
-        receiver = Agent()
-        db.register_agent(sender1)
-        db.register_agent(sender2)
-        db.register_agent(receiver)
-
-        msg1 = Message(
-            from_agent_id=sender1.agent_id,
-            to_type=MessageType.AGENT,
-            to_id=receiver.agent_id,
-            text="From sender1",
-        )
-        msg2 = Message(
-            from_agent_id=sender2.agent_id,
-            to_type=MessageType.AGENT,
-            to_id=receiver.agent_id,
-            text="From sender2",
-        )
-        db.send_message(msg1)
-        db.send_message(msg2)
-
-        # Filter by sender1
-        inbox = db.get_inbox(receiver.agent_id, from_agent_id=sender1.agent_id)
-        assert len(inbox) == 1
-        assert inbox[0].text == "From sender1"
-
-    def test_get_inbox_with_date_filters(self, db):
-        import time
-
-        sender = Agent()
-        receiver = Agent()
-        db.register_agent(sender)
-        db.register_agent(receiver)
-
-        # Send first message
-        msg1 = Message(
-            from_agent_id=sender.agent_id,
-            to_type=MessageType.AGENT,
-            to_id=receiver.agent_id,
-            text="First message",
-        )
-        db.send_message(msg1)
-
-        # Wait a bit
-        time.sleep(0.1)
-        timestamp = datetime.now(UTC)
-        time.sleep(0.1)
-
-        # Send second message
-        msg2 = Message(
-            from_agent_id=sender.agent_id,
-            to_type=MessageType.AGENT,
-            to_id=receiver.agent_id,
-            text="Second message",
-        )
-        db.send_message(msg2)
-
-        # Test since filter
-        inbox = db.get_inbox(receiver.agent_id, since=timestamp)
-        assert len(inbox) == 1
-        assert inbox[0].text == "Second message"
-
-        # Test until filter
-        inbox = db.get_inbox(receiver.agent_id, until=timestamp)
-        assert len(inbox) == 1
-        assert inbox[0].text == "First message"
-
     def test_search_messages_by_keyword(self, db):
         agent = Agent()
         db.register_agent(agent)
 
         msg1 = Message(
             from_agent_id=agent.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T001",
+            task_id="T001",
             text="This is a bug report",
         )
         msg2 = Message(
             from_agent_id=agent.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T002",
+            task_id="T002",
             text="This is a feature request",
         )
         msg3 = Message(
             from_agent_id=agent.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T003",
+            task_id="T003",
             text="Another bug was found",
         )
         db.send_message(msg1)
@@ -470,14 +377,12 @@ class TestMessageOperations:
 
         msg1 = Message(
             from_agent_id=agent1.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T001",
+            task_id="T001",
             text="From agent1",
         )
         msg2 = Message(
             from_agent_id=agent2.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T002",
+            task_id="T002",
             text="From agent2",
         )
         db.send_message(msg1)
@@ -496,8 +401,7 @@ class TestMessageOperations:
 
         msg1 = Message(
             from_agent_id=agent.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T001",
+            task_id="T001",
             text="Old message",
         )
         db.send_message(msg1)
@@ -508,8 +412,7 @@ class TestMessageOperations:
 
         msg2 = Message(
             from_agent_id=agent.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T002",
+            task_id="T002",
             text="Recent message",
         )
         db.send_message(msg2)
@@ -534,20 +437,17 @@ class TestMessageOperations:
 
         msg1 = Message(
             from_agent_id=agent1.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T001",
+            task_id="T001",
             text="bug in feature A",
         )
         msg2 = Message(
             from_agent_id=agent2.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T002",
+            task_id="T002",
             text="bug in feature B",
         )
         msg3 = Message(
             from_agent_id=agent1.agent_id,
-            to_type=MessageType.TASK,
-            to_id="T003",
+            task_id="T003",
             text="feature C completed",
         )
         db.send_message(msg1)
@@ -559,97 +459,64 @@ class TestMessageOperations:
         assert len(results) == 1
         assert results[0].text == "bug in feature A"
 
-    def test_message_read_status_tracking(self, db):
-        """Test that messages can be marked as read."""
-        sender = Agent()
-        receiver = Agent()
-        db.register_agent(sender)
-        db.register_agent(receiver)
+    def test_mark_task_messages_read(self, db):
+        """Test marking task messages as read by an agent."""
+        agent1 = Agent()
+        agent2 = Agent()
+        db.register_agent(agent1)
+        db.register_agent(agent2)
 
-        msg = Message(
-            from_agent_id=sender.agent_id,
-            to_type=MessageType.AGENT,
-            to_id=receiver.agent_id,
-            text="Test message",
-        )
-        db.send_message(msg)
-
-        # Get inbox without marking as read
-        inbox = db.get_inbox(receiver.agent_id, mark_as_read=False)
-        assert len(inbox) == 1
-        assert inbox[0].read_at is None  # Should be unread
-
-        # Get inbox and mark as read
-        inbox = db.get_inbox(receiver.agent_id, mark_as_read=True)
-        assert len(inbox) == 1
-        assert inbox[0].read_at is not None  # Should be marked as read
-
-        # Verify read status persists
-        inbox = db.get_inbox(receiver.agent_id, mark_as_read=False)
-        assert len(inbox) == 1
-        assert inbox[0].read_at is not None  # Should still be read
-
-    def test_unread_only_filter(self, db):
-        """Test filtering for unread messages only."""
-        sender = Agent()
-        receiver = Agent()
-        db.register_agent(sender)
-        db.register_agent(receiver)
-
-        # Send two messages
+        # Send messages to task
         msg1 = Message(
-            from_agent_id=sender.agent_id,
-            to_type=MessageType.AGENT,
-            to_id=receiver.agent_id,
-            text="Message 1",
+            from_agent_id=agent1.agent_id,
+            task_id="T001",
+            text="First message",
         )
         msg2 = Message(
-            from_agent_id=sender.agent_id,
-            to_type=MessageType.AGENT,
-            to_id=receiver.agent_id,
-            text="Message 2",
+            from_agent_id=agent1.agent_id,
+            task_id="T001",
+            text="Second message",
         )
         db.send_message(msg1)
         db.send_message(msg2)
 
-        # Mark first message as read (msg2 since DESC order)
-        inbox = db.get_inbox(receiver.agent_id, limit=1, mark_as_read=True)
-        assert len(inbox) == 1
+        # Mark messages as read by agent2
+        count = db.mark_task_messages_read("T001", agent2.agent_id)
+        assert count == 2
 
-        # Get all messages
-        all_messages = db.get_inbox(receiver.agent_id, mark_as_read=False)
-        assert len(all_messages) == 2
+        # Verify messages are marked as read
+        thread = db.get_task_thread("T001")
+        assert len(thread) == 2
+        for msg in thread:
+            assert agent2.agent_id in msg.read_by
 
-        # Get only unread messages
-        unread_messages = db.get_inbox(receiver.agent_id, unread_only=True, mark_as_read=False)
-        assert len(unread_messages) == 1
-        assert unread_messages[0].text == "Message 1"  # The one not read yet
+    def test_get_task_unread_messages(self, db):
+        """Test getting unread messages for a task from agent perspective."""
+        agent1 = Agent()
+        agent2 = Agent()
+        db.register_agent(agent1)
+        db.register_agent(agent2)
 
-    def test_mark_as_read_updates_multiple_messages(self, db):
-        """Test that mark_as_read works with multiple messages."""
-        sender = Agent()
-        receiver = Agent()
-        db.register_agent(sender)
-        db.register_agent(receiver)
-
-        # Send three messages
+        # Send three messages to task
         for i in range(3):
             msg = Message(
-                from_agent_id=sender.agent_id,
-                to_type=MessageType.AGENT,
-                to_id=receiver.agent_id,
+                from_agent_id=agent1.agent_id,
+                task_id="T001",
                 text=f"Message {i}",
             )
             db.send_message(msg)
 
-        # Get all messages and mark as read
-        inbox = db.get_inbox(receiver.agent_id, mark_as_read=True)
-        assert len(inbox) == 3
-        assert all(msg.read_at is not None for msg in inbox)
+        # Get unread messages for agent2
+        unread = db.get_task_unread_messages("T001", agent2.agent_id)
+        assert len(unread) == 3
 
-        # Verify no unread messages remain
-        unread = db.get_inbox(receiver.agent_id, unread_only=True, mark_as_read=False)
-        assert len(unread) == 0
+        # Mark first message as read
+        thread = db.get_task_thread("T001", limit=1)
+        db.mark_task_messages_read("T001", agent2.agent_id, [thread[0].message_id])
+
+        # Should now have 2 unread
+        unread = db.get_task_unread_messages("T001", agent2.agent_id)
+        assert len(unread) == 2
 
 
 class TestStats:

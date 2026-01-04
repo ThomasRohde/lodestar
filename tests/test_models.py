@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from lodestar.models.envelope import Envelope, NextAction
-from lodestar.models.runtime import Agent, Lease, Message, MessageType
+from lodestar.models.runtime import Agent, Lease, Message
 from lodestar.models.spec import Project, Spec, Task, TaskStatus
 
 
@@ -140,8 +140,7 @@ class TestMessage:
     def test_message_creation(self):
         msg = Message(
             from_agent_id="A12345678",
-            to_type=MessageType.TASK,
-            to_id="T001",
+            task_id="T001",
             text="Hello",
         )
         assert msg.message_id.startswith("M")

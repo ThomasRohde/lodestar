@@ -655,65 +655,85 @@ This is the **recommended way to complete tasks** when you've finished and verif
 
 #### `lodestar.message.send`
 
-Send a message to another agent.
+Send a message to a task thread. Messages are visible to all agents working on the task.
 
 **Inputs:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `from_agent_id` | string | Yes | Sending agent ID |
-| `to_agent_id` | string | Yes | Recipient agent ID |
-| `content` | string | Yes | Message content (max 10,000 chars) |
-| `task_id` | string | No | Related task ID (optional) |
-| `subject` | string | No | Message subject (optional) |
+| `task_id` | string | Yes | Task ID to send message to |
+| `body` | string | Yes | Message content (max 16KB) |
+| `subject` | string | No | Message subject (optional, stored in meta) |
+| `severity` | string | No | Message severity: info, warning, handoff, blocker (optional) |
 
 **Returns:**
 
 ```json
 {
   "messageId": "M123",
-  "fromAgentId": "A1234ABCD",
-  "taskId": "F002",
-  "subject": "Task handoff",
+  "deliveredTo": ["task:F002"],
   "sentAt": "2025-01-15T11:00:00Z"
 }
 ```
 
-!!! warning "Note: message.list is deprecated"
-    The `message.list` (inbox) tool has been removed. Use `task.context` to get task thread messages when starting work on a task.
-      "messageId": "M123",
-      "fromAgentId": "A5678EFGH",
-      "toAgentId": "A1234ABCD",
-      "taskId": "F002",
-      "subject": "Task handoff",
-      "content": "I've completed the authentication logic...",
-      "read": false,
-      "sentAt": "2025-01-15T11:00:00Z"
-    }
-  ],
-  "total": 5,
-  "unreadCount": 2
-}
-```
+!!! info "Task-Only Messaging"
+    Lodestar uses task-targeted messaging only. There is no agent-to-agent direct messaging. All communication happens in task threads where all agents working on the task can see the messages.
 
-#### `lodestar.message.ack`
+#### `lodestar.message.list`
 
-Mark a message as read.
+List messages in a task thread.
 
 **Inputs:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `agent_id` | string | Yes | Agent ID |
-| `message_id` | string | Yes | Message ID to acknowledge |
+| `task_id` | string | Yes | Task ID to retrieve messages for |
+| `unread_by` | string | No | Agent ID to filter for unread messages |
+| `limit` | integer | No | Max results (default 50, max 200) |
+| `since` | string | No | ISO timestamp to filter messages after |
 
 **Returns:**
 
 ```json
 {
-  "messageId": "M123",
-  "read": true,
-  "readAt": "2025-01-15T11:30:00Z"
+  "messages": [
+    {
+      "message_id": "M123",
+      "from_agent_id": "A5678EFGH",
+      "task_id": "F002",
+      "text": "I've completed the authentication logic...",
+      "created_at": "2025-01-15T11:00:00Z",
+      "read_by": [],
+      "meta": {
+        "subject": "Task handoff",
+        "severity": "info"
+      }
+    }
+  ],
+  "count": 5,
+  "task_id": "F002"
+}
+```
+
+#### `lodestar.message.ack`
+
+Mark task messages as read by an agent.
+
+**Inputs:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `task_id` | string | Yes | Task ID whose messages to mark as read |
+| `agent_id` | string | Yes | Agent ID marking messages as read |
+| `message_ids` | array | No | Specific message IDs to mark (marks all if omitted) |
+
+**Returns:**
+
+```json
+{
+  "task_id": "F002",
+  "updatedCount": 3
 }
 ```
 

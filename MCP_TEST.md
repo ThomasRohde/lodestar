@@ -128,11 +128,13 @@ Test file locking improvements:
 **Test 3C - Message Sending During Operations**
 ```
 While tasks are in various states:
-1. Send message to task thread using lodestar.message.send (task_id=TEST-001)
-2. Send direct message to other agent using lodestar.message.send (to_agent_id)
-3. List messages for your agent using lodestar.message.list
-4. Mark messages as read using lodestar.message.ack
+1. Send message to task thread using lodestar.message.send (from_agent_id, task_id, body)
+2. List messages in task thread using lodestar.message.list (task_id)
+3. Mark messages as read using lodestar.message.ack (task_id, agent_id)
 ```
+
+!!! note "Task-Only Messaging"
+    Lodestar uses task-targeted messaging only. All messages are sent to task threads where all agents working on the task can see them. There is no agent-to-agent direct messaging.
 
 ### Phase 4: Task Lifecycle (MCP Tools)
 

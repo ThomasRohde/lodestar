@@ -9,7 +9,7 @@ import pytest
 from lodestar.mcp.server import LodestarContext
 from lodestar.mcp.tools.message import message_list
 from lodestar.mcp.tools.task import task_get, task_list
-from lodestar.models.runtime import Agent, Lease, Message, MessageType
+from lodestar.models.runtime import Agent, Lease, Message
 from lodestar.models.spec import PrdContext, PrdRef, Task, TaskStatus
 from lodestar.spec.loader import save_spec
 from lodestar.util.prd import compute_prd_hash
@@ -710,12 +710,21 @@ class TestMessageList:
         lodestar_dir = tmp_path / ".lodestar"
         lodestar_dir.mkdir()
 
-        # Create minimal spec
+        # Create minimal spec with tasks
         from lodestar.models.spec import Project, Spec
 
         spec = Spec(
             project=Project(name="test-project"),
-            tasks={},
+            tasks={
+                "T001": Task(
+                    id="T001",
+                    title="Test task",
+                    description="Task for testing messages",
+                    status=TaskStatus.READY,
+                    priority=1,
+                    labels=["test"],
+                ),
+            },
         )
         save_spec(spec, tmp_path)
 
@@ -728,37 +737,55 @@ class TestMessageList:
         context.db.register_agent(agent1)
         context.db.register_agent(agent2)
 
-        # Send messages to agent1
+        # Send messages to task T001
         msg1 = Message(
             from_agent_id="A002",
-            to_type=MessageType.AGENT,
-            to_id="A001",
+            task_id="T001",
             text="First message",
         )
         msg2 = Message(
             from_agent_id="A002",
-            to_type=MessageType.AGENT,
-            to_id="A001",
+            task_id="T001",
             text="Second message",
         )
         msg3 = Message(
-            from_agent_id="A002",
-            to_type=MessageType.AGENT,
-            to_id="A001",
+            from_agent_id="A001",
+            task_id="T001",
             text="Third message",
         )
         context.db.send_message(msg1)
         context.db.send_message(msg2)
         context.db.send_message(msg3)
 
-        # Mark msg1 as read
-        context.db._messages.get_inbox(agent_id="A001", limit=1, mark_as_read=True)
+        # Mark msg1 as read by A001
+        context.db.mark_task_messages_read("T001", "A001", [msg1.message_id])
 
         return context
 
+    def test_list_task_messages(self, message_context):
+        """Test listing messages in a task thread."""
+        result = message_list(message_context, task_id="T001")
+
+        assert result.isError is None or result.isError is False
+        data = result.structuredContent
+
+        # Should return all 3 messages
+        assert data["count"] == 3
+        assert len(data["messages"]) == 3
+        assert data["task_id"] == "T001"
+
+        # Verify message structure
+        msg = data["messages"][0]
+        assert "message_id" in msg
+        assert "created_at" in msg
+        assert "from_agent_id" in msg
+        assert "task_id" in msg
+        assert "text" in msg
+        assert msg["task_id"] == "T001"
+
     def test_list_unread_messages(self, message_context):
-        """Test listing unread messages (default behavior)."""
-        result = message_list(message_context, agent_id="A001")
+        """Test listing unread messages for a specific agent."""
+        result = message_list(message_context, task_id="T001", unread_by="A001")
 
         assert result.isError is None or result.isError is False
         data = result.structuredContent
@@ -767,30 +794,9 @@ class TestMessageList:
         assert data["count"] == 2
         assert len(data["messages"]) == 2
 
-        # Verify message structure
-        msg = data["messages"][0]
-        assert "id" in msg
-        assert "createdAt" in msg
-        assert "from" in msg
-        assert "to" in msg
-        assert "body" in msg
-        assert msg["from"] == "A002"
-        assert msg["to"] == "A001"
-
-    def test_list_all_messages(self, message_context):
-        """Test listing all messages including read ones."""
-        result = message_list(message_context, agent_id="A001", unread_only=False)
-
-        assert result.isError is None or result.isError is False
-        data = result.structuredContent
-
-        # Should return all 3 messages
-        assert data["count"] == 3
-        assert len(data["messages"]) == 3
-
     def test_list_with_limit(self, message_context):
         """Test limiting number of messages returned."""
-        result = message_list(message_context, agent_id="A001", unread_only=False, limit=2)
+        result = message_list(message_context, task_id="T001", limit=2)
 
         assert result.isError is None or result.isError is False
         data = result.structuredContent
@@ -798,36 +804,39 @@ class TestMessageList:
         assert data["count"] == 2
         assert len(data["messages"]) == 2
 
-    def test_pagination_with_cursor(self, message_context):
-        """Test cursor-based pagination."""
-        # Get first page with limit 1
-        result1 = message_list(message_context, agent_id="A001", unread_only=False, limit=1)
+    def test_list_with_since_filter(self, message_context):
+        """Test filtering messages by timestamp."""
+        # Get all messages first
+        result1 = message_list(message_context, task_id="T001")
         data1 = result1.structuredContent
 
-        assert data1["count"] == 1
-        assert "nextCursor" in data1
-        first_cursor = data1["nextCursor"]
+        # Use the second message's timestamp as the 'since' filter
+        if len(data1["messages"]) >= 2:
+            since_time = data1["messages"][1]["created_at"]
 
-        # Get second page using cursor
-        result2 = message_list(
-            message_context, agent_id="A001", unread_only=False, limit=1, since_id=first_cursor
+            result2 = message_list(message_context, task_id="T001", since=since_time)
+            data2 = result2.structuredContent
+
+            # Should return fewer messages
+            assert data2["count"] < data1["count"]
+
+    def test_empty_thread(self, message_context):
+        """Test listing messages for task with no messages."""
+        # Create a new task with no messages
+        from lodestar.models.spec import Task, TaskStatus
+
+        spec = message_context.spec
+        spec.tasks["T002"] = Task(
+            id="T002",
+            title="Empty task",
+            description="No messages",
+            status=TaskStatus.READY,
+            priority=1,
+            labels=["test"],
         )
-        data2 = result2.structuredContent
+        save_spec(spec, message_context.repo_root)
 
-        assert data2["count"] == 1
-        # Message IDs should be different
-        assert data1["messages"][0]["id"] != data2["messages"][0]["id"]
-
-    def test_no_cursor_when_all_returned(self, message_context):
-        """Test that nextCursor is not present when all messages returned."""
-        result = message_list(message_context, agent_id="A001", unread_only=False, limit=100)
-        data = result.structuredContent
-
-        assert "nextCursor" not in data or data["nextCursor"] is None
-
-    def test_empty_inbox(self, message_context):
-        """Test listing messages for agent with no messages."""
-        result = message_list(message_context, agent_id="A002")
+        result = message_list(message_context, task_id="T002")
 
         assert result.isError is None or result.isError is False
         data = result.structuredContent
@@ -835,62 +844,61 @@ class TestMessageList:
         assert data["count"] == 0
         assert len(data["messages"]) == 0
 
-    def test_invalid_agent_id_empty(self, message_context):
-        """Test error with empty agent_id."""
-        result = message_list(message_context, agent_id="")
+    def test_invalid_task_id_empty(self, message_context):
+        """Test error with empty task_id."""
+        result = message_list(message_context, task_id="")
 
         assert result.isError is True
-        assert result.structuredContent["error_code"] == "INVALID_AGENT_ID"
+        assert result.structuredContent["error_code"] == "INVALID_TASK_ID"
 
     def test_invalid_limit_too_small(self, message_context):
         """Test error with limit less than 1."""
-        result = message_list(message_context, agent_id="A001", limit=0)
+        result = message_list(message_context, task_id="T001", limit=0)
 
         assert result.isError is True
         assert result.structuredContent["error_code"] == "INVALID_LIMIT"
 
     def test_invalid_limit_too_large(self, message_context):
         """Test error with limit exceeding maximum."""
-        result = message_list(message_context, agent_id="A001", limit=300)
+        result = message_list(message_context, task_id="T001", limit=300)
 
         assert result.isError is True
         assert result.structuredContent["error_code"] == "LIMIT_TOO_LARGE"
 
     def test_message_with_metadata(self, message_context):
-        """Test that message metadata is properly extracted."""
+        """Test that message metadata is properly included."""
         # Send a message with subject and severity in meta
         msg = Message(
             from_agent_id="A002",
-            to_type=MessageType.AGENT,
-            to_id="A001",
+            task_id="T001",
             text="Message with metadata",
             meta={"subject": "Test Subject", "severity": "warning"},
         )
         message_context.db.send_message(msg)
 
-        result = message_list(message_context, agent_id="A001", unread_only=True)
+        result = message_list(message_context, task_id="T001")
         data = result.structuredContent
 
         # Find the message with metadata
-        msg_data = next((m for m in data["messages"] if m["body"] == "Message with metadata"), None)
+        msg_data = next((m for m in data["messages"] if m["text"] == "Message with metadata"), None)
         assert msg_data is not None
-        assert msg_data.get("subject") == "Test Subject"
-        assert msg_data.get("severity") == "warning"
+        assert "meta" in msg_data
+        assert msg_data["meta"].get("subject") == "Test Subject"
+        assert msg_data["meta"].get("severity") == "warning"
 
     def test_message_read_status(self, message_context):
-        """Test that read status is properly included."""
-        result = message_list(message_context, agent_id="A001", unread_only=False)
+        """Test that read_by status is properly included."""
+        result = message_list(message_context, task_id="T001")
         data = result.structuredContent
 
-        # Check that messages have correct read status
-        # Note: messages are returned in descending order (newest first),
-        # and the first message (newest) was marked as read
-        read_count = sum(1 for msg in data["messages"] if "readAt" in msg)
-        unread_count = sum(1 for msg in data["messages"] if "readAt" not in msg)
+        # Check that messages have read_by arrays
+        for msg in data["messages"]:
+            assert "read_by" in msg
+            assert isinstance(msg["read_by"], list)
 
-        # Should have 1 read message and 2 unread messages
-        assert read_count == 1
-        assert unread_count == 2
+        # The first message should have A001 in read_by
+        read_counts = [len(msg["read_by"]) for msg in data["messages"]]
+        assert sum(read_counts) >= 1  # At least one message marked as read
 
 
 class TestProgressNotifications:

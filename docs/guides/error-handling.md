@@ -169,12 +169,12 @@ Input validation errors are raised before any file operations occur.
 ```python
 # Don't retry - fix the input
 try:
-    result = lodestar_message_send(from_agent, to_agent, message)
+    result = lodestar_message_send(from_agent_id, task_id, message_body)
 except ValidationError as e:
-    if "exceeds maximum length" in str(e):
+    if "exceeds maximum" in str(e):
         # Truncate message and resend
-        message = message[:16000]  # Leave room for encoding
-        result = lodestar_message_send(from_agent, to_agent, message)
+        message_body = message_body[:16000]  # Leave room for encoding
+        result = lodestar_message_send(from_agent_id, task_id, message_body)
     else:
         raise  # Other validation errors need different fixes
 ```
